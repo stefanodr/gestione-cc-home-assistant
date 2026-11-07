@@ -1,0 +1,26 @@
+name: "Gestione C/C"
+slug: "gestione_cc"
+description: "Gestione C/C privata, con archivio centralizzato e accesso LAN autenticato"
+version: "0.2.0-beta.3"
+url: "https://github.com/stefanodr/gestione-cc-home-assistant"
+webui: "https://192.168.1.27:8443"
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: false
+host_network: false
+ingress: false
+ports:
+  8443/tcp: 8443
+ports_description:
+  8443/tcp: "Interfaccia web Gestione C/C protetta HTTPS (rete locale)"
+options:
+  admin_username: "admin"
+  bootstrap_pin: ""
+  lan_host: "192.168.1.27"
+schema:
+  admin_username: str
+  bootstrap_pin: password
+  lan_host: str
