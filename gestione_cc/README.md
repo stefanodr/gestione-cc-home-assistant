@@ -46,3 +46,8 @@ Consultare docs/home-assistant-backup-restore.md. Le copie automatiche vengono a
 - Import QIF/CSV/XLSX/GnuCash, inserimento manuale, ripartizioni, report, grafici, PDF, XLSX e persistenza multi-dispositivo.
 - Backup SQLite, integrity_check, ripristino, copia pre-restore e login con l'account ripristinato.
 - Pulsante Lovelace che apre il browser esterno.
+
+
+### Accesso limitato alla rete locale
+
+La versione beta 0.2.0-beta.4 accetta connessioni HTTPS soltanto dagli indirizzi appartenenti alla rete indicata nell'opzione `lan_network` (predefinita `192.168.1.0/24`). L'indirizzo `lan_host` identifica il nome/IP usato per il certificato HTTPS. Non configurare inoltri di porta sul router. Il pulsante Home Assistant `Apri interfaccia utente web` usa il segnaposto `[HOST]`: per aprire l'app occorre accedere a Home Assistant tramite il suo indirizzo LAN; quando Home Assistant è aperto tramite Nabu Casa il collegamento non viene trasformato automaticamente nell'IP LAN.
