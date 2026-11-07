@@ -3,7 +3,7 @@ slug: "gestione_cc"
 description: "Gestione C/C privata, con archivio centralizzato e accesso LAN autenticato"
 version: "0.2.0-beta.3"
 url: "https://github.com/stefanodr/gestione-cc-home-assistant"
-webui: "https://192.168.1.27:8443"
+webui: "https://[HOST]:[PORT:8443]"
 arch:
   - amd64
   - aarch64
