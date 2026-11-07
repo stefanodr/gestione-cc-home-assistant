@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Accesso · Gestione C/C</title>
+<link rel="icon" type="image/svg+xml" href="/brand-logo.svg">
+<link rel="stylesheet" href="/login.css">
+</head>
+<body>
+<main class="login-card">
+<img class="mark-logo" src="/brand-logo.svg" alt="" width="76" height="76">
+<h1>Gestione C/C</h1>
+<p>Inserisci il PIN amministratore di 6 cifre.</p>
+<form id="loginForm">
+<label for="pin">PIN amministratore</label>
+<div class="pin-entry"><input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" aria-label="PIN di 6 cifre" required autofocus></div>
+<p id="error" role="alert" aria-live="polite"></p>
+<button type="submit" id="submit">Accedi</button>
+</form>
+</main>
+<script src="/login.js" defer></script>
+</body></html>
