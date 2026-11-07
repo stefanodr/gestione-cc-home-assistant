@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#132d2b">
+  <title>Gestione C/C</title>
+  <link rel="icon" type="image/svg+xml" href="brand-logo.svg">
+  <link rel="stylesheet" href="app.css">
+  <script src="vendor/jszip.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><img class="brand-logo" src="brand-logo.svg" alt="" width="46" height="46"><div><strong>Gestione C/C</strong><span>conto personale</span></div></div>
+      <div class="workspace-label">AREA PERSONALE</div>
+      <nav class="main-nav" aria-label="Navigazione principale">
+        <button class="nav-item active" data-view="overview"><span class="nav-icon">◫</span>Panoramica</button>
+        <button class="nav-item" data-view="transactions"><span class="nav-icon">⇄</span>Movimenti <span class="nav-count" id="pendingNavCount">0</span></button>
+        <button class="nav-item" data-view="reports"><span class="nav-icon">▥</span>Report</button>
+        <button class="nav-item" data-view="accounts"><span class="nav-icon">☷</span>Piano dei conti</button>
+        <button class="nav-item" data-view="rules"><span class="nav-icon">✦</span>Regole apprese</button>
+        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span>Impostazioni</button>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="local-card"><span class="local-dot"></span><div><strong>Archivio centralizzato</strong><small>server domestico · accesso autenticato</small></div></div>
+      <div class="sidebar-foot">EDIZIONE SERVER · SVILUPPO</div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="breadcrumbs"><span>Finanze personali</span><span class="crumb-sep">/</span><strong id="currentSection">Panoramica</strong></div>
+        <div class="top-actions">
+          <button class="button button-quiet" id="importGnucash"><span>＋</span> Importa GnuCash</button>
+          <button class="button button-primary" id="importBank"><span>＋</span> Importa movimenti</button>
+          <button class="icon-button" id="exportBackup" title="Esporta archivio locale" aria-label="Esporta archivio locale">⇧</button>
+          <button class="button button-quiet" id="serverLogout" title="Termina la sessione protetta">Esci</button>
+        </div>
+      </header>
+
+      <section class="content-view active" id="view-overview">
+        <div class="page-heading">
+          <div><p class="eyebrow" id="welcomeDate">GESTIONE DEL CONTO</p><h1>Panoramica</h1><p class="subtitle">Entrate, uscite e andamento dei tuoi conti in un colpo d’occhio.</p></div>
+          <div class="heading-actions"><div class="period-control"><label for="accountPicker">Conto</label><select id="accountPicker"></select></div><div class="period-navigation"><button class="period-arrow" id="monthPrev" type="button" aria-label="Periodo precedente" title="Periodo precedente">‹</button><div class="period-control"><label for="monthPicker">Periodo</label><input id="monthPicker" type="month"></div><button class="period-arrow" id="monthNext" type="button" aria-label="Periodo successivo" title="Periodo successivo">›</button></div></div>
+        </div>
+        <div id="demoBanner" class="demo-banner"><span class="demo-dot"></span>Dati dimostrativi · importa i tuoi movimenti per provare il flusso</div>
+        <div class="metric-grid overview-metrics" id="overviewMetrics">
+          <article class="metric-card"><div class="metric-head"><span>Flussi in entrata</span><span class="metric-icon green">↗</span></div><strong id="incomeMetric">—</strong><small id="incomeCompare">nel periodo selezionato</small></article>
+          <article class="metric-card"><div class="metric-head"><span>Flussi in uscita</span><span class="metric-icon coral">↘</span></div><strong id="expenseMetric">—</strong><small id="expenseCompare">nel periodo selezionato</small></article>
+          <article class="metric-card"><div class="metric-head"><span>Saldo netto del periodo</span><span class="metric-icon blue">∑</span></div><strong id="netMetric">—</strong><small>movimenti in entrata meno uscita</small></article>
+          <article class="metric-card"><div class="metric-head"><span>Saldo conto</span><span class="metric-icon blue">€</span></div><strong id="balanceMetric">—</strong><small id="balanceFootnote">saldo ricostruito dai movimenti</small></article>
+          <article class="metric-card"><div class="metric-head"><span>Da classificare</span><span class="metric-icon amber">✦</span></div><strong id="pendingMetric">—</strong><small id="pendingHint">conferma per insegnare una regola</small></article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="panel chart-panel">
+            <div class="panel-heading"><div><p class="eyebrow">CONFRONTO STORICO</p><h2 id="mainChartTitle">Flussi mensili</h2><p class="panel-subtitle" id="mainChartSubtitle">Stesso periodo nei quattro anni</p></div><button class="text-button" data-goto="reports">Apri report <span>→</span></button></div>
+            <div class="chart-wrap"><canvas id="flowChart" aria-label="Grafico dei flussi di cassa"></canvas></div>
+            <div class="legend" id="flowLegend"></div>
+          </article>
+          <article class="panel comparison-panel">
+            <div class="panel-heading"><div><p class="eyebrow">STESSO PERIODO</p><h2>Confronto per anno</h2></div><span class="badge badge-muted">4 anni</span></div>
+            <div class="comparison-table-wrap"><table class="compact-table"><thead><tr><th>Anno</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody id="comparisonBody"></tbody></table></div>
+            <div class="panel-footnote">I trasferimenti tra conti sono mostrati a parte.</div>
+          </article>
+        </div>
+
+        <div class="dashboard-grid bottom-grid">
+          <article class="panel category-panel">
+            <div class="panel-heading"><div><p class="eyebrow">DOVE VANNO I SOLDI</p><h2>Uscite per categoria</h2><p class="panel-subtitle" id="categoryPeriodLabel">Periodo selezionato</p></div><button class="text-button" data-goto="reports">Dettaglio <span>→</span></button></div>
+            <div id="categoryBars" class="category-bars"></div>
+          </article>
+          <article class="panel pending-panel">
+            <div class="panel-heading"><div><p class="eyebrow">APPRENDIMENTO LOCALE</p><h2>Movimenti da rivedere</h2><p class="panel-subtitle">La tua conferma migliora i suggerimenti successivi.</p></div><span class="badge badge-pending" id="pendingBadge">0 da rivedere</span></div>
+            <div id="pendingPreview" class="pending-preview"></div>
+            <button class="button button-outline full-width" data-goto="transactions">Rivedi movimenti <span>→</span></button>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-view" id="view-transactions">
+        <div class="page-heading"><div><p class="eyebrow">REGISTRO</p><h1>Movimenti</h1><p class="subtitle">Cerca una contropartita digitando il nome; puoi ripartire un’uscita tra più categorie.</p></div><div class="heading-actions"><select id="transactionFilter"><option value="all">Tutti i movimenti</option><option value="pending">Da classificare</option><option value="confirmed">Confermati</option></select><input id="statementMonth" type="month" aria-label="Mese da esportare"><button class="button button-outline" id="exportStatementPdf">PDF mensile</button><button class="button button-outline" id="exportStatementXlsx">XLSX mensile</button><button class="button button-outline" id="addManualTransaction">＋ Nuovo movimento</button><button class="button button-primary" id="importBankSecondary">＋ Importa movimenti</button></div></div>
+        <div class="panel table-panel"><div class="table-scroll"><table class="data-table"><thead><tr><th>Data</th><th>Beneficiario / descrizione</th><th>Importo</th><th>Conto corrente</th><th>Contropartita</th><th>Affidabilità</th><th>Stato</th><th></th></tr></thead><tbody id="transactionsBody"></tbody></table></div><div class="empty-state hidden" id="emptyTransactions"><div class="empty-icon">⇄</div><strong>Nessun movimento da mostrare</strong><span>Importa un file QIF, Excel o un salvataggio GnuCash.</span><button class="button button-primary" id="emptyImport">Importa movimenti</button></div><div class="pagination-bar"><span id="transactionPageStatus">—</span><div><button class="row-action" id="transactionPrev">‹ Precedenti</button><button class="row-action" id="transactionNext">Successivi ›</button></div></div></div>
+        <div class="inline-note"><span>ⓘ</span><p>Confermando un conto, la regola viene salvata solo in questo browser. I movimenti suddivisi o ambigui vanno controllati prima della registrazione.</p></div>
+      </section>
+
+      <section class="content-view" id="view-reports">
+        <div class="page-heading"><div><p class="eyebrow">ANALISI</p><h1>Report dei flussi</h1><p class="subtitle">Confronta entrate, uscite e cause del saldo sul periodo scelto.</p><p class="panel-subtitle" id="reportNameCode"></p></div><div class="heading-actions"><div class="period-control"><label for="reportAccountPicker">Conto</label><select id="reportAccountPicker"></select></div><div class="period-control"><label for="reportPeriodMode">Periodo</label><select id="reportPeriodMode"><option value="monthly" selected>Mensile</option><option value="quarterly">Trimestrale</option><option value="halfyearly">Semestrale</option><option value="annual">Annuale</option></select></div><div class="period-navigation"><button class="period-arrow" id="reportPeriodPrev" type="button" aria-label="Periodo precedente" title="Periodo precedente">‹</button><div class="period-control"><label for="reportMonth">Intervallo selezionato</label><select id="reportMonth" aria-label="Seleziona il mese o intervallo del report"></select></div><button class="period-arrow" id="reportPeriodNext" type="button" aria-label="Periodo successivo" title="Periodo successivo">›</button></div><button class="button button-outline" id="exportReportPdf">PDF report</button><button class="button button-outline" id="exportReportXlsx">XLSX report</button></div></div>
+        <div class="metric-grid report-metrics"><article class="metric-card"><div class="metric-head"><span>Flussi in entrata</span><span class="metric-icon green">↗</span></div><strong id="reportIncome">—</strong><small>movimenti sul conto selezionato</small></article><article class="metric-card"><div class="metric-head"><span>Flussi in uscita</span><span class="metric-icon coral">↘</span></div><strong id="reportExpense">—</strong><small>movimenti sul conto selezionato</small></article><article class="metric-card"><div class="metric-head"><span>Saldo netto del periodo</span><span class="metric-icon blue">∑</span></div><strong id="reportNet">—</strong><small>entrate − uscite</small></article><article class="metric-card"><div class="metric-head"><span>Trasferimenti</span><span class="metric-icon amber">⇄</span></div><strong id="reportTransfers">—</strong><small>separati dalle categorie economiche</small></article></div>
+        <article class="panel report-assessment"><div class="report-assessment-head"><div><p class="eyebrow">RISULTATO DEL PERIODO</p><h2 id="reportVerdict">—</h2><p class="panel-subtitle" id="reportVerdictNote"></p></div><span class="report-verdict-badge" id="reportVerdictBadge">—</span></div><div class="report-deltas"><div><span>Entrate</span><strong class="amount-in" id="reportIncomeDelta">—</strong></div><div><span>Uscite</span><strong class="amount-out" id="reportExpenseDelta">—</strong></div><div><span>Saldo netto</span><strong id="reportNetDelta">—</strong></div></div><div class="report-assessment-bottom"><div><h3>Scostamenti di spesa dalla media</h3><div id="reportTopExpenses" class="report-top-expenses"></div></div><p id="reportAssessmentText"></p></div></article>
+        <div class="dashboard-grid report-grid"><article class="panel chart-panel"><div class="panel-heading"><div><p class="eyebrow">ANDAMENTO</p><h2 id="reportChartTitle">Flussi mensili per anno</h2></div></div><div class="chart-wrap tall"><canvas id="reportChart" aria-label="Grafico storico dei flussi"></canvas></div><div class="legend" id="reportLegend"></div></article><article class="panel"><div class="panel-heading"><div><p class="eyebrow">CONFRONTO</p><h2>Periodi omogenei</h2></div></div><div class="comparison-table-wrap"><table class="compact-table"><thead><tr><th>Anno</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody id="reportComparisonBody"></tbody></table></div><div class="panel-footnote" id="reportComparisonNote"></div></article></div>
+        <article class="panel report-category-table"><div class="panel-heading"><div><p class="eyebrow">DETTAGLIO</p><h2>Scostamenti per categoria</h2><p class="panel-subtitle" id="deviationBaselineNote">Spesa effettiva confrontata con la media del periodo di riferimento e con l’anno precedente.</p></div></div><div class="table-scroll"><table class="data-table"><thead><tr><th>Categoria</th><th>Spesa periodo</th><th>Anno precedente</th><th>Variazione annua</th><th>Media attesa</th><th>Scostamento dalla media</th><th>Variazione % media</th></tr></thead><tbody id="categoryCompareBody"></tbody></table></div></article>
+      </section>
+
+      <section class="content-view" id="view-accounts">
+        <div class="page-heading"><div><p class="eyebrow">STRUTTURA CONTABILE</p><h1>Piano dei conti</h1><p class="subtitle">Conti importati da GnuCash, con distinzione tra voci patrimoniali ed economiche.</p></div><button class="button button-outline" id="addAccount">＋ Aggiungi conto</button></div>
+        <div class="account-summary" id="accountSummary"></div>
+        <article class="panel table-panel"><div class="table-scroll"><table class="data-table"><thead><tr><th>Conto</th><th>Tipo GnuCash</th><th>Classificazione</th><th>Movimenti</th></tr></thead><tbody id="accountsBody"></tbody></table></div></article>
+        <div class="inline-note"><span>ⓘ</span><p>La classificazione semplificata non sostituisce il tipo originale GnuCash. I conti tecnici e strutturali restano distinti.</p></div>
+      </section>
+
+      <section class="content-view" id="view-rules">
+        <div class="page-heading"><div><p class="eyebrow">APPRENDIMENTO LOCALE</p><h1>Regole apprese</h1><p class="subtitle">Associazioni costruite dalle tue conferme e, se importato, dalla cronologia GnuCash locale.</p></div><span class="badge badge-muted" id="ruleCountBadge">0 regole</span></div>
+        <article class="panel table-panel"><div class="table-scroll"><table class="data-table"><thead><tr><th>Testo riconosciuto</th><th>Campo</th><th>Conto associato</th><th>Conferme</th><th></th></tr></thead><tbody id="rulesBody"></tbody></table></div><div class="empty-state hidden" id="emptyRules"><div class="empty-icon">✦</div><strong>Le regole si formeranno con l’uso</strong><span>Conferma il conto suggerito su un movimento per iniziare.</span></div></article>
+      </section>
+
+      <section class="content-view" id="view-settings">
+        <div class="page-heading"><div><p class="eyebrow">PREFERENZE</p><h1>Impostazioni</h1><p class="subtitle">Archivio centralizzato, importazione ed esportazione.</p></div></div>
+        <div class="settings-grid"><article class="panel setting-card"><div class="setting-icon">⌑</div><h2>Cambia PIN amministratore</h2><p>Il PIN è composto da 6 cifre. Dopo la modifica, le altre sessioni aperte verranno disconnesse.</p><form id="changePinForm" class="pin-settings-form"><label for="currentPin">PIN attuale</label><input id="currentPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" required><label for="newPin">Nuovo PIN</label><input id="newPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required><label for="confirmPin">Conferma nuovo PIN</label><input id="confirmPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required><p id="changePinMessage" role="status" aria-live="polite"></p><button class="button button-primary" type="submit" id="changePinButton">Aggiorna PIN</button></form></article><article class="panel setting-card"><div class="setting-icon">🔒</div><h2>Sicurezza connessione</h2><p>Questa applicazione utilizza HTTPS con una CA privata generata sul server domestico. Installa il certificato CA sui dispositivi autorizzati per eliminare l’avviso di sicurezza del browser.</p><a class="button button-outline" href="/ca.crt" download>Scarica certificato CA</a><div class="setting-row"><span>Connessione</span><strong>HTTPS · LAN</strong></div></article><article class="panel setting-card"><div class="setting-icon">⌂</div><h2>Archivio centralizzato</h2><p>I dati sono conservati nel database del server domestico e condivisi tra i dispositivi autorizzati.</p><div class="setting-row"><span>Movimenti salvati</span><strong id="settingsTxCount">0</strong></div><div class="setting-row"><span>Conti nel piano</span><strong id="settingsAccountCount">0</strong></div><div class="setting-row"><span>Regole imparate</span><strong id="settingsRuleCount">0</strong></div><div class="setting-row"><span>Stato</span><strong>Server domestico</strong></div></article><article class="panel setting-card"><div class="setting-icon cloud">⇧</div><h2>Backup e ripristino</h2><p>Esporta una copia JSON dell'archivio centrale oppure ripristina un backup creato dalla versione locale 1.6. Prima di ripristinare, esporta sempre una copia dei dati attuali.</p><button class="button button-outline" id="exportBackupSecondary">Esporta backup JSON</button><button class="button button-quiet" id="importBackup">Ripristina da file JSON</button><div class="setting-row"><span>Backup completo SQLite</span><strong>Automatico + manuale</strong></div><button class="button button-outline" id="exportSqliteBackup">Scarica database SQLite</button><button class="button button-quiet" id="restoreSqliteBackup">Ripristina database SQLite</button></article><article class="panel setting-card danger-card"><div class="setting-icon danger">⌫</div><h2>Cancellazione dei movimenti</h2><p>Elimina la cronologia importata e le regole imparate, mantenendo il piano dei conti.</p><button class="button button-danger" id="deletePersonalData">Elimina movimenti e regole</button></article></div>
+      </section>
+
+      <footer class="app-footer"><span>Gestione C/C · Archivio centralizzato</span><span id="saveStatus">Connessione al server domestico</span></footer>
+    </main>
+  </div>
+
+  <input id="bankFile" type="file" accept=".qif,.csv,.txt,.xlsx" hidden>
+  <input id="gnucashFile" type="file" accept=".gnucash,.xml,.gz,.gzip" hidden>
+  <input id="backupFile" type="file" accept="application/json,.json" hidden>
+  <input id="sqliteBackupFile" type="file" accept=".sqlite3,application/vnd.sqlite3,application/octet-stream" hidden>
+  <datalist id="accountSearchOptions"></datalist>
+
+  <div class="modal-backdrop hidden" id="noticeModal" role="dialog" aria-modal="true" aria-labelledby="noticeTitle"><div class="modal-card"><button class="modal-close" data-close-modal aria-label="Chiudi">×</button><div class="modal-symbol" id="noticeSymbol">✓</div><h2 id="noticeTitle">Operazione completata</h2><p id="noticeText"></p><button class="button button-primary" data-close-modal>Va bene</button></div></div>
+  <div class="modal-backdrop hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle"><div class="modal-card"><button class="modal-close" data-close-modal aria-label="Chiudi">×</button><div class="modal-symbol amber">!</div><h2 id="confirmTitle">Conferma importazione</h2><p id="confirmText"></p><div class="modal-actions"><button class="button button-quiet" data-close-modal>Annulla</button><button class="button button-primary" id="confirmAction">Continua</button></div></div></div>
+  <div class="modal-backdrop hidden" id="splitModal" role="dialog" aria-modal="true" aria-labelledby="splitDialogTitle"><div class="modal-card split-modal-card"><button class="modal-close" id="closeSplitTop" aria-label="Chiudi">×</button><div class="modal-symbol">⇄</div><h2 id="splitDialogTitle">Ripartisci il movimento</h2><p id="splitTitle" class="split-transaction-title"></p><p id="splitSubtitle"></p><div class="split-rows-head"><span>Categoria o contropartita</span><span>Importo assegnato</span><span></span></div><div id="splitRows" class="split-rows"></div><button class="text-button split-add" id="addSplitRow">＋ Aggiungi riga</button><div class="split-totals"><span>Totale assegnato</span><strong id="splitTotal">—</strong><span>Da assegnare</span><strong id="splitRemaining">—</strong></div><div class="modal-actions"><button class="button button-quiet" id="cancelSplit">Annulla</button><button class="button button-primary" id="saveSplit">Salva riparto</button></div></div></div>
+  <div class="modal-backdrop hidden" id="manualTransactionModal" role="dialog" aria-modal="true" aria-labelledby="manualTransactionTitle"><div class="modal-card split-modal-card"><button class="modal-close" id="closeManualTransaction" aria-label="Chiudi">×</button><div class="modal-symbol">＋</div><h2 id="manualTransactionTitle">Nuovo movimento</h2><p>Inseriscilo direttamente nel registro del conto.</p><div class="manual-fields"><label>Data<input id="manualDate" type="date" required></label><label>Descrizione<input id="manualPayee" type="text" maxlength="160" placeholder="Es. Spesa supermercato" required></label><label>Importo<input id="manualAmount" type="text" inputmode="decimal" placeholder="Es. 1.234,56; usa il segno meno per un’uscita" autocomplete="off" required></label><label>Conto corrente<select id="manualBankAccount" required></select></label><label>Categoria o contropartita<input id="manualCounterAccount" type="text" list="accountSearchOptions" placeholder="Scrivi per cercare o lascia da classificare" autocomplete="off"></label></div><div class="modal-actions"><button class="button button-quiet" id="cancelManualTransaction">Annulla</button><button class="button button-primary" id="saveManualTransaction">Aggiungi movimento</button></div></div></div>
+</body>
+</html>
