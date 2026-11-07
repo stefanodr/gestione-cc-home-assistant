@@ -2,6 +2,7 @@
 """Minimal authenticated LAN server and SQLite persistence for Gestione C/C."""
 import base64
 import hashlib
+import ipaddress
 import hmac
 import json
 import os
@@ -390,6 +391,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_json(405, {"error":"Metodo non consentito"})
 
+class LANOnlyHTTPServer(ThreadingHTTPServer):
+    """Accept connections only from the configured home LAN subnet."""
+    def __init__(self, server_address, RequestHandlerClass, allowed_network):
+        self.allowed_network = allowed_network
+        super().__init__(server_address, RequestHandlerClass)
+
+    def verify_request(self, request, client_address):
+        try:
+            return ipaddress.ip_address(client_address[0]) in self.allowed_network
+        except ValueError:
+            return False
+
+
 if __name__ == "__main__":
     init_db()
     cert_file = SSL_DIR / "server.crt"
@@ -399,7 +413,12 @@ if __name__ == "__main__":
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(certfile=str(cert_file), keyfile=str(key_file))
-    httpd = ThreadingHTTPServer(("0.0.0.0", 8443), Handler)
+    options = read_options()
+    try:
+        allowed_network = ipaddress.ip_network(str(options.get("lan_network", "192.168.1.0/24")), strict=False)
+    except ValueError as error:
+        raise RuntimeError("lan_network non valida: usare una rete IPv4/IPv6 in formato CIDR.") from error
+    httpd = LANOnlyHTTPServer(("0.0.0.0", 8443), Handler, allowed_network)
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     print("Gestione C/C HTTPS in ascolto sulla porta 8443")
     httpd.serve_forever()
