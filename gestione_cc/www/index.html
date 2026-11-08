@@ -127,8 +127,8 @@
             <p>Dal PC Windows crea un OAuth Client ID di tipo “Desktop app” nella Google Cloud Console, abilita Google Drive API e usa il comando rclone indicato qui sotto. Incolla poi il token JSON generato.</p>
             <label for="driveClientId">Client ID</label><input id="driveClientId" type="text" autocomplete="off" placeholder="…apps.googleusercontent.com">
             <label for="driveClientSecret">Client Secret</label><input id="driveClientSecret" type="password" autocomplete="new-password" placeholder="Client Secret Google">
-            <label for="driveTokenJson">Token JSON ottenuto da rclone authorize</label><textarea id="driveTokenJson" rows="5" spellcheck="false" placeholder='{"access_token":"…","refresh_token":"…","expiry":"…"}'></textarea>
-            <p class="drive-command">rclone authorize "drive" "CLIENT_ID" "CLIENT_SECRET"</p>
+            <label for="driveTokenJson">Token restituito da rclone authorize</label><textarea id="driveTokenJson" rows="5" spellcheck="false" placeholder="Incolla qui il token restituito dal comando rclone authorize"></textarea>
+            <p class="drive-command">rclone authorize drive --drive-scope drive.file --drive-client-id "CLIENT_ID" --drive-client-secret "CLIENT_SECRET"</p>
             <button class="button button-primary" id="connectDriveFolder" type="button">Collega Google Drive</button>
           </details>
           <button class="button button-outline" id="driveBackupNow" type="button">Esegui backup adesso</button>
