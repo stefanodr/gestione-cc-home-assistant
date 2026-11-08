@@ -8,14 +8,6 @@ Gestione C/C è un'applicazione web self-hosted per la gestione dei conti person
 > **Importante:** Gestione C/C è una **Home Assistant App**, non un'integrazione, una dashboard card o un plugin del Marketplace. Si installa dal catalogo delle App di Home Assistant.
 
 
-### Panoramica / Overview
-
-### Movimenti / Transactions
-
-### Report / Reports
-
-### Anteprima PDF / PDF preview
-
 ---
 
 # Italiano
@@ -81,6 +73,9 @@ Le copie automatiche locali non sostituiscono un backup esterno: un guasto del d
 
 ## Supporto
 
+- Licenza: [MIT](LICENSE)
+- Avvisi dipendenze: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+
 - Repository: https://github.com/stefanodr/gestione-cc-home-assistant
 - Segnalazioni: https://github.com/stefanodr/gestione-cc-home-assistant/issues
 - Note di rilascio: [CHANGELOG.md](CHANGELOG.md)
@@ -90,7 +85,7 @@ Quando apri una segnalazione indica versioni Home Assistant/App, architettura e 
 
 ## Stato e licenza
 
-Versione di distribuzione dichiarata: **1.0.0**. Il numero di versione non sostituisce i test nel sistema dell'utente. Il titolare del repository deve scegliere e aggiungere una licenza open-source prima della redistribuzione pubblica del codice: questo README non attribuisce automaticamente alcuna licenza.
+Versione di distribuzione dichiarata: **1.0.0**. Il progetto adotta la licenza MIT; il file `LICENSE` e gli avvisi delle dipendenze di terze parti devono essere presenti nella release pubblica. La pubblicazione non sostituisce i test nel sistema dell'utente.
 
 ---
 
@@ -163,6 +158,9 @@ Local automatic snapshots are not a substitute for off-host backups. A disk or h
 
 ## Support
 
+- Licence: [MIT](LICENSE)
+- Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+
 - Repository: https://github.com/stefanodr/gestione-cc-home-assistant
 - Issues: https://github.com/stefanodr/gestione-cc-home-assistant/issues
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
@@ -172,4 +170,4 @@ When reporting an issue, include Home Assistant/App versions, architecture and r
 
 ## Status and licence
 
-Declared distribution version: **1.0.0**. A version number does not replace testing on the user's own system. The repository owner must choose and add an open-source licence before public redistribution; no licence is automatically granted by this README.
+Declared distribution version: **1.0.0**. The project adopts the MIT License; the `LICENSE` file and third-party notices must accompany the public release. A version number does not replace testing on the user's own system.
