@@ -20,10 +20,10 @@ Prototipo avanzato in sviluppo, NON ancora approvato per dati contabili reali. F
 
 ## Prima installazione
 1. Assegnare un IP fisso o una prenotazione DHCP al server Home Assistant.
-2. Configurare lan_host con lo stesso IP/nome.
+2. Lasciare hostname su homeassistant.local oppure indicare il nome DNS locale effettivo di Home Assistant.
 3. Impostare nelle opzioni dell'App un PIN iniziale di esattamente 6 cifre. Al primo avvio il PIN sostituisce la password dell'eventuale amministratore già presente, mantenendone username e dati.
 4. Installare/avviare l'App.
-5. Aprire https://IP-HA:8443, accettare temporaneamente l'avviso iniziale solo sulla LAN, accedere e scaricare la CA dalle Impostazioni.
+5. Aprire https://homeassistant.local:8443, accettare temporaneamente l'avviso iniziale solo sulla LAN, accedere e scaricare la CA dalle Impostazioni.
 6. Installare la CA sui dispositivi autorizzati seguendo docs/home-assistant-https.md.
 
 Il PIN iniziale (`bootstrap_pin`) viene letto una sola volta: al primo avvio migra la credenziale dell'amministratore già presente, senza modificare archivio, movimenti, conti o regole. Dopo la migrazione il valore dell'opzione non viene più usato; cancellalo dalle opzioni dell'App dopo il primo avvio. Il PIN effettivo è conservato nel database solo come hash PBKDF2 con salt casuale. Il ripristino SQLite ripristina anche il PIN presente nel backup.
@@ -50,4 +50,4 @@ Consultare docs/home-assistant-backup-restore.md. Le copie automatiche vengono a
 
 ### Accesso limitato alla rete locale
 
-La versione beta 0.2.0-beta.4 accetta connessioni HTTPS soltanto dagli indirizzi appartenenti alla rete indicata nell'opzione `lan_network` (predefinita `192.168.1.0/24`). L'indirizzo `lan_host` identifica il nome/IP usato per il certificato HTTPS. Non configurare inoltri di porta sul router. Il pulsante Home Assistant `Apri interfaccia utente web` usa il segnaposto `[HOST]`: per aprire l'app occorre accedere a Home Assistant tramite il suo indirizzo LAN; quando Home Assistant è aperto tramite Nabu Casa il collegamento non viene trasformato automaticamente nell'IP LAN.
+La versione beta 0.2.0-beta.5 accetta connessioni HTTPS soltanto dagli indirizzi appartenenti alla rete indicata nell'opzione `lan_network` (predefinita `192.168.1.0/24`). L'opzione `hostname` identifica il nome DNS incluso nel certificato HTTPS (predefinito `homeassistant.local`). Non configurare inoltri di porta sul router. Il pulsante Home Assistant `Apri interfaccia utente web` usa il segnaposto `[HOST]`: per aprire l'app occorre accedere a Home Assistant tramite il suo indirizzo LAN; quando Home Assistant è aperto tramite Nabu Casa il collegamento non viene trasformato automaticamente nell'IP LAN.
