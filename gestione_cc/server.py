@@ -216,7 +216,7 @@ class Handler(BaseHTTPRequestHandler):
             item = self.require_auth()
             if not item: return
             with db() as c: row = c.execute("SELECT state_json,revision FROM app_state WHERE id=1").fetchone()
-            self.send_json(200, {"state": json.loads(row["state_json"]) if row else None, "revision": row["revision"] if row else 0})
+            self.send_json(200, {"state": json.loads(row["state_json"]) if row else None, "revision": row["revision"] if row else 0, "csrf": item["csrf"]})
             return
         if path == "/ca.crt":
             ca_file = SSL_DIR / "root-ca.crt"
