@@ -1,6 +1,6 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
-RUN apk add --no-cache python3 openssl
+RUN apk add --no-cache python3 openssl tzdata
 WORKDIR /app
 COPY server.py /app/server.py
 COPY run.sh /run.sh
