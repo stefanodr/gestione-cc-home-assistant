@@ -310,7 +310,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.0';
+    if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.1';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -591,7 +591,8 @@
     const monthEnd = localDateKey(new Date(year, month, 0));
     const cutoff = monthEnd > today ? today : monthEnd;
     const transactions = state.transactions.filter(tx => tx.date <= cutoff && tx.status !== 'duplicate' && (accountFilter === 'all' || tx.bankAccountId === accountFilter));
-    return { balance: Number(state.openingBalance || 0) + transactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0), transactions, cutoff, monthKey };
+    const openingBase = accountFilter === 'all' || accountFilter === state.bankAccountId ? Number(state.openingBalance || 0) : 0;
+    return { balance: openingBase + transactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0), transactions, cutoff, monthKey };
   }
 
   function renderAll() {
@@ -1724,7 +1725,8 @@
     const accountFilter = state.reportAccountId || state.bankAccountId || 'all';
     const belongsToAccount = tx => accountFilter === 'all' || tx.bankAccountId === accountFilter;
     const validTransactions = state.transactions.filter(tx => tx.status !== 'duplicate' && belongsToAccount(tx) && parseDate(tx.date));
-    const opening = Number(state.openingBalance || 0) + validTransactions.filter(tx => tx.date < start).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const openingBase = accountFilter === 'all' || accountFilter === state.bankAccountId ? Number(state.openingBalance || 0) : 0;
+    const opening = openingBase + validTransactions.filter(tx => tx.date < start).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     const transactions = validTransactions.filter(tx => tx.date >= start && tx.date <= end)
       .sort((a, b) => parseDate(a.date).localeCompare(parseDate(b.date)) || String(a.id || '').localeCompare(String(b.id || '')));
     let running = opening;
