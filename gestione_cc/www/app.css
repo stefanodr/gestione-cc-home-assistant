@@ -83,7 +83,6 @@ body.app-ready .app-shell{visibility:visible}
 .app-loading-card{width:min(420px,100%);display:grid;justify-items:center;gap:13px;text-align:center;background:#fff;border:1px solid #e3ebe8;border-radius:16px;padding:34px 28px;box-shadow:0 18px 55px rgba(25,58,52,.09)}
 .app-loading-mark{width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:#e5f2ee;color:#26766c;font-size:27px;font-weight:750}
 .app-loading-card strong{font-size:16px;color:#344a46}
-.app-loading-card>span:last-of-type{font-size:11px;line-height:1.6;color:#81908d}
 .app-loading-error .app-loading-mark{background:#fff0ed;color:#b34d40}
 .local-card .storage-meta{font-size:9px;line-height:1.45;overflow-wrap:anywhere;color:#a9c2bc}
 .local-card .storage-meta span{color:#d3e4df}
@@ -109,3 +108,16 @@ body.app-ready .app-shell{visibility:visible}
   .breadcrumbs{font-size:11px}
   #serverLogout{margin-left:0}
 }
+
+
+/* Indicatore essenziale per il caricamento dell'archivio */
+.app-loading-spinner{
+  width:34px;
+  height:34px;
+  border:3px solid #dcebe6;
+  border-top-color:#26766c;
+  border-radius:50%;
+  animation:app-loading-spin .8s linear infinite;
+}
+@keyframes app-loading-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.app-loading-spinner{animation-duration:2s}}
