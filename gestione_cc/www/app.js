@@ -316,7 +316,11 @@
     } catch (error) {
       $('#appLoading')?.classList.add('app-loading-error');
       $('#appLoadingTitle').textContent = 'Archivio non disponibile';
-      $('#appLoadingText').textContent = 'Non è stato possibile caricare il database centralizzato. Nessun dato dimostrativo è stato creato. Dettaglio: ' + (error.message || 'verifica la rete');
+      const loadingText = $('#appLoadingText');
+      if (loadingText) {
+        loadingText.textContent = 'Non è stato possibile caricare il database centralizzato. Nessun dato dimostrativo è stato creato. Dettaglio: ' + (error.message || 'verifica la rete');
+        loadingText.hidden = false;
+      }
       $('#retryAppLoading').hidden = false;
       $('#saveStatus').textContent = 'Server non raggiungibile';
       return;
@@ -326,7 +330,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.1';
+    if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.3';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
