@@ -1174,7 +1174,6 @@
   function parseCsv(text) {
     const rows = parseCsvRows(text);
     if (rows.length < 2) return [];
-    if (returnGrid) return rows;
     const headerIndex = detectHeaderRow(rows);
     if (headerIndex < 0) throw new Error('Non ho trovato le intestazioni nel CSV.');
     return parseGridRows(rows, headerIndex);
@@ -1233,6 +1232,7 @@
       }
       rows.push(row);
     }
+    if (returnGrid) return rows;
     const headerIndex = detectHeaderRow(rows);
     if (headerIndex < 0) throw new Error('Non ho riconosciuto la riga di intestazione nel foglio Excel. Per questo prototipo, esporta una tabella CSV con intestazioni e riprova.');
     return parseGridRows(rows, headerIndex);
