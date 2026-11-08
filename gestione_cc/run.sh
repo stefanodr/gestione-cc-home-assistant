@@ -12,7 +12,9 @@ if ! echo "$HOSTNAME_CFG" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
   bashio::log.error "hostname non valido: usare un nome DNS semplice, ad esempio homeassistant.local"
   exit 1
 fi
+CA_CREATED=0
 if [ ! -s /data/tls/root-ca.crt ] || [ ! -s /data/tls/root-ca.key ]; then
+  CA_CREATED=1
   bashio::log.info "Creo la CA privata per Gestione C/C"
   openssl req -x509 -newkey rsa:3072 -sha256 -days 3650 -nodes \
     -keyout /data/tls/root-ca.key -out /data/tls/root-ca.crt \
@@ -20,7 +22,7 @@ if [ ! -s /data/tls/root-ca.crt ] || [ ! -s /data/tls/root-ca.key ]; then
   chmod 600 /data/tls/root-ca.key
   chmod 644 /data/tls/root-ca.crt
 fi
-NEED_CERT=0
+NEED_CERT="$CA_CREATED"
 if [ ! -s /data/tls/server.crt ] || [ ! -s /data/tls/server.key ]; then NEED_CERT=1; fi
 if [ "$NEED_CERT" -eq 0 ] && ! openssl x509 -in /data/tls/server.crt -noout -ext subjectAltName 2>/dev/null | grep -Fq "DNS:$HOSTNAME_CFG"; then NEED_CERT=1; fi
 if [ "$NEED_CERT" -eq 1 ]; then
