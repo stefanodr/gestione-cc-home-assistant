@@ -1,6 +1,7 @@
 (() => {
   'use strict';
 
+  const APP_VERSION = '1.6';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -288,6 +289,7 @@
     $('#reportPeriodMode').value = reportMode;
     if (state.reportAccountDefaultMigrated) await saveState();
     setupControls();
+    const versionLabel = $('#appVersion'); if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 0.2.0-beta.5';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const initialMonth = currentMonth;
     $('#monthPicker').value = initialMonth;
@@ -1150,6 +1152,7 @@
   function parseCsv(text) {
     const rows = parseCsvRows(text);
     if (rows.length < 2) return [];
+    if (returnGrid) return rows;
     const headerIndex = detectHeaderRow(rows);
     if (headerIndex < 0) throw new Error('Non ho trovato le intestazioni nel CSV.');
     return parseGridRows(rows, headerIndex);
@@ -1169,7 +1172,7 @@
     if (cell || row.length) { row.push(cell); rows.push(row); }
     return rows.map(r => r.map(v => String(v).trim()));
   }
-  async function parseXlsx(file) {
+  async function parseXlsx(file, returnGrid = false) {
     if (!window.JSZip) throw new Error('Lettore Excel non disponibile. Riprova usando il file CSV esportato da Excel.');
     const zip = await JSZip.loadAsync(file);
     const workbookXml = await readZipText(zip, 'xl/workbook.xml');
