@@ -9,8 +9,6 @@
   let stateRevision = 0;
   let saveQueue = Promise.resolve();
   let state;
-  let driveDirectoryHandle = null;
-  let driveBackupReady = false;
   let reportMode = 'monthly';
   let transactionPage = 0;
   let confirmCallback = null;
@@ -321,7 +319,7 @@
     const clientSecret = $('#driveClientSecret')?.value.trim() || '';
     const token = $('#driveTokenJson')?.value.trim() || '';
     if (!clientId || !clientSecret || !token) {
-      showNotice('Dati mancanti', 'Inserisci Client ID, Client Secret e token JSON generato da rclone authorize.');
+      showNotice('Dati mancanti', 'Inserisci Client ID, Client Secret e il token restituito da rclone authorize.');
       return;
     }
     const button = $('#connectDriveFolder');
@@ -1201,8 +1199,6 @@
     $('#settingsTxCount').textContent = String(state.transactions.length);
     $('#settingsAccountCount').textContent = String(state.accounts.filter(a => !['ROOT'].includes(a.type)).length);
     $('#settingsRuleCount').textContent = String(state.rules.filter(r => r.source !== 'demo').length);
-    const driveBackupStatus = $('#driveBackupStatus');
-    if (driveBackupStatus) driveBackupStatus.textContent = driveDirectoryHandle ? driveBackupReady ? `Cartella collegata: ${driveDirectoryHandle.name} · riattiva il permesso se richiesto` : `Backup esistente in ${driveDirectoryHandle.name} · non ancora attivato` : 'Non collegata';
   }
   async function importAccountsFromExcel(event) {
     const file = event.target.files?.[0]; if (!file) return;
