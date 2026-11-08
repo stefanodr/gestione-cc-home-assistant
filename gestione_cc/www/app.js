@@ -289,7 +289,7 @@
     $('#reportPeriodMode').value = reportMode;
     if (state.reportAccountDefaultMigrated) await saveState();
     setupControls();
-    const versionLabel = $('#appVersion'); if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 0.2.0-beta.5';
+    const versionLabel = $('#appVersion'); if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 0.2.0-beta.6';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const initialMonth = currentMonth;
     $('#monthPicker').value = initialMonth;
@@ -1066,7 +1066,8 @@
     $('#settingsTxCount').textContent = String(state.transactions.length);
     $('#settingsAccountCount').textContent = String(state.accounts.filter(a => !['ROOT'].includes(a.type)).length);
     $('#settingsRuleCount').textContent = String(state.rules.filter(r => r.source !== 'demo').length);
-    $('#driveBackupStatus').textContent = driveDirectoryHandle ? driveBackupReady ? `Cartella collegata: ${driveDirectoryHandle.name} · riattiva il permesso se richiesto` : `Backup esistente in ${driveDirectoryHandle.name} · non ancora attivato` : 'Non collegata';
+    const driveBackupStatus = $('#driveBackupStatus');
+    if (driveBackupStatus) driveBackupStatus.textContent = driveDirectoryHandle ? driveBackupReady ? `Cartella collegata: ${driveDirectoryHandle.name} · riattiva il permesso se richiesto` : `Backup esistente in ${driveDirectoryHandle.name} · non ancora attivato` : 'Non collegata';
   }
   async function importAccountsFromExcel(event) {
     const file = event.target.files?.[0]; if (!file) return;
