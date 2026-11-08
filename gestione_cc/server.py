@@ -420,12 +420,16 @@ class Handler(BaseHTTPRequestHandler):
             if not item: return
             cfg = drive_read_config()
             connected = bool(cfg.get("token", {}).get("refresh_token"))
-            self.send_json(200, {
-                "connected": connected,
-                "last_session_backup": cfg.get("last_session_backup"),
-                "last_nightly_backup": cfg.get("last_nightly_backup"),
-                "backups": drive_list_backups() if connected else []
-            })
+            try:
+                backups = drive_list_backups() if connected else []
+                self.send_json(200, {
+                    "connected": connected,
+                    "last_session_backup": cfg.get("last_session_backup"),
+                    "last_nightly_backup": cfg.get("last_nightly_backup"),
+                    "backups": backups
+                })
+            except Exception as error:
+                self.send_json(502, {"error": "Google Drive non raggiungibile: " + str(error)})
             return
         if path == "/api/drive/download":
             item = self.require_auth()
@@ -555,10 +559,18 @@ class Handler(BaseHTTPRequestHandler):
                 token = drive_parse_token(payload.get("token"))
                 if not client_id.endswith(".apps.googleusercontent.com") or not client_secret:
                     raise ValueError("Client ID o Client Secret non validi.")
+                previous_config = drive_read_config()
                 drive_write_config({"client_id": client_id, "client_secret": client_secret, "token": token})
-                # Validate the grant and create the dedicated folder immediately.
-                drive_access_token(force_refresh=True)
-                drive_ensure_folder()
+                try:
+                    # Validate the grant and create the dedicated folder immediately.
+                    drive_access_token(force_refresh=True)
+                    drive_ensure_folder()
+                except Exception:
+                    if previous_config:
+                        drive_write_config(previous_config)
+                    elif DRIVE_CONFIG.exists():
+                        DRIVE_CONFIG.unlink()
+                    raise
                 self.send_json(200, {"ok": True})
             except Exception as error:
                 self.send_json(400, {"error": str(error)})
