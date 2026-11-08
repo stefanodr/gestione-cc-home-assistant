@@ -400,7 +400,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.3';
+    if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.5';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -502,6 +502,7 @@
       const button = $('#serverLogout');
       if (button) { button.disabled = true; button.textContent = 'Backup…'; }
       try {
+        await saveQueue;
         await apiRequest('/api/logout', { method: 'POST', body: '{}' });
         location.replace('/login');
       } catch (error) {
