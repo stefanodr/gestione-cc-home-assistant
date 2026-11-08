@@ -3,6 +3,11 @@
 ## Stato
 Prototipo avanzato in sviluppo, NON ancora approvato per dati contabili reali. Frontend collegato al database SQLite server, login amministratore, HTTPS locale, backup e ripristino predisposti. Mancano il collaudo runtime su Home Assistant OS e la verifica completa di tutte le funzioni dell'app.
 
+## Note beta.9
+- Ridotta una chiamata sequenziale all'avvio: la lettura dell'archivio restituisce insieme il token CSRF, evitando una richiesta separata di verifica sessione.
+- Nella pagina Report dell'app restano soltanto i pulsanti PDF report e XLSX report.
+- Il report PDF si apre in una pagina di anteprima dedicata con i pulsanti Stampa ed Esporta PDF nella barra superiore; la barra non viene inclusa nel documento stampato.
+
 ## Note beta.8
 - Aggiunta una schermata di caricamento iniziale: i dati dimostrativi e i valori vuoti non vengono mostrati mentre il database reale è ancora in lettura.
 - L'apertura dell'app non riscrive più inutilmente l'intero archivio a ogni accesso; salva solo alla creazione iniziale o quando una normalizzazione/migrazione modifica effettivamente i dati.
