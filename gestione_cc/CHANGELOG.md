@@ -1,11 +1,18 @@
 # Gestione C/C Home Assistant App — Changelog
 
+## 1.0.4 — 8 novembre 2026
+
+- Uniformata la finestra di anteprima dei PDF: Report Gestione C/C ed estratto conto utilizzano un unico comando «STAMPA/ESPORTA PDF».
+- Il comando apre la normale finestra di stampa del browser, da cui scegliere una stampante oppure «Salva come PDF».
+- Migliorata la formattazione Excel dell'estratto conto con bordi e griglie, intestazioni evidenziate, date e importi formattati, colonne dimensionate e valori numerici allineati.
+- Riordinato il riepilogo Excel: saldo iniziale in apertura e totali di entrate, uscite e saldo finale in chiusura.
+- Esclusi i totali dal filtro automatico dei movimenti.
+
 ## 1.0.3 — 8 novembre 2026
 
 - Semplificata la schermata di caricamento dell'archivio con il messaggio «Caricamento archivio in corso.....» e un indicatore animato.
 - Il comando Riprova resta nascosto durante il caricamento e compare solo in caso di errore o timeout.
 - Aggiunto un timeout di 15 secondi e impediti clic ripetuti sul comando Riprova.
-
 
 ## 1.0.2 — 8 novembre 2026
 
