@@ -89,3 +89,23 @@ body.app-ready .app-shell{visibility:visible}
 .local-card .storage-meta span{color:#d3e4df}
 @media(max-width:900px){.local-card>div{display:none}}
 .report-export-button{white-space:nowrap}
+
+/* Layout mobile: barra superiore e azioni sempre accessibili in verticale. */
+.overview-statement-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media(max-width:760px){
+  .topbar{height:auto;min-height:0;align-items:flex-start;flex-direction:column;gap:12px;padding:14px 0;margin-bottom:20px}
+  .top-actions{width:100%;display:flex;flex-wrap:wrap;gap:7px}
+  .top-actions .button,.top-actions .icon-button{min-height:40px}
+  #serverLogout{margin-left:auto;flex:0 0 auto}
+  .main-area{padding:0 16px 20px}
+  .page-heading{align-items:stretch;flex-direction:column;gap:14px}
+  .heading-actions{width:100%;display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px}
+  .heading-actions .period-control,.heading-actions .period-navigation{min-width:0;flex:1 1 145px}
+  .overview-statement-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .overview-statement-actions .button{white-space:normal;min-height:42px;padding:9px 8px;text-align:center}
+}
+@media(max-width:420px){
+  .top-actions .button{font-size:11px;padding:9px 10px}
+  .breadcrumbs{font-size:11px}
+  #serverLogout{margin-left:0}
+}
