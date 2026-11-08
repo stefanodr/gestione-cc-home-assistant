@@ -2,6 +2,16 @@
 
 Notable changes for Gestione C/C Home Assistant App.
 
+## [1.0.5] - 2026-11-08
+
+- Added optional Google Drive backup integration, with OAuth desktop authorization generated on a Windows PC and credentials stored only in the Home Assistant App data volume.
+- Added automatic session backup when signing out, best-effort backup on browser page close, and independent nightly backup at 03:00 Europe/Rome.
+- Kept one rolling session backup and the latest three nightly SQLite backups in a dedicated Google Drive folder.
+- Added Google Drive backup listing, manual backup, integrity-checked restore and pre-restore local snapshot.
+- Google Drive backup files are intentionally unencrypted; the feature is opt-in and does not expose the LAN-only web interface to the Internet.
+- Added tzdata to ensure the nightly scheduler uses the Europe/Rome time zone.
+
+
 ## [1.0.4] - 2026-11-08
 
 - Unified the PDF preview toolbar: both the Gestione C/C report and the bank statement now use a single “STAMPA/ESPORTA PDF” command.
