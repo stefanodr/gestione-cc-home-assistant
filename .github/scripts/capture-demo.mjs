@@ -76,17 +76,17 @@ try {
   await page.goto('http://127.0.0.1:8765/index.html', { waitUntil: 'networkidle' });
   await page.waitForFunction(() => document.body.classList.contains('app-ready'), { timeout: 30000 });
   await page.waitForTimeout(900);
-  await page.screenshot({ path: path.join(outputDir, 'panoramica.png'), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, 'panoramica.png'), fullPage: false });
 
   await page.locator('.nav-item[data-view="transactions"]').click();
   await page.waitForFunction(() => document.querySelector('#view-transactions')?.classList.contains('active'));
   await page.waitForTimeout(500);
-  await page.screenshot({ path: path.join(outputDir, 'movimenti.png'), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, 'movimenti.png'), fullPage: false });
 
   await page.locator('.nav-item[data-view="reports"]').click();
   await page.waitForFunction(() => document.querySelector('#view-reports')?.classList.contains('active'));
   await page.waitForTimeout(900);
-  await page.screenshot({ path: path.join(outputDir, 'report.png'), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, 'report.png'), fullPage: false });
   console.log('Created three screenshots from the actual Gestione C/C frontend using fictional demo data only.');
 } finally {
   await browser.close();
