@@ -140,6 +140,16 @@ def drive_parse_token(value):
             parsed = json.loads(decoded)
         except Exception as error:
             raise ValueError("Token non riconosciuto. Incolla esattamente il token restituito da rclone authorize.") from error
+    if isinstance(parsed, dict) and isinstance(parsed.get("token"), dict):
+        parsed = parsed["token"]
+    if isinstance(parsed, dict):
+        # Accept both standard OAuth JSON and rclone token field names.
+        parsed = {
+            "access_token": parsed.get("access_token") or parsed.get("AccessToken", ""),
+            "refresh_token": parsed.get("refresh_token") or parsed.get("RefreshToken", ""),
+            "token_type": parsed.get("token_type") or parsed.get("TokenType", "Bearer"),
+            "expiry": parsed.get("expiry") or parsed.get("Expiry", ""),
+        }
     if not isinstance(parsed, dict) or not parsed.get("refresh_token"):
         raise ValueError("Il token non contiene un refresh_token valido. Ripeti l'autorizzazione Google.")
     return parsed
