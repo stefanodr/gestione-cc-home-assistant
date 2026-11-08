@@ -2,6 +2,20 @@
 
 Notable changes for Gestione C/C Home Assistant App.
 
+## [1.0.2] - 2026-11-08
+
+- Improved multi-page A4 PDF bank-statement pagination.
+- Opening balance appears once at the beginning of the statement.
+- Movement-table headers repeat on subsequent pages.
+- Transaction rows are kept together and are not split across pages.
+- Final income/expense totals and closing balance are grouped at the end.
+
+## [1.0.1] - 2026-11-08
+
+- Improved responsive layout and visibility of the Exit control on portrait smartphones.
+- Added PDF and XLSX bank-statement exports from Overview for the selected period.
+- Statement includes opening and closing balances, separate income and expense columns, and running balance.
+
 ## [1.0.0] - 2026-11-08
 
 - First documented distribution baseline.
