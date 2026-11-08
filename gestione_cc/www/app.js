@@ -327,9 +327,10 @@
       const fn = confirmCallback; closeModals();
       if (!fn) return;
       showNotice('Operazione in corso', 'Attendi il completamento. L’elaborazione resta su questo computer.');
-      try { await fn(); }
+      try { await fn(true); }
       catch (error) { console.error('Operazione di conferma non completata', error); closeModals(); showNotice('Operazione non completata', error?.message || String(error) || 'Errore inatteso dopo la conferma.'); }
     });
+    $('#confirmExclude')?.addEventListener('click', async () => { const fn=confirmCallback; closeModals(); if(!fn)return; showNotice('Operazione in corso','Attendi il completamento.'); try{await fn(false);}catch(error){showNotice('Operazione non completata',error.message||String(error));} });
     $$('.nav-item').forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
     $$('[data-goto]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.goto)));
     $('#monthPicker').addEventListener('change', () => { state.selectedMonth = $('#monthPicker').value; syncReportPeriodPicker(state.selectedMonth); $('#statementMonth').value = state.selectedMonth; saveState(); renderAll(); });
@@ -1115,48 +1116,30 @@
   }
 
   async function onBankFile(event) {
-    const file = event.target.files?.[0]; if (!file) return;
+    const file=event.target.files?.[0]; if(!file)return;
     try {
-      let imported;
-      const ext = file.name.toLowerCase().split('.').pop();
-      if (ext === 'qif' || ext === 'txt') imported = parseQif(await file.text());
-      else if (ext === 'csv') imported = parseCsv(await file.text());
-      else if (ext === 'xlsx') imported = await parseXlsx(file);
-      else throw new Error('Formato non supportato. Seleziona QIF, CSV o XLSX.');
-      if (!imported.length) throw new Error('Non ho trovato movimenti con data e importo nel file.');
-      const continueImport = async (replaceDemo) => {
-        if (replaceDemo) { state = { ...createDemoState(), accounts: defaultAccounts(), transactions: [], rules: [], demo: false, openingBalance: 0 }; }
-        const selectedImportAccount = state.reportAccountId && state.reportAccountId !== 'all' && isLiquidAccount(accountById(state.reportAccountId)) ? state.reportAccountId : state.bankAccountId;
-        const unique = imported.filter(tx => !isDuplicate(tx));
-        const duplicates = imported.length - unique.length;
-        unique.forEach(tx => {
-        const suggestion = tx.split ? { id: null, label: 'Movimento suddiviso · rivedi le righe', confidence: .1 } : suggestionFor(tx);
-          tx.suggestionId = suggestion.id; tx.suggestionLabel = suggestion.label; tx.confidence = suggestion.confidence;
-          if (tx.category) {
-            const category = findAccountByLabel(tx.category);
-            if (category) { tx.suggestionId = category.id; tx.suggestionLabel = category.path; tx.confidence = .96; }
-          }
-          tx.id = tx.id || uid(); tx.status = 'pending';
-          tx.bankAccountId = selectedImportAccount; tx.source = ext;
-        });
-        state.transactions.push(...unique); state.demo = false;
-        const mostRecentImport = imported.map(tx => tx.date).filter(Boolean).sort().at(-1);
-        if (mostRecentImport) {
-          const month = mostRecentImport.slice(0, 7);
-          state.selectedMonth = month;
-          $('#monthPicker').value = month; syncReportPeriodPicker(month); $('#statementMonth').value = month;
-        }
-        state.reportAccountId = selectedImportAccount;
-        $('#accountPicker').value = selectedImportAccount; $('#reportAccountPicker').value = selectedImportAccount;
-        await saveState(); renderAll(); navigate('transactions');
-        showNotice('Importazione completata', `${unique.length} movimenti aggiunti${duplicates ? ` · ${duplicates} duplicati ignorati` : ''}. Panoramica e Report sono impostati su ${mostRecentImport ? monthName(mostRecentImport.slice(0, 7)) : 'il periodo importato'} e sul conto selezionato. ${unique.filter(t => t.status === 'pending').length} da classificare. File elaborato sul dispositivo.`);
+      let imported; const ext=file.name.toLowerCase().split('.').pop();
+      if(ext==='qif'||ext==='txt') imported=parseQif(await file.text()); else if(ext==='csv') imported=parseCsv(await file.text()); else if(ext==='xlsx') imported=await parseXlsx(file); else throw new Error('Formato non supportato.');
+      if(!imported.length) throw new Error('Non ho trovato movimenti con data e importo.');
+      const start=replaceDemo=>{
+        if(replaceDemo) state={...createDemoState(),accounts:defaultAccounts(),transactions:[],rules:[],demo:false,openingBalance:0};
+        const known=new Set(state.transactions.filter(tx=>tx.status!=='duplicate').map(transactionFingerprint));
+        const duplicates=imported.filter(tx=>known.has(transactionFingerprint(tx)));
+        const commit=include=>{
+          const selected=state.reportAccountId&&state.reportAccountId!=='all'&&isLiquidAccount(accountById(state.reportAccountId))?state.reportAccountId:state.bankAccountId;
+          const batchKeys=new Set();
+          const chosen=imported.filter(tx=>{const key=transactionFingerprint(tx);const duplicate=known.has(key)||batchKeys.has(key);batchKeys.add(key);return include||!duplicate;});
+          chosen.forEach(tx=>{const key=transactionFingerprint(tx);const suggestion=tx.split?{id:null,label:'Movimento suddiviso · rivedi le righe',confidence:.1}:suggestionFor(tx);tx.suggestionId=suggestion.id;tx.suggestionLabel=suggestion.label;tx.confidence=suggestion.confidence;if(tx.category){const cat=findAccountByLabel(tx.category);if(cat){tx.suggestionId=cat.id;tx.suggestionLabel=cat.path;tx.confidence=.96;}}tx.id=uid();tx.status='pending';tx.bankAccountId=selected;tx.source=ext;if(known.has(key))tx.duplicateOverride=true;});
+          state.transactions.push(...chosen);state.demo=false;const latest=imported.map(tx=>tx.date).filter(Boolean).sort().at(-1);
+          if(latest){state.selectedMonth=latest.slice(0,7);$('#monthPicker').value=state.selectedMonth;syncReportPeriodPicker(state.selectedMonth);$('#statementMonth').value=state.selectedMonth;}
+          state.reportAccountId=selected;$('#accountPicker').value=selected;$('#reportAccountPicker').value=selected;
+          saveState().then(()=>{renderAll();navigate('transactions');showNotice('Importazione completata',chosen.length+' movimenti aggiunti. '+(duplicates.length?(include?duplicates.length+' duplicati inseriti comunque.':duplicates.length+' duplicati esclusi.'):'')+' '+chosen.filter(t=>t.status==='pending').length+' da classificare.');});
+        };
+        if(duplicates.length) showDuplicateChoice('Movimenti già presenti','Trovati '+duplicates.length+' possibili duplicati su '+imported.length+' righe. Scegli se escluderli oppure importarli comunque.',commit); else commit(false);
       };
-      if (state.demo) showConfirm('Sostituire i dati dimostrativi?', `Ho trovato ${imported.length} movimenti nel file. I dati dimostrativi saranno rimossi; il file sarà elaborato soltanto in questo browser.`, () => continueImport(true));
-      else await continueImport(false);
-    } catch (error) { showNotice('Importazione non riuscita', error.message || 'Non riesco a leggere il file.'); }
-    event.target.value = '';
-  }
-  function isDuplicate(candidate) {
+      if(state.demo) showConfirm('Sostituire i dati dimostrativi?','Ho trovato '+imported.length+' movimenti. I dati dimostrativi saranno rimossi.',()=>start(true)); else start(false);
+    }catch(error){showNotice('Importazione non riuscita',error.message||'Non riesco a leggere il file.');}event.target.value='';
+  }  function isDuplicate(candidate) {
     const key = transactionFingerprint(candidate);
     return state.transactions.some(tx => tx.status !== 'duplicate' && transactionFingerprint(tx) === key);
   }
@@ -1819,7 +1802,11 @@
   function showConfirm(title, text, callback) {
     $('#confirmTitle').textContent = title; $('#confirmText').textContent = text; confirmCallback = callback; $('#confirmModal').classList.remove('hidden');
   }
-  function closeModals() { $$('.modal-backdrop').forEach(m => m.classList.add('hidden')); confirmCallback = null; }
+  function showDuplicateChoice(title,text,callback){
+    $('#confirmTitle').textContent=title;$('#confirmText').textContent=text;confirmCallback=callback;
+    $('#confirmAction').textContent='Inserisci comunque';$('#confirmExclude')?.classList.remove('hidden');$('#confirmModal').classList.remove('hidden');
+  }
+  function closeModals() { $('.modal-backdrop').forEach(m => m.classList.add('hidden')); confirmCallback = null; $('#confirmExclude')?.classList.add('hidden'); if($('#confirmAction')) $('#confirmAction').textContent='Continua'; }
 
   initialize();
 })();
