@@ -1,0 +1,34 @@
+name: One-time v1.0.0 tag alignment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/refresh-release-tag.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  align-release-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Move v1.0.0 to the verified final release commit and remove this temporary workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/refresh-release-tag.yml
+          git commit -m "chore: remove one-time release tag alignment workflow"
+          git push origin HEAD:main
+          git fetch origin main
+          git tag -f v1.0.0 origin/main
+          git push --force origin refs/tags/v1.0.0
+          gh release edit v1.0.0 --notes-file gestione_cc/CHANGELOG.md
