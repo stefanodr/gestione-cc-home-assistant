@@ -286,10 +286,26 @@
     showNotice('Ripristino centralizzato', 'Per ripristinare i dati usa Ripristina da file JSON.');
   }
   async function initialize() {
-    $('#retryAppLoading')?.addEventListener('click', () => location.reload());
+    const retryButton = $('#retryAppLoading');
+    retryButton?.addEventListener('click', () => {
+      if (retryButton.disabled) return;
+      retryButton.disabled = true;
+      retryButton.textContent = 'Riprovo…';
+      location.reload();
+    });
     let needsSave = false;
     try {
-      const archive = await apiRequest('/api/state');
+      const controller = new AbortController();
+      const loadingTimeout = window.setTimeout(() => controller.abort(), 15000);
+      let archive;
+      try {
+        archive = await apiRequest('/api/state', { signal: controller.signal });
+      } catch (error) {
+        if (error?.name === 'AbortError') throw new Error('Il server non ha risposto entro 15 secondi. Verifica la connessione e riprova.');
+        throw error;
+      } finally {
+        window.clearTimeout(loadingTimeout);
+      }
       csrfToken = archive.csrf || '';
       stateRevision = Number.isInteger(archive.revision) ? archive.revision : 0;
       state = archive.state;
