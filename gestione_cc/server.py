@@ -415,6 +415,36 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/api/drive/status":
+            item = self.require_auth()
+            if not item: return
+            cfg = drive_read_config()
+            connected = bool(cfg.get("token", {}).get("refresh_token"))
+            self.send_json(200, {
+                "connected": connected,
+                "last_session_backup": cfg.get("last_session_backup"),
+                "last_nightly_backup": cfg.get("last_nightly_backup"),
+                "backups": drive_list_backups() if connected else []
+            })
+            return
+        if path == "/api/drive/download":
+            item = self.require_auth()
+            if not item: return
+            from urllib.parse import parse_qs
+            file_id = parse_qs(urlparse(self.path).query).get("id", [""])[0]
+            if not file_id:
+                self.send_json(400, {"error":"Backup non specificato"}); return
+            raw = drive_download_file(file_id)
+            if len(raw) < 100 or not raw.startswith(b"SQLite format 3\x00"):
+                self.send_json(400, {"error":"Il file selezionato non è un database SQLite valido"}); return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.sqlite3")
+            self.send_header("Content-Disposition", 'attachment; filename="Gestione-CC-backup-Google-Drive.sqlite3"')
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(raw)
+            return
         if path == "/api/status":
             item = self.session()
             self.send_json(200, {"authenticated": bool(item), "csrf": item["csrf"] if item else None})
@@ -510,6 +540,93 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if path == "/api/drive/connect":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            try:
+                client_id = str(payload.get("client_id", "")).strip()
+                client_secret = str(payload.get("client_secret", "")).strip()
+                token = drive_parse_token(payload.get("token"))
+                if not client_id.endswith(".apps.googleusercontent.com") or not client_secret:
+                    raise ValueError("Client ID o Client Secret non validi.")
+                drive_write_config({"client_id": client_id, "client_secret": client_secret, "token": token})
+                # Validate the grant and create the dedicated folder immediately.
+                drive_access_token(force_refresh=True)
+                drive_ensure_folder()
+                self.send_json(200, {"ok": True})
+            except Exception as error:
+                self.send_json(400, {"error": str(error)})
+            return
+        if path == "/api/drive/disconnect":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            try:
+                if DRIVE_CONFIG.exists(): DRIVE_CONFIG.unlink()
+                self.send_json(200, {"ok": True})
+            except Exception as error:
+                self.send_json(500, {"error": "Impossibile rimuovere la configurazione Google Drive: " + str(error)})
+            return
+        if path == "/api/drive/backup":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            try:
+                result = drive_session_backup(force=True)
+                self.send_json(200, result)
+            except Exception as error:
+                self.send_json(502, {"error": "Backup su Google Drive non riuscito: " + str(error)})
+            return
+        if path == "/api/drive/session-backup":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            try:
+                result = drive_session_backup()
+                self.send_json(200, result)
+            except Exception as error:
+                print("GestioneCC: backup di chiusura non riuscito: " + str(error))
+                self.send_json(502, {"error": "Backup di chiusura non riuscito: " + str(error)})
+            return
+        if path == "/api/drive/restore":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            try:
+                file_id = str(payload.get("file_id", ""))
+                if not file_id: raise ValueError("Backup non specificato.")
+                raw = drive_download_file(file_id)
+                if len(raw) < 100 or not raw.startswith(b"SQLite format 3\x00"):
+                    raise ValueError("Il file selezionato non è un database SQLite valido.")
+                temp = BACKUP_DIR / ("drive-restore-" + secrets.token_hex(8) + ".sqlite3")
+                BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+                temp.write_bytes(raw)
+                check = sqlite3.connect("file:" + str(temp) + "?mode=ro", uri=True)
+                try:
+                    integrity = check.execute("PRAGMA integrity_check").fetchone()[0]
+                    tables = {row[0] for row in check.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                    row = check.execute("SELECT state_json FROM app_state WHERE id=1").fetchone() if "app_state" in tables else None
+                    if integrity != "ok" or not {"app_state", "users", "audit"}.issubset(tables):
+                        raise ValueError("Database danneggiato o non compatibile.")
+                    if row and not valid_state(json.loads(row[0])):
+                        raise ValueError("Archivio contabile non valido.")
+                    if not check.execute("SELECT 1 FROM users LIMIT 1").fetchone():
+                        raise ValueError("Account amministratore assente.")
+                finally:
+                    check.close()
+                create_sqlite_backup("pre-drive-restore")
+                source = sqlite3.connect("file:" + str(temp) + "?mode=ro", uri=True)
+                destination = sqlite3.connect(DB_PATH, timeout=30)
+                try:
+                    source.backup(destination)
+                    destination.commit()
+                finally:
+                    destination.close()
+                    source.close()
+                sessions.clear()
+                self.send_json(200, {"ok": True}, {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
+            except Exception as error:
+                self.send_json(400, {"error": "Ripristino Google Drive non riuscito: " + str(error)})
+            finally:
+                try: temp.unlink()
+                except Exception: pass
+            return
         if path == "/api/sqlite-restore":
             item = self.require_auth(csrf=True)
             if not item: return
@@ -584,8 +701,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/logout":
             item = self.require_auth(csrf=True)
             if not item: return
+            try:
+                backup_result = drive_session_backup()
+            except Exception as error:
+                self.send_json(502, {"error":"Non ho potuto completare il backup su Google Drive. La sessione resta aperta: " + str(error)})
+                return
             sessions.pop(self.cookie_token(), None)
-            self.send_json(200, {"ok":True}, {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
+            self.send_json(200, {"ok":True,"backup":backup_result}, {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
             return
         if path == "/api/import":
             item = self.require_auth(csrf=True)
@@ -661,6 +783,7 @@ if __name__ == "__main__":
         allowed_network = ipaddress.ip_network(str(options.get("lan_network", "192.168.1.0/24")), strict=False)
     except ValueError as error:
         raise RuntimeError("lan_network non valida: usare una rete IPv4/IPv6 in formato CIDR.") from error
+    __import__("threading").Thread(target=drive_backup_scheduler, daemon=True, name="drive-backup-scheduler").start()
     httpd = LANOnlyHTTPServer(("0.0.0.0", 8443), Handler, allowed_network)
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     print("Gestione C/C HTTPS in ascolto sulla porta 8443")
