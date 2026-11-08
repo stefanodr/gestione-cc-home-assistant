@@ -1645,25 +1645,30 @@
       zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`);
       zip.folder('_rels').file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
       zip.folder('xl').file('workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sheet, i) => `<sheet name="${xmlEscape(sheet.name.slice(0, 31))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`);
-      zip.folder('xl').file('styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="€ #,##0.00;[Red]-€ #,##0.00;€ 0.00"/><numFmt numFmtId="165" formatCode="0.0%;[Red]-0.0%"/></numFmts><fonts count="3"><font><sz val="11"/><color rgb="FF243431"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="16"/><color rgb="FF173E39"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF176E66"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFDCE5E2"/></left><right style="thin"><color rgb="FFDCE5E2"/></right><top style="thin"><color rgb="FFDCE5E2"/></top><bottom style="thin"><color rgb="FFDCE5E2"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" ><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`);
+      zip.folder('xl').file('styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="€ #,##0.00;[Red]-€ #,##0.00;€ 0.00"/><numFmt numFmtId="165" formatCode="0.0%;[Red]-0.0%"/></numFmts><fonts count="4"><font><sz val="11"/><color rgb="FF243431"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="16"/><color rgb="FF173E39"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FF174B43"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF176E66"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEAF3F0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFDCE5E2"/></left><right style="thin"><color rgb="FFDCE5E2"/></right><top style="thin"><color rgb="FFDCE5E2"/></top><bottom style="thin"><color rgb="FFDCE5E2"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="11"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="14" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`);
       zip.folder('xl').folder('_rels').file('workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
       const worksheets = zip.folder('xl').folder('worksheets');
       sheets.forEach((sheet, sheetIndex) => {
-        const rows = sheet.rows.map((row, rowIndex) => `<row r="${rowIndex + 1}">${row.map((value, colIndex) => {
+        const rows = sheet.rows.map((row, rowIndex) => `<row r="${rowIndex + 1}"${sheet.rowHeights?.[rowIndex] ? ` ht="${sheet.rowHeights[rowIndex]}" customHeight="1"` : ''}>${row.map((value, colIndex) => {
           const ref = `${excelColumn(colIndex)}${rowIndex + 1}`;
-          let cellValue = value, style = rowIndex === (sheet.titleRow ?? -1) ? 5 : (rowIndex === (sheet.headerRow ?? 0) || sheet.headerRows?.includes(rowIndex)) ? 1 : 0;
+          const isTitle = rowIndex === (sheet.titleRow ?? -1);
+          const isHeader = rowIndex === (sheet.headerRow ?? 0) || sheet.headerRows?.includes(rowIndex);
+          const isSummary = sheet.summaryRows?.includes(rowIndex);
+          let cellValue = value, style = isTitle ? 5 : isHeader ? 1 : isSummary ? 9 : 6;
           if (typeof value === 'string' && sheet.dateColumns?.includes(colIndex) && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-            const [y, m, d] = value.split('-').map(Number); cellValue = (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000; style = 4;
+            const [y, m, d] = value.split('-').map(Number); cellValue = (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000; style = isSummary ? 9 : 8;
           } else if (typeof value === 'number' && Number.isFinite(value)) {
-            if (sheet.percentColumns?.includes(colIndex)) style = 3;
-            else if (sheet.currencyColumns?.includes(colIndex) || sheet.currencyColumns === undefined) style = 2;
+            if (isSummary) style = 10;
+            else if (sheet.percentColumns?.includes(colIndex)) style = 3;
+            else if (sheet.currencyColumns?.includes(colIndex) || sheet.currencyColumns === undefined) style = 7;
           }
           return typeof cellValue === 'number' && Number.isFinite(cellValue) ? `<c r="${ref}"${style ? ` s="${style}"` : ''}><v>${cellValue}</v></c>` : `<c r="${ref}"${style ? ` s="${style}"` : ''} t="inlineStr"><is><t xml:space="preserve">${xmlEscape(cellValue)}</t></is></c>`;
         }).join('')}</row>`).join('');
         const colXml = sheet.widths?.length ? `<cols>${sheet.widths.map((width, i) => `<col min="${i + 1}" max="${i + 1}" width="${width}" customWidth="1"/>`).join('')}</cols>` : '';
         const headerRow = (sheet.headerRow ?? 0) + 1, lastRow = sheet.rows.length, lastCol = Math.max(1, ...sheet.rows.map(row => row.length));
         const pane = `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${headerRow}" topLeftCell="A${headerRow + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`;
-        const filter = sheet.autoFilter !== false && lastRow > headerRow ? `<autoFilter ref="A${headerRow}:${excelColumn(lastCol - 1)}${lastRow}"/>` : '';
+        const filterEndRow = sheet.autoFilterEndRow ?? lastRow;
+        const filter = sheet.autoFilter !== false && filterEndRow > headerRow ? `<autoFilter ref="A${headerRow}:${excelColumn(lastCol - 1)}${filterEndRow}"/>` : '';
         worksheets.file(`sheet${sheetIndex + 1}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${pane}${colXml}<sheetData>${rows}</sheetData>${filter}</worksheet>`);
       });
       const chartSheets = sheets.map((sheet, index) => ({ sheet, index })).filter(item => item.sheet.charts && item.sheet.charts.length);
@@ -1714,19 +1719,14 @@
   function printHtml(title, content, options = {}) {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { showNotice('Finestra di stampa bloccata', 'Consenti l’apertura della finestra del report e riprova.'); return; }
-    const reportToolbar = options.reportToolbar ? `<div class="report-toolbar"><div><strong>Report Gestione C/C</strong><span>Anteprima del documento</span></div><div class="report-toolbar-actions"><button type="button" id="reportPrintAction">Stampa</button><button type="button" id="reportPdfAction">Esporta PDF</button></div></div>` : '';
+    const reportToolbar = options.reportToolbar ? `<div class="report-toolbar"><div><strong>${safeText(options.toolbarTitle || 'Report Gestione C/C')}</strong><span>Anteprima del documento</span></div><div class="report-toolbar-actions"><button type="button" id="reportPrintAction">STAMPA/ESPORTA PDF</button></div></div>` : '';
     const reportScript = options.reportToolbar ? '' : `<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250));</script>`;
     printWindow.document.open();
     printWindow.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeText(title)}</title><style>@page{size:A4;margin:15mm}*{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#213330;margin:0}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:20px 0 8px}.sub{color:#667772;margin-bottom:18px}.summary{display:flex;gap:12px;margin:14px 0}.summary div{border:1px solid #dce5e2;padding:10px;flex:1}.summary strong{display:block;font-size:15px;margin-top:5px}.summary span{display:block;font-size:9px;color:#63736f;margin-top:4px}.chart{width:100%;margin:8px 0 18px;break-inside:avoid}.chart svg{display:block;width:100%;height:auto;max-height:100mm}table{width:100%;border-collapse:collapse;font-size:10px;margin:8px 0 16px}th,td{border-bottom:1px solid #dce5e2;text-align:left;padding:6px 5px}th{background:#f0f5f3;font-weight:700}td.num,th.num{text-align:right}.foot{font-size:9px;color:#647570;margin-top:16px}.report-toolbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 18px;margin:0 0 22px;background:#f3f7f5;border-bottom:1px solid #dce5e2;font-family:Arial,sans-serif}.report-toolbar strong{display:block;font-size:13px}.report-toolbar span{display:block;margin-top:3px;color:#71817c;font-size:10px}.report-toolbar-actions{display:flex;gap:8px}.report-toolbar button{border:1px solid #cbdad5;border-radius:7px;background:#fff;color:#294d45;padding:9px 13px;font-size:12px;font-weight:650;cursor:pointer}.report-toolbar button:hover{background:#e6f1ed;border-color:#8eafa4}.report-document{max-width:1100px;margin:0 auto;padding:0 22px 28px}@media print{thead{display:table-header-group}table{width:100%;border-collapse:collapse;break-inside:auto;page-break-inside:auto}tr{break-inside:avoid;page-break-inside:avoid}td,th{padding:5px 4px}.statement-opening{break-inside:avoid;page-break-inside:avoid;margin:12px 0 18px;padding:10px 12px;border:1px solid #dce5e2;font-size:12px}.statement-opening strong{margin-left:12px;font-size:15px}.statement-ending{break-inside:avoid;page-break-inside:avoid;margin-top:18px}.statement-ending .summary{display:flex;gap:10px}.statement-ending .summary div{flex:1}.report-toolbar{display:none!important}.report-document{max-width:none;margin:0;padding:0}}@media(max-width:600px){.report-toolbar{align-items:flex-start;flex-direction:column}.report-toolbar-actions{width:100%}.report-toolbar button{flex:1}}.statement-opening{margin:12px 0 18px;padding:10px 12px;border:1px solid #dce5e2;border-radius:6px}.statement-opening strong{margin-left:12px;font-size:15px}.statement-ending{margin-top:20px}.statement-ending .summary{display:flex;gap:10px}.statement-ending .summary div{flex:1}</style></head><body>${reportToolbar}<main class="report-document">${content}<p class="foot">Creato da Gestione C/C · ${new Date().toLocaleString('it-IT')}</p></main>${reportScript}</body></html>`);
     printWindow.document.close();
     if (options.reportToolbar) {
       const printButton = printWindow.document.getElementById('reportPrintAction');
-      const pdfButton = printWindow.document.getElementById('reportPdfAction');
       if (printButton) printButton.addEventListener('click', () => {
-        printWindow.focus();
-        printWindow.print();
-      });
-      if (pdfButton) pdfButton.addEventListener('click', () => {
         printWindow.focus();
         printWindow.print();
       });
@@ -1766,13 +1766,16 @@
       return '<tr><td>' + formatDate(tx.date) + '</td><td>' + safeText(description) + '</td><td class="num">' + (income ? euro.format(income) : '') + '</td><td class="num">' + (expense ? euro.format(expense) : '') + '</td><td class="num">' + euro.format(balance) + '</td></tr>';
     }).join('');
     const content = '<h1>Estratto conto</h1><div class="sub">' + safeText(monthName(ctx.monthKey)) + ' · ' + safeText(ctx.accountName) + '</div><div class="statement-opening">Saldo iniziale <strong>' + euro.format(ctx.opening) + '</strong></div><table class="statement-table"><thead><tr><th>Data</th><th>Descrizione</th><th class="num">Entrate</th><th class="num">Uscite</th><th class="num">Saldo progressivo</th></tr></thead><tbody>' + (rows || '<tr><td colspan="5">Nessun movimento nel periodo selezionato.</td></tr>') + '</tbody></table><section class="statement-ending"><h2>Riepilogo del periodo</h2><div class="summary"><div>Entrate<strong>' + euro.format(ctx.totals.income) + '</strong></div><div>Uscite<strong>' + euro.format(ctx.totals.expense) + '</strong></div><div>Saldo finale<strong>' + euro.format(ctx.closing) + '</strong></div></div><div class="foot">' + ctx.transactions.length + ' movimenti · Periodo dal ' + formatDate(ctx.start) + ' al ' + formatDate(ctx.end) + '. Prospetto personale non sostitutivo dell’estratto ufficiale della banca.</div></section>';
-    printHtml('Estratto-conto-' + ctx.monthKey, content);
+    printHtml('Estratto-conto-' + ctx.monthKey, content, { reportToolbar: true, toolbarTitle: 'Estratto conto' });
   }
   function exportOverviewStatementXlsx() {
     const ctx = overviewStatementContext();
     const rows = [
-      ['ESTRATTO CONTO · GESTIONE C/C'], ['Periodo', monthName(ctx.monthKey)], ['Conto', ctx.accountName],
-      ['Saldo iniziale', ctx.opening], [],
+      ['ESTRATTO CONTO · GESTIONE C/C'],
+      ['Periodo', monthName(ctx.monthKey)],
+      ['Conto', ctx.accountName],
+      ['Saldo iniziale', ctx.opening],
+      [],
       ['Data', 'Descrizione', 'Causale', 'Entrate', 'Uscite', 'Saldo progressivo', 'Contropartita', 'Stato'],
       ...ctx.rows.map(({ tx, income, expense, balance }) => [
         tx.date, transactionDescription(tx) || transactionCausale(tx) || 'Movimento',
@@ -1780,13 +1783,22 @@
         tx.counterpartSplits?.length ? tx.counterpartSplits.map(s => accountLabel(s.accountId)).join('; ') : accountLabel(tx.counterpartAccountId),
         tx.status || ''
       ]),
-      [], ['Totale entrate', ctx.totals.income], ['Totale uscite', ctx.totals.expense],
-      ['Saldo iniziale', ctx.opening], ['Saldo finale', ctx.closing]
+      []
     ];
+    const summaryStart = rows.length;
+    rows.push(
+      ['RIEPILOGO DEL PERIODO'],
+      ['Totale entrate', ctx.totals.income],
+      ['Totale uscite', ctx.totals.expense],
+      ['Saldo finale', ctx.closing]
+    );
     downloadXlsx('Estratto-conto-' + ctx.monthKey + '.xlsx', [{
       name: 'Estratto conto', rows, titleRow: 0, headerRow: 5,
+      summaryRows: [summaryStart, summaryStart + 1, summaryStart + 2, summaryStart + 3],
       currencyColumns: [3, 4, 5], dateColumns: [0],
-      widths: [15, 42, 38, 18, 18, 21, 42, 16], autoFilter: true
+      widths: [15, 42, 38, 18, 18, 21, 42, 16],
+      autoFilter: true, autoFilterEndRow: 6 + ctx.rows.length,
+      rowHeights: { 0: 26, 5: 30 }
     }]);
   }
   function exportStatementPdf() {
