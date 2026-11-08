@@ -73,7 +73,9 @@ Le copie automatiche locali non sostituiscono un backup esterno: un guasto del d
 
 ## Supporto
 
-- Diritti d'autore: Copyright © 2026 Stefano Di Ricco (`stefanodr`). Tutti i diritti riservati; non è attualmente concessa una licenza generale d'uso, modifica, distribuzione o sfruttamento commerciale.
+- Licenza: [licenza proprietaria d'uso personale](LICENSE). Uso gratuito consentito alle persone fisiche per finalità personali e non commerciali, nei limiti della licenza. Gli usi aziendali, professionali e commerciali richiedono un accordo scritto.
+- Licenze commerciali: [condizioni e richieste](COMMERCIAL-LICENSING.md).
+- Copyright © 2026 Stefano Di Ricco (`stefanodr`). Tutti i diritti riservati salvo i permessi espressamente concessi.
 - Avvisi dipendenze: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 - Repository: https://github.com/stefanodr/gestione-cc-home-assistant
@@ -85,7 +87,7 @@ Quando apri una segnalazione indica versioni Home Assistant/App, architettura e 
 
 ## Stato e licenza
 
-Versione di distribuzione dichiarata: **1.0.0**. Il progetto non è attualmente rilasciato con una licenza open source. Il codice originale è protetto dal diritto d'autore; tutti i diritti sono riservati. Qualsiasi utilizzo, modifica, ridistribuzione o sfruttamento commerciale richiede una preventiva autorizzazione scritta del titolare, salvo i diritti concessi dalle licenze dei componenti di terze parti. La strategia di licenza commerciale è in valutazione. La pubblicazione non sostituisce i test nel sistema dell'utente.
+Versione di distribuzione dichiarata: **1.0.0**. Il progetto è distribuito con licenza proprietaria d'uso personale, non con una licenza open source. L'uso personale gratuito è consentito alle persone fisiche nei limiti di `LICENSE`; l'uso professionale, aziendale, la modifica, la redistribuzione e lo sfruttamento commerciale richiedono un accordo scritto, salvo i diritti inderogabili e quelli dei componenti di terze parti. Consultare `COMMERCIAL-LICENSING.md`. La pubblicazione non sostituisce i test nel sistema dell'utente.
 
 ---
 
@@ -158,7 +160,9 @@ Local automatic snapshots are not a substitute for off-host backups. A disk or h
 
 ## Support
 
-- Copyright: Copyright © 2026 Stefano Di Ricco (`stefanodr`). All rights reserved; no general licence to use, modify, distribute or commercially exploit the software is currently granted.
+- Licence: [proprietary personal-use licence](LICENSE). Free use is permitted to individuals for personal, non-commercial purposes, subject to its terms. Business, professional and commercial uses require a written agreement.
+- Commercial licensing: [terms and enquiries](COMMERCIAL-LICENSING.md).
+- Copyright © 2026 Stefano Di Ricco (`stefanodr`). All rights reserved except for permissions expressly granted.
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 - Repository: https://github.com/stefanodr/gestione-cc-home-assistant
@@ -170,4 +174,4 @@ When reporting an issue, include Home Assistant/App versions, architecture and r
 
 ## Status and licence
 
-Declared distribution version: **1.0.0**. The project is not currently released under an open-source licence. The original code is protected by copyright; all rights are reserved. Any use, modification, redistribution or commercial exploitation requires the copyright holder's prior written permission, except for rights granted by third-party component licences. The commercial licensing strategy is under review. A version number does not replace testing on the user's own system.
+Declared distribution version: **1.0.0**. The project is distributed under a proprietary personal-use licence, not an open-source licence. Free personal use by individuals is permitted under `LICENSE`; professional or business use, modification, redistribution and commercial exploitation require a written agreement, subject to mandatory legal rights and third-party component licences. See `COMMERCIAL-LICENSING.md`. A version number does not replace testing on the user's own system.
