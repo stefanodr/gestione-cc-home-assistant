@@ -1,6 +1,6 @@
 # Gestione C/C — Documentation / Documentazione
 
-**Versione / Version:** 1.0.0
+**Versione / Version:** 1.0.5
 
 [Italiano](#italiano) · [English](#english)
 
@@ -71,6 +71,31 @@ Esporta lo stato applicativo in un file JSON, utile per migrazioni compatibili.
 
 ### Backup SQLite
 Scarica una copia del database SQLite. Le copie automatiche vengono create prima delle scritture quando è trascorso l'intervallo previsto; vengono conservate fino a 30 copie in `/data/backups`.
+
+### Backup facoltativo su Google Drive
+Da **Impostazioni → Backup · Google Drive** puoi collegare il tuo account Google. L'autorizzazione viene generata sul PC Windows con un OAuth Client di tipo Desktop e rclone; Home Assistant non deve essere esposto su Internet e non richiede un URL di callback pubblico.
+
+1. Nella Google Cloud Console crea un progetto e abilita **Google Drive API**.
+2. Configura la schermata consenso OAuth per uso personale e aggiungi il tuo account Google come utente di prova.
+3. In **Accesso ai dati** aggiungi lo scope `https://www.googleapis.com/auth/drive.file`.
+4. Crea un ID client OAuth di tipo **App desktop** e conserva Client ID e Client Secret.
+5. Scarica rclone per Windows dal sito ufficiale ed estrai `rclone.exe`.
+6. Apri il Prompt dei comandi nella cartella di rclone ed esegui, sostituendo i due valori tra virgolette:
+
+   ```text
+   rclone authorize drive --drive-scope drive.file --drive-client-id "IL_TUO_CLIENT_ID" --drive-client-secret "IL_TUO_CLIENT_SECRET"
+   ```
+
+7. Accedi a Google nella finestra del browser e autorizza l'accesso. Copia il solo token restituito da rclone (non le righe descrittive) e incollalo nella sezione Google Drive dell'App insieme a Client ID e Client Secret.
+8. Premi **Collega Google Drive**. L'App verifica l'autorizzazione e crea la cartella `Gestione C-C Backup`.
+
+Per un uso continuativo, imposta la schermata consenso su **In produzione** dopo aver completato i dati richiesti: un'app esterna lasciata in modalità di test può avere token di aggiornamento con scadenza di 7 giorni. Per un uso personale limitato può comparire un avviso Google relativo all'app non verificata; non condividere l'app con altri utenti.
+
+Il token OAuth e il Client Secret sono credenziali: non inviarli in chat, non inserirli in GitHub e non allegarli a segnalazioni. Gestione C/C li conserva nel file privato `/data/google_drive.json` sul volume dell'App. Lo scope `drive.file` limita l'accesso ai file e alla cartella creati dall'applicazione.
+
+Se Google Drive è collegato, vengono conservati un backup di sessione e gli ultimi tre backup notturni delle 03:00 (Europe/Rome). **Esci** attende il backup quando l'archivio è cambiato; la chiusura diretta della scheda tenta un backup ma il browser non ne garantisce il completamento. Il backup notturno è indipendente dalla sessione. I file SQLite sono normali file non cifrati: proteggi l'account Google e chiunque abbia accesso al Drive può leggerli.
+
+Puoi selezionare un backup nell'elenco e ripristinarlo. Prima della sostituzione viene creata una copia preventiva locale e il database scaricato viene sottoposto a controllo d'integrità e compatibilità. Dopo il ripristino dovrai accedere nuovamente con il PIN contenuto nel backup.
 
 ### Procedura consigliata
 1. Crea un backup JSON e uno SQLite dalle Impostazioni.
@@ -184,6 +209,31 @@ Exports the application state to JSON for compatible data migration or transfer.
 
 ### SQLite backup
 Downloads a copy of the SQLite database. Automatic snapshots are created before writes when the configured interval has elapsed; up to 30 local copies are retained under `/data/backups`.
+
+### Optional Google Drive backup
+You can connect your Google account from **Settings → Backup · Google Drive**. Authorization is generated on a Windows PC with a Desktop OAuth client and rclone; Home Assistant does not need to be exposed to the Internet and no public callback URL is required.
+
+1. Create a project in Google Cloud Console and enable **Google Drive API**.
+2. Configure the OAuth consent screen for personal use and add your Google account as a test user.
+3. Under **Data access**, add the scope `https://www.googleapis.com/auth/drive.file`.
+4. Create an OAuth client ID of type **Desktop app** and keep its Client ID and Client Secret.
+5. Download rclone for Windows from its official website and extract `rclone.exe`.
+6. Open Command Prompt in the rclone folder and run the following, replacing the two quoted values:
+
+   ```text
+   rclone authorize drive --drive-scope drive.file --drive-client-id "YOUR_CLIENT_ID" --drive-client-secret "YOUR_CLIENT_SECRET"
+   ```
+
+7. Sign in to Google in the browser window and grant access. Copy only the token returned by rclone (not the explanatory lines) and paste it into the App's Google Drive section with the Client ID and Client Secret.
+8. Select **Connect Google Drive**. The App validates the authorization and creates the `Gestione C-C Backup` folder.
+
+For long-term use, set the OAuth consent screen to **In production** after completing the required details. An external app left in testing mode may receive refresh tokens that expire after seven days. Personal-use apps may show Google's unverified-app warning; do not share the app with other users.
+
+The OAuth token and Client Secret are credentials: never send them in chat, commit them to GitHub or attach them to issue reports. Gestione C/C stores them in the private `/data/google_drive.json` file on the App volume. The `drive.file` scope limits access to files and the folder created by the application.
+
+When connected, the App retains one session backup and the latest three nightly backups at 03:00 (Europe/Rome). **Exit** waits for the backup if the archive changed; closing the browser tab only attempts a backup and the browser cannot guarantee completion. The nightly backup runs independently of the session. SQLite files are ordinary, unencrypted files: protect your Google account and remember that anyone with Drive access can read them.
+
+You can select a backup from the list and restore it. Before replacing the database, the App creates a local pre-restore copy and checks the downloaded database for integrity and compatibility. You must sign in again with the PIN stored in the restored backup.
 
 ### Recommended procedure
 1. Create both JSON and SQLite backups in Settings.
