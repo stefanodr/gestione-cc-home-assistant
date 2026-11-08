@@ -121,3 +121,6 @@ body.app-ready .app-shell{visibility:visible}
 }
 @keyframes app-loading-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.app-loading-spinner{animation-duration:2s}}
+
+.app-loading-error .app-loading-spinner{display:none}
+.app-loading-text{font-size:11px;line-height:1.6;color:#81908d}
