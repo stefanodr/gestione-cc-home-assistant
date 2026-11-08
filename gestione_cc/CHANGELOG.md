@@ -1,5 +1,12 @@
 # Gestione C/C Home Assistant App — Changelog
 
+## 1.0.3 — 8 novembre 2026
+
+- Semplificata la schermata di caricamento dell'archivio con il messaggio «Caricamento archivio in corso.....» e un indicatore animato.
+- Il comando Riprova resta nascosto durante il caricamento e compare solo in caso di errore o timeout.
+- Aggiunto un timeout di 15 secondi e impediti clic ripetuti sul comando Riprova.
+
+
 ## 1.0.2 — 8 novembre 2026
 
 - Migliorata l'impaginazione dell'estratto conto PDF per la stampa su più pagine A4.
