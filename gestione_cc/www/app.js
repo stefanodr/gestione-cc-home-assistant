@@ -397,6 +397,9 @@
       state = createDemoState(); await saveState(); renderAll(); showNotice('Prototipo ripristinato', 'I dati dimostrativi sono di nuovo disponibili.');
     }));
     $('#addAccount').addEventListener('click', addAccount);
+    $('#importAccountsExcel')?.addEventListener('click', () => $('#accountFile').click());
+    $('#accountFile')?.addEventListener('change', importAccountsFromExcel);
+    $('#downloadAccountTemplate')?.addEventListener('click', downloadAccountTemplate);
     $('#view-transactions').addEventListener('change', onAccountSelection);
     window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { drawFlowChart(); drawReportChart(); }, 120); });
   }
@@ -1063,6 +1066,42 @@
     $('#settingsAccountCount').textContent = String(state.accounts.filter(a => !['ROOT'].includes(a.type)).length);
     $('#settingsRuleCount').textContent = String(state.rules.filter(r => r.source !== 'demo').length);
     $('#driveBackupStatus').textContent = driveDirectoryHandle ? driveBackupReady ? `Cartella collegata: ${driveDirectoryHandle.name} · riattiva il permesso se richiesto` : `Backup esistente in ${driveDirectoryHandle.name} · non ancora attivato` : 'Non collegata';
+  }
+  async function importAccountsFromExcel(event) {
+    const file = event.target.files?.[0]; if (!file) return;
+    try {
+      const ext = file.name.toLowerCase().split('.').pop();
+      const rows = ext === 'xlsx' ? await parseXlsx(file, true) : ext === 'csv' ? parseCsvRows(await file.text()) : null;
+      if (!rows) throw new Error('Seleziona un file Excel .xlsx oppure CSV.');
+      const hi = rows.findIndex(row => row.some(v => /percorso|conto|account/i.test(String(v))) && row.some(v => /tipo|type|classificazione/i.test(String(v))));
+      if (hi < 0) throw new Error('Intestazioni non riconosciute. Scarica e usa il modello Excel.');
+      const headers = rows[hi].map(v => normalize(v));
+      const pc = headers.findIndex(v => /percorso|conto|account/.test(v));
+      const tc = headers.findIndex(v => /tipo|type/.test(v));
+      const cc = headers.findIndex(v => /classificazione/.test(v));
+      if (pc < 0 || (tc < 0 && cc < 0)) throw new Error('Servono Percorso conto e Tipo GnuCash o Classificazione.');
+      const aliases = { ENTRATA:'INCOME', ENTRATE:'INCOME', RICAVO:'INCOME', USCITA:'EXPENSE', USCITE:'EXPENSE', SPESA:'EXPENSE', SPESE:'EXPENSE', PATRIMONIALE:'ASSET', TECNICA:'TRADING' };
+      const allowed = ['ROOT','ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','TRADING','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','CREDITLINE'];
+      const parsed = rows.slice(hi+1).filter(row => String(row[pc] ?? '').trim()).map(row => {
+        const path = String(row[pc]).trim().replace(/^:+|:+$/g,''); const raw = normalize(tc >= 0 ? row[tc] : row[cc]).toUpperCase(); const type = aliases[raw] || raw;
+        if (!path || !allowed.includes(type)) throw new Error('Tipo non valido per il conto ' + path + ': ' + type); return {path,type};
+      });
+      if (!parsed.length) throw new Error('Il foglio non contiene conti.');
+      const seen = new Set(); const unique = parsed.filter(a => !seen.has(a.path) && seen.add(a.path));
+      const old = new Set(state.accounts.map(a => a.path)); const fresh = unique.filter(a => !old.has(a.path)); const dup = unique.length-fresh.length;
+      showConfirm('Importare il piano dei conti?', 'Trovati '+unique.length+' conti: '+fresh.length+' nuovi e '+dup+' già presenti. I conti esistenti non saranno sovrascritti.', async () => {
+        for (const item of fresh.sort((a,b)=>a.path.split(':').length-b.path.split(':').length)) {
+          const parentPath=item.path.split(':').slice(0,-1).join(':'); const parent=state.accounts.find(a=>a.path===parentPath);
+          if (parentPath && !parent) throw new Error('Manca il conto padre '+parentPath+'. Includilo nel foglio.');
+          state.accounts.push({id:uid('a'),name:item.path.split(':').pop(),path:item.path,type:item.type,classification:classifyType(item.type),parentId:parent?.id||'root'});
+        }
+        state.demo=false; await saveState(); renderAll(); showNotice('Piano dei conti importato',fresh.length+' conti aggiunti. '+dup+' già presenti lasciati invariati.');
+      });
+    } catch(error) { showNotice('Importazione piano dei conti non riuscita',error.message||'File non leggibile.'); }
+    event.target.value='';
+  }
+  function downloadAccountTemplate() {
+    downloadXlsx('Modello-piano-dei-conti.xlsx',[{name:'Piano dei conti',rows:[['Percorso conto','Tipo GnuCash','Classificazione'],['Attività','ASSET','Patrimoniale'],['Attività:Conto corrente','BANK','Patrimoniale'],['Uscite','EXPENSE','Economica'],['Uscite:Casa','EXPENSE','Economica'],['Entrate','INCOME','Economica']],widths:[42,22,24]}]);
   }
   async function addAccount() {
     const name = window.prompt('Nome del nuovo conto (es. Uscite:Abbonamenti):');
