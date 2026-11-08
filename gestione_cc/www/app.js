@@ -1,6 +1,7 @@
 (() => {
   'use strict';
 
+  const APP_VERSION = '1.6';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -288,6 +289,7 @@
     $('#reportPeriodMode').value = reportMode;
     if (state.reportAccountDefaultMigrated) await saveState();
     setupControls();
+    const versionLabel = $('#appVersion'); if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 0.2.0-beta.5';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const initialMonth = currentMonth;
     $('#monthPicker').value = initialMonth;
@@ -325,9 +327,10 @@
       const fn = confirmCallback; closeModals();
       if (!fn) return;
       showNotice('Operazione in corso', 'Attendi il completamento. L’elaborazione resta su questo computer.');
-      try { await fn(); }
+      try { await fn(true); }
       catch (error) { console.error('Operazione di conferma non completata', error); closeModals(); showNotice('Operazione non completata', error?.message || String(error) || 'Errore inatteso dopo la conferma.'); }
     });
+    $('#confirmExclude')?.addEventListener('click', async () => { const fn=confirmCallback; closeModals(); if(!fn)return; showNotice('Operazione in corso','Attendi il completamento.'); try{await fn(false);}catch(error){showNotice('Operazione non completata',error.message||String(error));} });
     $$('.nav-item').forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
     $$('[data-goto]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.goto)));
     $('#monthPicker').addEventListener('change', () => { state.selectedMonth = $('#monthPicker').value; syncReportPeriodPicker(state.selectedMonth); $('#statementMonth').value = state.selectedMonth; saveState(); renderAll(); });
@@ -395,6 +398,9 @@
       state = createDemoState(); await saveState(); renderAll(); showNotice('Prototipo ripristinato', 'I dati dimostrativi sono di nuovo disponibili.');
     }));
     $('#addAccount').addEventListener('click', addAccount);
+    $('#importAccountsExcel')?.addEventListener('click', () => $('#accountFile').click());
+    $('#accountFile')?.addEventListener('change', importAccountsFromExcel);
+    $('#downloadAccountTemplate')?.addEventListener('click', downloadAccountTemplate);
     $('#view-transactions').addEventListener('change', onAccountSelection);
     window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { drawFlowChart(); drawReportChart(); }, 120); });
   }
@@ -1062,6 +1068,42 @@
     $('#settingsRuleCount').textContent = String(state.rules.filter(r => r.source !== 'demo').length);
     $('#driveBackupStatus').textContent = driveDirectoryHandle ? driveBackupReady ? `Cartella collegata: ${driveDirectoryHandle.name} · riattiva il permesso se richiesto` : `Backup esistente in ${driveDirectoryHandle.name} · non ancora attivato` : 'Non collegata';
   }
+  async function importAccountsFromExcel(event) {
+    const file = event.target.files?.[0]; if (!file) return;
+    try {
+      const ext = file.name.toLowerCase().split('.').pop();
+      const rows = ext === 'xlsx' ? await parseXlsx(file, true) : ext === 'csv' ? parseCsvRows(await file.text()) : null;
+      if (!rows) throw new Error('Seleziona un file Excel .xlsx oppure CSV.');
+      const hi = rows.findIndex(row => row.some(v => /percorso|conto|account/i.test(String(v))) && row.some(v => /tipo|type|classificazione/i.test(String(v))));
+      if (hi < 0) throw new Error('Intestazioni non riconosciute. Scarica e usa il modello Excel.');
+      const headers = rows[hi].map(v => normalize(v));
+      const pc = headers.findIndex(v => /percorso|conto|account/.test(v));
+      const tc = headers.findIndex(v => /tipo|type/.test(v));
+      const cc = headers.findIndex(v => /classificazione/.test(v));
+      if (pc < 0 || (tc < 0 && cc < 0)) throw new Error('Servono Percorso conto e Tipo GnuCash o Classificazione.');
+      const aliases = { ENTRATA:'INCOME', ENTRATE:'INCOME', RICAVO:'INCOME', USCITA:'EXPENSE', USCITE:'EXPENSE', SPESA:'EXPENSE', SPESE:'EXPENSE', PATRIMONIALE:'ASSET', TECNICA:'TRADING' };
+      const allowed = ['ROOT','ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','TRADING','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','CREDITLINE'];
+      const parsed = rows.slice(hi+1).filter(row => String(row[pc] ?? '').trim()).map(row => {
+        const path = String(row[pc]).trim().replace(/^:+|:+$/g,''); const raw = normalize(tc >= 0 ? row[tc] : row[cc]).toUpperCase(); const type = aliases[raw] || raw;
+        if (!path || !allowed.includes(type)) throw new Error('Tipo non valido per il conto ' + path + ': ' + type); return {path,type};
+      });
+      if (!parsed.length) throw new Error('Il foglio non contiene conti.');
+      const seen = new Set(); const unique = parsed.filter(a => !seen.has(a.path) && seen.add(a.path));
+      const old = new Set(state.accounts.map(a => a.path)); const fresh = unique.filter(a => !old.has(a.path)); const dup = unique.length-fresh.length;
+      showConfirm('Importare il piano dei conti?', 'Trovati '+unique.length+' conti: '+fresh.length+' nuovi e '+dup+' già presenti. I conti esistenti non saranno sovrascritti.', async () => {
+        for (const item of fresh.sort((a,b)=>a.path.split(':').length-b.path.split(':').length)) {
+          const parentPath=item.path.split(':').slice(0,-1).join(':'); const parent=state.accounts.find(a=>a.path===parentPath);
+          if (parentPath && !parent) throw new Error('Manca il conto padre '+parentPath+'. Includilo nel foglio.');
+          state.accounts.push({id:uid('a'),name:item.path.split(':').pop(),path:item.path,type:item.type,classification:classifyType(item.type),parentId:parent?.id||'root'});
+        }
+        state.demo=false; await saveState(); renderAll(); showNotice('Piano dei conti importato',fresh.length+' conti aggiunti. '+dup+' già presenti lasciati invariati.');
+      });
+    } catch(error) { showNotice('Importazione piano dei conti non riuscita',error.message||'File non leggibile.'); }
+    event.target.value='';
+  }
+  function downloadAccountTemplate() {
+    downloadXlsx('Modello-piano-dei-conti.xlsx',[{name:'Piano dei conti',rows:[['Percorso conto','Tipo GnuCash','Classificazione'],['Attività','ASSET','Patrimoniale'],['Attività:Conto corrente','BANK','Patrimoniale'],['Uscite','EXPENSE','Economica'],['Uscite:Casa','EXPENSE','Economica'],['Entrate','INCOME','Economica']],widths:[42,22,24]}]);
+  }
   async function addAccount() {
     const name = window.prompt('Nome del nuovo conto (es. Uscite:Abbonamenti):');
     if (!name?.trim()) return;
@@ -1074,52 +1116,40 @@
   }
 
   async function onBankFile(event) {
-    const file = event.target.files?.[0]; if (!file) return;
+    const file=event.target.files?.[0]; if(!file)return;
     try {
-      let imported;
-      const ext = file.name.toLowerCase().split('.').pop();
-      if (ext === 'qif' || ext === 'txt') imported = parseQif(await file.text());
-      else if (ext === 'csv') imported = parseCsv(await file.text());
-      else if (ext === 'xlsx') imported = await parseXlsx(file);
-      else throw new Error('Formato non supportato. Seleziona QIF, CSV o XLSX.');
-      if (!imported.length) throw new Error('Non ho trovato movimenti con data e importo nel file.');
-      const continueImport = async (replaceDemo) => {
-        if (replaceDemo) { state = { ...createDemoState(), accounts: defaultAccounts(), transactions: [], rules: [], demo: false, openingBalance: 0 }; }
-        const selectedImportAccount = state.reportAccountId && state.reportAccountId !== 'all' && isLiquidAccount(accountById(state.reportAccountId)) ? state.reportAccountId : state.bankAccountId;
-        const unique = imported.filter(tx => !isDuplicate(tx));
-        const duplicates = imported.length - unique.length;
-        unique.forEach(tx => {
-        const suggestion = tx.split ? { id: null, label: 'Movimento suddiviso · rivedi le righe', confidence: .1 } : suggestionFor(tx);
-          tx.suggestionId = suggestion.id; tx.suggestionLabel = suggestion.label; tx.confidence = suggestion.confidence;
-          if (tx.category) {
-            const category = findAccountByLabel(tx.category);
-            if (category) { tx.suggestionId = category.id; tx.suggestionLabel = category.path; tx.confidence = .96; }
-          }
-          tx.id = tx.id || uid(); tx.status = 'pending';
-          tx.bankAccountId = selectedImportAccount; tx.source = ext;
-        });
-        state.transactions.push(...unique); state.demo = false;
-        const mostRecentImport = imported.map(tx => tx.date).filter(Boolean).sort().at(-1);
-        if (mostRecentImport) {
-          const month = mostRecentImport.slice(0, 7);
-          state.selectedMonth = month;
-          $('#monthPicker').value = month; syncReportPeriodPicker(month); $('#statementMonth').value = month;
-        }
-        state.reportAccountId = selectedImportAccount;
-        $('#accountPicker').value = selectedImportAccount; $('#reportAccountPicker').value = selectedImportAccount;
-        await saveState(); renderAll(); navigate('transactions');
-        showNotice('Importazione completata', `${unique.length} movimenti aggiunti${duplicates ? ` · ${duplicates} duplicati ignorati` : ''}. Panoramica e Report sono impostati su ${mostRecentImport ? monthName(mostRecentImport.slice(0, 7)) : 'il periodo importato'} e sul conto selezionato. ${unique.filter(t => t.status === 'pending').length} da classificare. File elaborato sul dispositivo.`);
+      let imported; const ext=file.name.toLowerCase().split('.').pop();
+      if(ext==='qif'||ext==='txt') imported=parseQif(await file.text()); else if(ext==='csv') imported=parseCsv(await file.text()); else if(ext==='xlsx') imported=await parseXlsx(file); else throw new Error('Formato non supportato.');
+      if(!imported.length) throw new Error('Non ho trovato movimenti con data e importo.');
+      const start=replaceDemo=>{
+        if(replaceDemo) state={...createDemoState(),accounts:defaultAccounts(),transactions:[],rules:[],demo:false,openingBalance:0};
+        const known=new Set(state.transactions.filter(tx=>tx.status!=='duplicate').map(transactionFingerprint));
+        const duplicates=findImportDuplicates(imported);
+        const commit=include=>{
+          const selected=state.reportAccountId&&state.reportAccountId!=='all'&&isLiquidAccount(accountById(state.reportAccountId))?state.reportAccountId:state.bankAccountId;
+          const batchKeys=new Set();
+          const chosen=imported.filter(tx=>{const key=transactionFingerprint(tx);const duplicate=known.has(key)||batchKeys.has(key);batchKeys.add(key);return include||!duplicate;});
+          chosen.forEach(tx=>{const key=transactionFingerprint(tx);const suggestion=tx.split?{id:null,label:'Movimento suddiviso · rivedi le righe',confidence:.1}:suggestionFor(tx);tx.suggestionId=suggestion.id;tx.suggestionLabel=suggestion.label;tx.confidence=suggestion.confidence;if(tx.category){const cat=findAccountByLabel(tx.category);if(cat){tx.suggestionId=cat.id;tx.suggestionLabel=cat.path;tx.confidence=.96;}}tx.id=uid();tx.status='pending';tx.bankAccountId=selected;tx.source=ext;if(known.has(key))tx.duplicateOverride=true;});
+          state.transactions.push(...chosen);state.demo=false;const latest=imported.map(tx=>tx.date).filter(Boolean).sort().at(-1);
+          if(latest){state.selectedMonth=latest.slice(0,7);$('#monthPicker').value=state.selectedMonth;syncReportPeriodPicker(state.selectedMonth);$('#statementMonth').value=state.selectedMonth;}
+          state.reportAccountId=selected;$('#accountPicker').value=selected;$('#reportAccountPicker').value=selected;
+          saveState().then(()=>{renderAll();navigate('transactions');showNotice('Importazione completata',chosen.length+' movimenti aggiunti. '+(duplicates.length?(include?duplicates.length+' duplicati inseriti comunque.':duplicates.length+' duplicati esclusi.'):'')+' '+chosen.filter(t=>t.status==='pending').length+' da classificare.');});
+        };
+        if(duplicates.length) showDuplicateChoice('Movimenti già presenti','Trovati '+duplicates.length+' possibili duplicati su '+imported.length+' righe. Scegli se escluderli oppure importarli comunque.',commit); else commit(false);
       };
-      if (state.demo) showConfirm('Sostituire i dati dimostrativi?', `Ho trovato ${imported.length} movimenti nel file. I dati dimostrativi saranno rimossi; il file sarà elaborato soltanto in questo browser.`, () => continueImport(true));
-      else await continueImport(false);
-    } catch (error) { showNotice('Importazione non riuscita', error.message || 'Non riesco a leggere il file.'); }
-    event.target.value = '';
-  }
-  function isDuplicate(candidate) {
+      if(state.demo) showConfirm('Sostituire i dati dimostrativi?','Ho trovato '+imported.length+' movimenti. I dati dimostrativi saranno rimossi.',()=>start(true)); else start(false);
+    }catch(error){showNotice('Importazione non riuscita',error.message||'Non riesco a leggere il file.');}event.target.value='';
+  }  function isDuplicate(candidate) {
     const key = transactionFingerprint(candidate);
     return state.transactions.some(tx => tx.status !== 'duplicate' && transactionFingerprint(tx) === key);
   }
-  function transactionFingerprint(tx) { return [tx.date, Number(tx.amount).toFixed(2), normalize(tx.payee), normalize(tx.memo)].join('|'); }
+  function transactionFingerprint(tx) { return [parseDate(tx.date), Number(tx.amount).toFixed(2), normalize(transactionDescription(tx)), normalize(transactionCausale(tx))].join('|'); }
+  function findImportDuplicates(rows) {
+    const seen = new Set(state.transactions.filter(tx => tx.status !== 'duplicate').map(transactionFingerprint));
+    const duplicates = [];
+    rows.forEach(tx => { const key = transactionFingerprint(tx); if (seen.has(key)) duplicates.push(tx); seen.add(key); });
+    return duplicates;
+  }
   function parseQif(content) {
     const records = []; let record = {};
     const append = (field, value) => { if (!value) return; record[field] = record[field] ? `${record[field]} ${value}` : value; };
@@ -1169,7 +1199,7 @@
     if (cell || row.length) { row.push(cell); rows.push(row); }
     return rows.map(r => r.map(v => String(v).trim()));
   }
-  async function parseXlsx(file) {
+  async function parseXlsx(file, returnGrid = false) {
     if (!window.JSZip) throw new Error('Lettore Excel non disponibile. Riprova usando il file CSV esportato da Excel.');
     const zip = await JSZip.loadAsync(file);
     const workbookXml = await readZipText(zip, 'xl/workbook.xml');
@@ -1208,6 +1238,7 @@
       }
       rows.push(row);
     }
+    if (returnGrid) return rows;
     const headerIndex = detectHeaderRow(rows);
     if (headerIndex < 0) throw new Error('Non ho riconosciuto la riga di intestazione nel foglio Excel. Per questo prototipo, esporta una tabella CSV con intestazioni e riprova.');
     return parseGridRows(rows, headerIndex);
@@ -1312,54 +1343,31 @@
   }
 
   async function onGnuCashFile(event) {
-    const file = event.target.files?.[0]; if (!file) return;
-    try {
-      let text;
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      // GnuCash can store a book as SQLite as well as XML. This prototype's
-      // browser importer currently understands XML only; fail with a useful
-      // local conversion path instead of a confusing generic XML parse error.
-      const signature = new TextDecoder('ascii').decode(bytes.subarray(0, 16));
-      if (signature.startsWith('SQLite format 3')) {
-        throw new Error('Questo salvataggio GnuCash è in formato SQLite. Il prototipo importa XML: in GnuCash apri il libro e usa File → Salva con nome…, scegli formato XML e salva una copia in una cartella locale; poi importa quella copia. Non sovrascrivere il file originale.');
-      }
-      if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
-        if (!('DecompressionStream' in window)) throw new Error('Questo browser non supporta la decompressione gzip. Salva una copia XML non compressa da GnuCash e riprova.');
-        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-        text = await new Response(stream).text();
-      } else text = new TextDecoder('utf-8').decode(bytes);
-      if (!text.trimStart().startsWith('<?xml') && !text.trimStart().startsWith('<gnc-v2')) {
-        throw new Error('Il file non sembra un libro GnuCash XML leggibile. Se il formato è SQLite, aprilo in GnuCash e usa File → Salva con nome… per creare una copia in formato XML, senza sovrascrivere l’originale.');
-      }
-      const parsed = parseGnuCashXml(text);
-      if (!parsed.accounts.length) throw new Error('Nel file non ho trovato un piano dei conti leggibile.');
-      showConfirm('Importare il libro GnuCash in questo prototipo?', `Verranno importati ${parsed.accounts.length} conti e ${parsed.transactions.length} movimenti storici. L’elaborazione avviene in questo browser e i dati saranno salvati nel suo archivio locale. Il file originale non verrà modificato.`, async () => {
-        state.accounts = parsed.accounts; state.transactions = parsed.transactions; state.rules = parsed.rules; state.demo = false;
-        state.bankAccountId = parsed.bankAccountId || parsed.accounts.find(a => a.type === 'BANK')?.id || state.bankAccountId;
-        state.reportAccountId = 'all';
-        state.reportAccountDefaultMigrated = true;
-        state.openingBalance = 0;
-        const importedDates = parsed.transactions.map(item => parseDate(item.date)).filter(Boolean).sort();
-        if (importedDates.length) state.selectedMonth = importedDates.at(-1).slice(0, 7);
-        const saved = await saveState(); transactionPage = 0;
-        if (importedDates.length) {
-          const latestMonth = importedDates.at(-1).slice(0, 7);
-          $('#monthPicker').value = latestMonth; syncReportPeriodPicker(latestMonth); $('#statementMonth').value = latestMonth;
-        }
-        $$('.content-view').forEach(section => section.classList.toggle('active', section.id === 'view-transactions'));
-        $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === 'transactions'));
-        $('#currentSection').textContent = 'Movimenti';
-        renderTransactions(); renderAccounts(); renderRules(); renderPendingPreview();
-        $('#pendingNavCount').textContent = String(pendingTransactions().length);
-        $('#demoBanner').classList.toggle('hidden', !state.demo);
-        const dates = importedDates;
-        const dateRange = dates.length ? ` Intervallo date importato: ${formatDate(dates[0])}–${formatDate(dates.at(-1))}.` : ' Non sono state riconosciute date nei movimenti.';
-        showNotice(saved ? 'Libro importato' : 'Importato ma non salvato', `${parsed.accounts.length} conti e ${parsed.transactions.length} movimenti sono stati caricati.${dateRange} ${saved ? 'Sono salvati nel browser: vedi i primi 100 movimenti, ordinati dal più recente; usa Successivi per continuare.' : 'L’archivio locale del browser non è disponibile; esporta subito un backup JSON e non chiudere la pagina finché non l’hai salvato.'}`);
-      });
-    } catch (error) { showNotice('Importazione GnuCash non riuscita', error.message || 'Non riesco a leggere il file.'); }
-    event.target.value = '';
-  }
-  function parseGnuCashXml(text) {
+    const file=event.target.files?.[0];if(!file)return;
+    try{
+      const bytes=new Uint8Array(await file.arrayBuffer());const sig=new TextDecoder('ascii').decode(bytes.subarray(0,16));
+      if(sig.startsWith('SQLite format 3'))throw new Error('Il file GnuCash è SQLite. Aprilo in GnuCash e salva una copia XML, senza sovrascrivere l’originale.');
+      let xml;if(bytes[0]===0x1f&&bytes[1]===0x8b){if(!('DecompressionStream'in window))throw new Error('Browser senza supporto gzip.');xml=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();}else xml=new TextDecoder('utf-8').decode(bytes);
+      if(!xml.trimStart().startsWith('<?xml')&&!xml.trimStart().startsWith('<gnc-v2'))throw new Error('Il file non sembra un libro GnuCash XML leggibile.');
+      const parsed=parseGnuCashXml(xml);if(!parsed.accounts.length)throw new Error('Nel file non ho trovato un piano dei conti leggibile.');
+      const duplicateCount=findImportDuplicates(parsed.transactions).length;
+      const merge=include=>{
+        const byPath=new Map(state.accounts.map(ac=>[ac.path,ac]));const idMap=new Map();
+        parsed.accounts.forEach(ac=>{if(ac.type==='ROOT'){idMap.set(ac.id,state.accounts.find(x=>x.type==='ROOT')?.id||'root');return;}const old=byPath.get(ac.path);idMap.set(ac.id,old?old.id:uid('a'));});
+        const additions=parsed.accounts.filter(ac=>ac.type!=='ROOT'&&!byPath.has(ac.path)).map(ac=>({...ac,id:idMap.get(ac.id),parentId:idMap.get(ac.parentId)||'root'}));state.accounts.push(...additions);
+        const keys=new Set(state.transactions.filter(tx=>tx.status!=='duplicate').map(transactionFingerprint));const seen=new Set();
+        const chosen=parsed.transactions.filter(tx=>{const key=transactionFingerprint(tx);const duplicate=keys.has(key)||seen.has(key);seen.add(key);return include||!duplicate;});
+        const imported=chosen.map(tx=>({...tx,id:uid('g'),bankAccountId:idMap.get(tx.bankAccountId)||tx.bankAccountId,counterpartAccountId:idMap.get(tx.counterpartAccountId)||tx.counterpartAccountId,counterpartSplits:(tx.counterpartSplits||[]).map(sp=>({...sp,accountId:idMap.get(sp.accountId)||sp.accountId})),duplicateOverride:keys.has(transactionFingerprint(tx))}));
+        state.transactions.push(...imported);const ruleKeys=new Set(state.rules.map(r=>[r.field,r.token,r.accountId].join('|')));
+        parsed.rules.forEach(rule=>{const accountId=idMap.get(rule.accountId)||rule.accountId;const key=[rule.field,rule.token,accountId].join('|');if(!ruleKeys.has(key)){state.rules.push({...rule,id:uid('r'),accountId});ruleKeys.add(key);}});
+        state.demo=false;state.bankAccountId=parsed.bankAccountId?(idMap.get(parsed.bankAccountId)||state.bankAccountId):state.bankAccountId;state.reportAccountId='all';state.reportAccountDefaultMigrated=true;
+        const dates=imported.map(tx=>parseDate(tx.date)).filter(Boolean).sort();if(dates.length)state.selectedMonth=dates.at(-1).slice(0,7);
+        saveState().then(saved=>{transactionPage=0;if(dates.length){const m=dates.at(-1).slice(0,7);$('#monthPicker').value=m;syncReportPeriodPicker(m);$('#statementMonth').value=m;}renderAll();navigate('transactions');showNotice(saved?'Libro GnuCash importato':'Importazione non salvata',additions.length+' conti aggiunti; '+imported.length+' movimenti importati. '+(duplicateCount?(include?duplicateCount+' duplicati inseriti comunque.':duplicateCount+' duplicati esclusi.'):'')+' I dati esistenti sono stati conservati.');}).catch(error=>showNotice('Salvataggio non riuscito',error.message||'Errore nel database.'));
+      };
+      if(duplicateCount)showDuplicateChoice('Movimenti GnuCash già presenti','Trovati '+duplicateCount+' possibili duplicati su '+parsed.transactions.length+' movimenti. Scegli se escluderli oppure importarli comunque.',merge);
+      else showConfirm('Importare il libro GnuCash?','Saranno aggiunti '+parsed.accounts.length+' conti e '+parsed.transactions.length+' movimenti. I dati esistenti non saranno sostituiti.',()=>merge(false));
+    }catch(error){showNotice('Importazione GnuCash non riuscita',error.message||'Non riesco a leggere il file.');}event.target.value='';
+  }  function parseGnuCashXml(text) {
     const doc = parseXml(text);
     const all = [...doc.getElementsByTagName('*')];
     const accountNodes = all.filter(el => el.localName === 'account' && childText(el, 'name') !== null && childText(el, 'type') !== null);
@@ -1777,7 +1785,11 @@
   function showConfirm(title, text, callback) {
     $('#confirmTitle').textContent = title; $('#confirmText').textContent = text; confirmCallback = callback; $('#confirmModal').classList.remove('hidden');
   }
-  function closeModals() { $$('.modal-backdrop').forEach(m => m.classList.add('hidden')); confirmCallback = null; }
+  function showDuplicateChoice(title,text,callback){
+    $('#confirmTitle').textContent=title;$('#confirmText').textContent=text;confirmCallback=callback;
+    $('#confirmAction').textContent='Inserisci comunque';$('#confirmExclude')?.classList.remove('hidden');$('#confirmModal').classList.remove('hidden');
+  }
+  function closeModals() { $('.modal-backdrop').forEach(m => m.classList.add('hidden')); confirmCallback = null; $('#confirmExclude')?.classList.add('hidden'); if($('#confirmAction')) $('#confirmAction').textContent='Continua'; }
 
   initialize();
 })();

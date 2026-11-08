@@ -1,7 +1,7 @@
 name: "Gestione C/C"
 slug: "gestione_cc"
 description: "Gestione C/C privata, con archivio centralizzato e accesso LAN autenticato"
-version: "0.2.0-beta.4"
+version: "0.2.0-beta.5"
 url: "https://github.com/stefanodr/gestione-cc-home-assistant"
 webui: "https://[HOST]:[PORT:8443]"
 arch:
@@ -19,10 +19,10 @@ ports_description:
 options:
   admin_username: "admin"
   bootstrap_pin: ""
-  lan_host: "192.168.1.27"
+  hostname: "homeassistant.local"
   lan_network: "192.168.1.0/24"
 schema:
   admin_username: str
   bootstrap_pin: password
-  lan_host: str
+  hostname: str
   lan_network: str
