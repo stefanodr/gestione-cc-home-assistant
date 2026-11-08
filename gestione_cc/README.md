@@ -3,6 +3,14 @@
 ## Stato
 Prototipo avanzato in sviluppo, NON ancora approvato per dati contabili reali. Frontend collegato al database SQLite server, login amministratore, HTTPS locale, backup e ripristino predisposti. Mancano il collaudo runtime su Home Assistant OS e la verifica completa di tutte le funzioni dell'app.
 
+## Note beta.8
+- Aggiunta una schermata di caricamento iniziale: i dati dimostrativi e i valori vuoti non vengono mostrati mentre il database reale è ancora in lettura.
+- L'apertura dell'app non riscrive più inutilmente l'intero archivio a ogni accesso; salva solo alla creazione iniziale o quando una normalizzazione/migrazione modifica effettivamente i dati.
+- Conservata la selezione del periodo già utilizzata, invece di riportare sempre la panoramica al mese corrente.
+- Aggiunta la visualizzazione autenticata del percorso del database SQLite e della sua dimensione effettiva in KB/MB.
+- Separati i comandi Stampa ed Esporta PDF nel report. Entrambi aprono la finestra di stampa del browser; per ottenere il file PDF scegliere “Salva come PDF”.
+- Aggiunto l'endpoint autenticato per leggere i metadati del file SQLite, senza esporli prima del login.
+
 ## Note beta.7
 - Corretto il selettore di chiusura delle finestre: ora vengono chiusi tutti i dialoghi aperti, evitando che la conferma GnuCash resti in primo piano.
 - L'importazione GnuCash attende il completamento del salvataggio sul database prima di mostrare l'esito.
