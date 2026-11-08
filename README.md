@@ -1,8 +1,5 @@
 # Gestione C/C — Home Assistant App
 
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-App-18BCF2?logo=homeassistant)](https://www.home-assistant.io/)
-[![Version](https://img.shields.io/badge/version-1.0.0-23856f)](https://github.com/stefanodr/gestione-cc-home-assistant)
-[![Architecture](https://img.shields.io/badge/arch-amd64%20%7C%20aarch64-blue)](gestione_cc/config.yaml)
 
 **Italiano · English**
 
@@ -10,21 +7,14 @@ Gestione C/C è un'applicazione web self-hosted per la gestione dei conti person
 
 > **Importante:** Gestione C/C è una **Home Assistant App**, non un'integrazione, una dashboard card o un plugin del Marketplace. Si installa dal catalogo delle App di Home Assistant.
 
-## Anteprima / Screenshots
-
-Tutte le immagini sono mockup illustrativi con nomi, importi e movimenti interamente fittizi. Non sono screenshot di un archivio reale.
 
 ### Panoramica / Overview
-![Panoramica Gestione C/C — dati fittizi](gestione_cc/images/overview-demo.svg)
 
 ### Movimenti / Transactions
-![Registro movimenti — dati fittizi](gestione_cc/images/movements-demo.svg)
 
 ### Report / Reports
-![Pagina report — dati fittizi](gestione_cc/images/report-dashboard-demo.svg)
 
 ### Anteprima PDF / PDF preview
-![Report PDF con Stampa ed Esporta PDF — dati fittizi](gestione_cc/images/report-pdf-demo.svg)
 
 ---
 
