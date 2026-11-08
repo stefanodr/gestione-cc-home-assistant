@@ -1,12 +1,19 @@
 # Gestione C/C Home Assistant App — Changelog
 
-## 1.0.1 — in preparazione
+## 1.0.2 — 8 novembre 2026
+
+- Migliorata l'impaginazione dell'estratto conto PDF per la stampa su più pagine A4.
+- Il saldo iniziale compare una sola volta, in apertura del documento.
+- Le intestazioni della tabella dei movimenti vengono ripetute sulle pagine successive.
+- Le righe dei movimenti non vengono spezzate tra due pagine.
+- Il riepilogo finale mantiene insieme totali entrate, uscite e saldo finale, in chiusura del documento.
+
+## 1.0.1 — 8 novembre 2026
 
 - Migliorata la disposizione responsive della barra superiore e del comando Esci su smartphone in verticale.
-- Aggiunti in Panoramica i pulsanti PDF ed Excel per l'estratto conto del mese selezionato.
-- L'estratto conto riporta saldo iniziale, entrate, uscite in colonne separate, saldo progressivo e saldo finale.
+- Aggiunti in Panoramica i pulsanti PDF ed Excel per l'estratto conto del periodo selezionato.
+- L'estratto conto riporta saldo iniziale, entrate e uscite in colonne separate, saldo progressivo e saldo finale.
 - Gli export rispettano il conto selezionato ed escludono i movimenti duplicati.
-
 
 ## 1.0.0 — 8 novembre 2026
 
