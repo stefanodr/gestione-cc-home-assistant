@@ -1047,11 +1047,11 @@
     const incomeDelta = current.income - previous.income;
     const expenseDelta = current.expense - previous.expense;
     const netDelta = current.net - previous.net;
-    $('#reportIncomeDelta').textContent = `${signedEuro(incomeDelta)} rispetto a ${previous.year}`;
+    $('#reportIncomeDelta').textContent = `${signedEuro(incomeDelta)} rispetto a ${comparisons[1].year}`;
     $('#reportIncomeDelta').className = incomeDelta < 0 ? 'amount-out' : 'report-value-positive';
-    $('#reportExpenseDelta').textContent = `${signedEuro(expenseDelta)} rispetto a ${previous.year}`;
+    $('#reportExpenseDelta').textContent = `${signedEuro(expenseDelta)} rispetto a ${comparisons[1].year}`;
     $('#reportExpenseDelta').className = expenseDelta < 0 ? 'amount-out' : 'report-value-positive';
-    $('#reportNetDelta').textContent = `${signedEuro(netDelta)} rispetto a ${previous.year}`;
+    $('#reportNetDelta').textContent = `${signedEuro(netDelta)} rispetto a ${comparisons[1].year}`;
     $('#reportNetDelta').className = netDelta < 0 ? 'amount-out' : 'report-value-positive';
     const deviations = reportDeviationRows(comparisons);
     const averageDeviations = deviations.filter(row => row.delta >= 0.01).sort((a, b) => b.delta - a.delta);
