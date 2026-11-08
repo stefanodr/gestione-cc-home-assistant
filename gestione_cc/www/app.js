@@ -289,7 +289,7 @@
     $('#reportPeriodMode').value = reportMode;
     if (state.reportAccountDefaultMigrated) await saveState();
     setupControls();
-    const versionLabel = $('#appVersion'); if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 0.2.0-beta.6';
+    const versionLabel = $('#appVersion'); if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 0.2.0-beta.7';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const initialMonth = currentMonth;
     $('#monthPicker').value = initialMonth;
@@ -1352,7 +1352,7 @@
       if(!xml.trimStart().startsWith('<?xml')&&!xml.trimStart().startsWith('<gnc-v2'))throw new Error('Il file non sembra un libro GnuCash XML leggibile.');
       const parsed=parseGnuCashXml(xml);if(!parsed.accounts.length)throw new Error('Nel file non ho trovato un piano dei conti leggibile.');
       const duplicateCount=findImportDuplicates(parsed.transactions).length;
-      const merge=include=>{
+      const merge=async include=>{
         const byPath=new Map(state.accounts.map(ac=>[ac.path,ac]));const idMap=new Map();
         parsed.accounts.forEach(ac=>{if(ac.type==='ROOT'){idMap.set(ac.id,state.accounts.find(x=>x.type==='ROOT')?.id||'root');return;}const old=byPath.get(ac.path);idMap.set(ac.id,old?old.id:uid('a'));});
         const additions=parsed.accounts.filter(ac=>ac.type!=='ROOT'&&!byPath.has(ac.path)).map(ac=>({...ac,id:idMap.get(ac.id),parentId:idMap.get(ac.parentId)||'root'}));state.accounts.push(...additions);
@@ -1363,7 +1363,7 @@
         parsed.rules.forEach(rule=>{const accountId=idMap.get(rule.accountId)||rule.accountId;const key=[rule.field,rule.token,accountId].join('|');if(!ruleKeys.has(key)){state.rules.push({...rule,id:uid('r'),accountId});ruleKeys.add(key);}});
         state.demo=false;state.bankAccountId=parsed.bankAccountId?(idMap.get(parsed.bankAccountId)||state.bankAccountId):state.bankAccountId;state.reportAccountId='all';state.reportAccountDefaultMigrated=true;
         const dates=imported.map(tx=>parseDate(tx.date)).filter(Boolean).sort();if(dates.length)state.selectedMonth=dates.at(-1).slice(0,7);
-        saveState().then(saved=>{transactionPage=0;if(dates.length){const m=dates.at(-1).slice(0,7);$('#monthPicker').value=m;syncReportPeriodPicker(m);$('#statementMonth').value=m;}renderAll();navigate('transactions');showNotice(saved?'Libro GnuCash importato':'Importazione non salvata',additions.length+' conti aggiunti; '+imported.length+' movimenti importati. '+(duplicateCount?(include?duplicateCount+' duplicati inseriti comunque.':duplicateCount+' duplicati esclusi.'):'')+' I dati esistenti sono stati conservati.');}).catch(error=>showNotice('Salvataggio non riuscito',error.message||'Errore nel database.'));
+        const saved=await saveState();transactionPage=0;if(dates.length){const m=dates.at(-1).slice(0,7);$('#monthPicker').value=m;syncReportPeriodPicker(m);$('#statementMonth').value=m;}renderAll();navigate('transactions');showNotice(saved?'Libro GnuCash importato':'Importazione non salvata',additions.length+' conti aggiunti; '+imported.length+' movimenti importati. '+(duplicateCount?(include?duplicateCount+' duplicati inseriti comunque.':duplicateCount+' duplicati esclusi.'):'')+' I dati esistenti sono stati conservati.');
       };
       if(duplicateCount)showDuplicateChoice('Movimenti GnuCash già presenti','Trovati '+duplicateCount+' possibili duplicati su '+parsed.transactions.length+' movimenti. Scegli se escluderli oppure importarli comunque.',merge);
       else showConfirm('Importare il libro GnuCash?','Saranno aggiunti '+parsed.accounts.length+' conti e '+parsed.transactions.length+' movimenti. I dati esistenti non saranno sostituiti.',()=>merge(false));
@@ -1790,7 +1790,7 @@
     $('#confirmTitle').textContent=title;$('#confirmText').textContent=text;confirmCallback=callback;
     $('#confirmAction').textContent='Inserisci comunque';$('#confirmExclude')?.classList.remove('hidden');$('#confirmModal').classList.remove('hidden');
   }
-  function closeModals() { $('.modal-backdrop').forEach(m => m.classList.add('hidden')); confirmCallback = null; $('#confirmExclude')?.classList.add('hidden'); if($('#confirmAction')) $('#confirmAction').textContent='Continua'; }
+  function closeModals() { $$('.modal-backdrop').forEach(m => m.classList.add('hidden')); confirmCallback = null; $('#confirmExclude')?.classList.add('hidden'); if($('#confirmAction')) $('#confirmAction').textContent='Continua'; }
 
   initialize();
 })();
