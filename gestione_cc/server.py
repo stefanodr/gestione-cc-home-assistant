@@ -540,6 +540,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        payload = {}
+        if path != "/api/sqlite-restore":
+            try: payload = json.loads(self.body() or b"{}")
+            except Exception:
+                self.send_json(400, {"error":"JSON non valido"})
+                return
         if path == "/api/drive/connect":
             item = self.require_auth(csrf=True)
             if not item: return
@@ -662,8 +668,6 @@ class Handler(BaseHTTPRequestHandler):
                 try: temp.unlink()
                 except OSError: pass
             return
-        try: payload = json.loads(self.body() or b"{}")
-        except Exception: self.send_json(400, {"error":"JSON non valido"}); return
         if path == "/api/login":
             pin = str(payload.get("pin", ""))
             peer = self.client_address[0]
