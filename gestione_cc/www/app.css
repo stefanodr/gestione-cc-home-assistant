@@ -75,7 +75,7 @@
 .pin-settings-form{display:grid;gap:7px;margin-top:12px}.pin-settings-form label{font-size:10px;color:#6f807b;font-weight:650}.pin-settings-form input{width:100%;min-width:0;border:1px solid #dce5e2;border-radius:7px;background:#fff;padding:10px;color:#344945;font-size:14px;letter-spacing:.25em;font-variant-numeric:tabular-nums}.pin-settings-form input:focus{outline:2px solid #c7e4dd}.pin-settings-form #changePinMessage{min-height:16px;margin:4px 0;color:#317f74;font-size:10px;line-height:1.4}
 
 
-/* Beta 0.2.0-beta.8: caricamento archivio e metadati SQLite */
+/* Beta 0.2.0-beta.9: caricamento archivio e metadati SQLite */
 .app-shell{visibility:hidden}
 body.app-ready .app-shell{visibility:visible}
 .app-loading{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:#f5f8f7}
