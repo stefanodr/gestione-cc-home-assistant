@@ -289,12 +289,10 @@
     $('#retryAppLoading')?.addEventListener('click', () => location.reload());
     let needsSave = false;
     try {
-      const status = await fetch('/api/status', { credentials: 'same-origin', cache: 'no-store' });
-      if (!status.ok) throw new Error('Impossibile verificare la sessione.');
-      const session = await status.json();
-      if (!session.authenticated) { location.replace('/login'); return; }
-      csrfToken = session.csrf || '';
-      state = await dbGet('state');
+      const archive = await apiRequest('/api/state');
+      csrfToken = archive.csrf || '';
+      stateRevision = Number.isInteger(archive.revision) ? archive.revision : 0;
+      state = archive.state;
       if (!state) {
         state = { version: 1, demo: false, accounts: defaultAccounts(), transactions: [], rules: [], bankAccountId: 'bank', openingBalance: 0, lastSaved: new Date().toISOString() };
         needsSave = true;
@@ -312,7 +310,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 0.2.0-beta.8';
+    if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 0.2.0-beta.9';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -421,8 +419,7 @@
     $('#restoreDriveBackup')?.addEventListener('click', restoreDriveBackup);
     $('#exportStatementPdf')?.addEventListener('click', exportStatementPdf);
     $('#exportStatementXlsx')?.addEventListener('click', exportStatementXlsx);
-    $('#printReport')?.addEventListener('click', () => exportReportPdf('print'));
-    $('#exportReportPdf')?.addEventListener('click', () => exportReportPdf('pdf'));
+    $('#exportReportPdf')?.addEventListener('click', exportReportPdf);
     $('#exportReportXlsx')?.addEventListener('click', exportReportXlsx);
     $('#exitApp')?.addEventListener('click', exitApp);
     $('#deletePersonalData')?.addEventListener('click', deletePersonalData);
@@ -1691,11 +1688,18 @@
       showNotice('File Excel pronto', `Creato ${filename}. Puoi aprirlo con Excel o LibreOffice.`);
     } catch (error) { showNotice('Esportazione Excel non riuscita', error?.message || String(error)); }
   }
-  function printHtml(title, content) {
+  function printHtml(title, content, options = {}) {
     const printWindow = window.open('', '_blank');
-    if (!printWindow) { showNotice('Finestra di stampa bloccata', 'Consenti l’apertura della finestra di stampa e riprova.'); return; }
+    if (!printWindow) { showNotice('Finestra di stampa bloccata', 'Consenti l’apertura della finestra del report e riprova.'); return; }
+    const reportToolbar = options.reportToolbar ? `<div class="report-toolbar"><div><strong>Report Gestione C/C</strong><span>Anteprima del documento</span></div><div class="report-toolbar-actions"><button type="button" id="reportPrintAction">Stampa</button><button type="button" id="reportPdfAction">Esporta PDF</button></div></div>` : '';
+    const reportScript = options.reportToolbar ? `<script>
+      document.getElementById('reportPrintAction').addEventListener('click',()=>window.print());
+      document.getElementById('reportPdfAction').addEventListener('click',()=>{
+        window.print();
+      });
+    </script>` : `<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250));</script>`;
     printWindow.document.open();
-    printWindow.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${safeText(title)}</title><style>@page{size:A4;margin:15mm}*{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#213330;margin:0}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:20px 0 8px}.sub{color:#667772;margin-bottom:18px}.summary{display:flex;gap:12px;margin:14px 0}.summary div{border:1px solid #dce5e2;padding:10px;flex:1}.summary strong{display:block;font-size:15px;margin-top:5px}.summary span{display:block;font-size:9px;color:#63736f;margin-top:4px}.chart{width:100%;margin:8px 0 18px;break-inside:avoid}.chart svg{display:block;width:100%;height:auto;max-height:100mm}table{width:100%;border-collapse:collapse;font-size:10px;margin:8px 0 16px}th,td{border-bottom:1px solid #dce5e2;text-align:left;padding:6px 5px}th{background:#f0f5f3;font-weight:700}td.num,th.num{text-align:right}.foot{font-size:9px;color:#647570;margin-top:16px}@media print{thead{display:table-header-group}tr{break-inside:avoid}}</style></head><body>${content}<p class="foot">Creato da Gestione C/C · ${new Date().toLocaleString('it-IT')}</p><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250));</script></body></html>`);
+    printWindow.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeText(title)}</title><style>@page{size:A4;margin:15mm}*{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#213330;margin:0}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:20px 0 8px}.sub{color:#667772;margin-bottom:18px}.summary{display:flex;gap:12px;margin:14px 0}.summary div{border:1px solid #dce5e2;padding:10px;flex:1}.summary strong{display:block;font-size:15px;margin-top:5px}.summary span{display:block;font-size:9px;color:#63736f;margin-top:4px}.chart{width:100%;margin:8px 0 18px;break-inside:avoid}.chart svg{display:block;width:100%;height:auto;max-height:100mm}table{width:100%;border-collapse:collapse;font-size:10px;margin:8px 0 16px}th,td{border-bottom:1px solid #dce5e2;text-align:left;padding:6px 5px}th{background:#f0f5f3;font-weight:700}td.num,th.num{text-align:right}.foot{font-size:9px;color:#647570;margin-top:16px}.report-toolbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 18px;margin:0 0 22px;background:#f3f7f5;border-bottom:1px solid #dce5e2;font-family:Arial,sans-serif}.report-toolbar strong{display:block;font-size:13px}.report-toolbar span{display:block;margin-top:3px;color:#71817c;font-size:10px}.report-toolbar-actions{display:flex;gap:8px}.report-toolbar button{border:1px solid #cbdad5;border-radius:7px;background:#fff;color:#294d45;padding:9px 13px;font-size:12px;font-weight:650;cursor:pointer}.report-toolbar button:hover{background:#e6f1ed;border-color:#8eafa4}.report-document{max-width:1100px;margin:0 auto;padding:0 22px 28px}@media print{thead{display:table-header-group}tr{break-inside:avoid}.report-toolbar{display:none!important}.report-document{max-width:none;margin:0;padding:0}}@media(max-width:600px){.report-toolbar{align-items:flex-start;flex-direction:column}.report-toolbar-actions{width:100%}.report-toolbar button{flex:1}}</style></head><body>${reportToolbar}<main class="report-document">${content}<p class="foot">Creato da Gestione C/C · ${new Date().toLocaleString('it-IT')}</p></main>${reportScript}</body></html>`);
     printWindow.document.close();
   }
   function statementContext() {
@@ -1712,7 +1716,7 @@
     const content = `<h1>Prospetto movimenti mensile</h1><div class="sub">${safeText(monthName(monthKey))} · ${safeText(accountName)}</div><div class="summary"><div>Entrate<strong>${euro.format(totals.income)}</strong></div><div>Uscite<strong>${euro.format(totals.expense)}</strong></div><div>Saldo netto del periodo<strong>${euro.format(totals.net)}</strong></div></div><table><thead><tr><th>Data</th><th>Descrizione</th><th>Causale</th><th>Contropartita</th><th class="num">Entrate</th><th class="num">Uscite</th></tr></thead><tbody>${rows || '<tr><td colspan="6">Nessun movimento nel periodo selezionato.</td></tr>'}</tbody></table><div class="foot">${transactions.length} movimenti. Prospetto personale non sostitutivo dell’estratto ufficiale della banca.</div>`;
     printHtml(`Movimenti ${monthKey}`, content);
   }
-  function exportReportPdf(outputMode = 'pdf') {
+  function exportReportPdf() {
     const comparisons = selectedComparisons(), current = comparisons[0].data, previous = comparisons[1].data;
     const deviations = reportDeviationRows(comparisons);
     const averageDeviations = deviations.filter(row => row.delta >= 0.01).sort((a, b) => b.delta - a.delta);
@@ -1724,8 +1728,7 @@
     const baselineText = reportMode === 'monthly' && Number(monthSelection().slice(5, 7)) <= 2 ? 'Confronto con lo stesso mese dell’anno precedente' : 'Media degli altri periodi completi disponibili dello stesso anno';
     const chart = reportChartSvg();
     const content = `<h1>Report Gestione C/C</h1><div class="sub">${safeText(code)} · ${safeText(label)} · ${safeText(scope)}</div><div class="summary"><div>Entrate<strong>${euro.format(current.income)}</strong><span style="color:${current.income - previous.income < 0 ? '#b00020' : '#171b1a'}">Confronto precedente: ${signedEuro(current.income - previous.income)}</span></div><div>Uscite<strong>${euro.format(current.expense)}</strong><span style="color:${current.expense - previous.expense < 0 ? '#b00020' : '#171b1a'}">Confronto precedente: ${signedEuro(current.expense - previous.expense)}</span></div><div>Saldo netto<strong style="color:${current.net < 0 ? '#b00020' : '#171b1a'};font-weight:${current.net < 0 ? '700' : '400'}">${euro.format(current.net)}</strong><span style="color:${current.net - previous.net < 0 ? '#b00020' : '#171b1a'}">${verdict} · variazione ${signedEuro(current.net - previous.net)}</span></div></div><h2>Flusso del periodo</h2><div class="chart">${chart}</div><h2>Valutazione e scostamenti</h2><p><strong style="color:${current.net < 0 ? '#b00020' : '#171b1a'}">${verdict}</strong>: ${current.net > .005 ? 'le entrate hanno superato le uscite.' : current.net < -.005 ? 'le uscite hanno superato le entrate.' : 'entrate e uscite sono in pareggio.'} I trasferimenti sono separati dall’analisi delle spese.</p><p>${averageDeviations[0] ? `Lo scostamento maggiore è ${safeText(averageDeviations[0].name)}: ${averageDeviations[0].delta > 0 ? 'sopra' : 'sotto'} la media di ${euro.format(Math.abs(averageDeviations[0].delta))}.` : 'Non emergono scostamenti confrontabili dalla media.'}</p><h2>Scostamenti di spesa · ${safeText(baselineText)}</h2><table><thead><tr><th>Categoria</th><th class="num">Spesa periodo</th><th class="num">Anno prec.</th><th class="num">Var. annua</th><th class="num">Media attesa</th><th class="num">Scostamento</th><th class="num">Var. % media</th></tr></thead><tbody>${rows || '<tr><td colspan="7">Nessuno scostamento calcolabile.</td></tr>'}</tbody></table><h2>Confronto con gli anni precedenti</h2><table><thead><tr><th>Anno</th><th class="num">Entrate</th><th class="num">Uscite</th><th class="num">Netto</th><th class="num">Trasferimenti</th></tr></thead><tbody>${periodRows}</tbody></table>`;
-    const documentTitle = outputMode === 'print' ? 'Stampa-' + code : 'Report-' + code;
-    printHtml(documentTitle, content);
+    printHtml('Report-' + code, content, { reportToolbar: true });
   }
   function exportStatementXlsx() {
     const { monthKey, transactions, totals, accountName } = statementContext();
