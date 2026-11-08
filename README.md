@@ -32,7 +32,7 @@ Gestione C/C è un'applicazione web self-hosted per la gestione dei conti person
 - **Report:** analisi mensile, trimestrale, semestrale e annuale, confronti storici e scostamenti per categoria.
 - **Esportazione:** report XLSX e anteprima PDF stampabile; il browser consente di salvare il documento come PDF.
 - **Archivio centralizzato:** database SQLite persistente, condiviso tra i dispositivi autorizzati.
-- **Backup e ripristino:** backup JSON e SQLite, copie automatiche locali e ripristino con controlli d'integrità.
+- **Backup e ripristino:** backup JSON e SQLite, copie automatiche locali, backup facoltativo su Google Drive e ripristino con controlli d'integrità.
 - **Accesso protetto:** PIN amministratore di 6 cifre e connessione HTTPS.
 
 ## Requisiti
@@ -156,7 +156,7 @@ Gestione C/C is a self-hosted personal finance web application distributed as a 
 - The PIN is processed with PBKDF2-HMAC-SHA256 and a random salt.
 - HttpOnly, Secure and SameSite=Strict session cookies; CSRF protection for state-changing requests.
 - Login throttling and revision checks help reduce brute-force attempts and silent concurrent overwrites.
-- Accounting data are stored in the App's persistent volume; the application is not designed to send them to external cloud services.
+- Accounting data are stored in the App's persistent volume. Only when the user explicitly connects Google Drive are SQLite backup files sent to their own Google account over HTTPS; the live database remains on the Home Assistant host.
 - Treat the private CA as a trust credential. Install it only on authorised devices and protect backups.
 
 No application can guarantee absolute security. Verify networking, backup and restore in your own environment before relying on the application. No independent security audit is claimed.
