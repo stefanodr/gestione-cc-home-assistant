@@ -31,7 +31,7 @@ function demoState() {
   ];
   const transactions = [];
   for (let year = yearNow - 3; year <= yearNow; year++) {
-    const monthLimit = year === yearNow ? monthNow : 11;
+    const monthLimit = year === yearNow ? monthNow - 1 : 11;
     for (let month = 0; month <= monthLimit; month++) {
       const mm = String(month + 1).padStart(2, '0');
       const jitter = ((year * 7 + month * 13) % 31) - 15;
@@ -43,8 +43,10 @@ function demoState() {
       if (month === 4 || month === 10) transactions.push({ id: `demo-health-${year}-${mm}`, date: `${year}-${mm}-11`, amount: -(22 + month), payee: 'Farmacia', memo: 'Acquisto salute', bankAccountId: 'bank', counterpartAccountId: 'health', status: 'confirmed', confidence: 1, source: 'demo' });
     }
   }
-  transactions.push({ id: 'demo-pending-1', date: `${yearNow}-${String(monthNow + 1).padStart(2, '0')}-06`, amount: -36.5, payee: 'Caffè Aurora', memo: 'Pagamento carta', bankAccountId: 'bank', counterpartAccountId: null, status: 'pending', confidence: 0.2, source: 'demo' });
-  transactions.push({ id: 'demo-pending-2', date: `${yearNow}-${String(monthNow + 1).padStart(2, '0')}-04`, amount: 74, payee: 'Rimborso', memo: 'Accredito', bankAccountId: 'bank', counterpartAccountId: null, status: 'pending', confidence: 0.2, source: 'demo' });
+  const today = now.getDate();
+  const monthKey = `${yearNow}-${String(monthNow + 1).padStart(2, '0')}`;
+  transactions.push({ id: 'demo-pending-1', date: `${monthKey}-${String(today).padStart(2, '0')}`, amount: -36.5, payee: 'Caffè Aurora', memo: 'Pagamento carta', bankAccountId: 'bank', counterpartAccountId: null, status: 'pending', confidence: 0.2, source: 'demo' });
+  transactions.push({ id: 'demo-pending-2', date: `${monthKey}-${String(Math.max(1, today - 2)).padStart(2, '0')}`, amount: 74, payee: 'Rimborso', memo: 'Accredito', bankAccountId: 'bank', counterpartAccountId: null, status: 'pending', confidence: 0.2, source: 'demo' });
   const rules = [
     ['Market Alfa', 'grocery', 8], ['Affitto', 'home', 8], ['Mobilità', 'transport', 8],
     ['Energia', 'utilities', 4], ['Datore di lavoro', 'salary', 8]
