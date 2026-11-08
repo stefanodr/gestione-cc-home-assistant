@@ -25,7 +25,7 @@
       </nav>
       <div class="sidebar-spacer"></div>
       <div class="local-card"><span class="local-dot"></span><div><strong>Archivio centralizzato</strong><small>server domestico · accesso autenticato</small></div></div>
-      <div class="sidebar-foot">EDIZIONE SERVER · SVILUPPO</div>
+      <div class="sidebar-foot" id="appVersion">Gestione C/C · v1.6</div>
     </aside>
 
     <main class="main-area">
@@ -94,7 +94,7 @@
       </section>
 
       <section class="content-view" id="view-accounts">
-        <div class="page-heading"><div><p class="eyebrow">STRUTTURA CONTABILE</p><h1>Piano dei conti</h1><p class="subtitle">Conti importati da GnuCash, con distinzione tra voci patrimoniali ed economiche.</p></div><button class="button button-outline" id="addAccount">＋ Aggiungi conto</button></div>
+        <div class="page-heading"><div><p class="eyebrow">STRUTTURA CONTABILE</p><h1>Piano dei conti</h1><p class="subtitle">Conti importati da GnuCash, con distinzione tra voci patrimoniali ed economiche.</p></div><div class="heading-actions"><button class="button button-outline" id="downloadAccountTemplate">Scarica modello Excel</button><button class="button button-quiet" id="importAccountsExcel">Importa da Excel</button><button class="button button-primary" id="addAccount">＋ Aggiungi conto</button></div></div>
         <div class="account-summary" id="accountSummary"></div>
         <article class="panel table-panel"><div class="table-scroll"><table class="data-table"><thead><tr><th>Conto</th><th>Tipo GnuCash</th><th>Classificazione</th><th>Movimenti</th></tr></thead><tbody id="accountsBody"></tbody></table></div></article>
         <div class="inline-note"><span>ⓘ</span><p>La classificazione semplificata non sostituisce il tipo originale GnuCash. I conti tecnici e strutturali restano distinti.</p></div>
@@ -115,13 +115,14 @@
   </div>
 
   <input id="bankFile" type="file" accept=".qif,.csv,.txt,.xlsx" hidden>
+  <input id="accountFile" type="file" accept=".xlsx,.csv" hidden>
   <input id="gnucashFile" type="file" accept=".gnucash,.xml,.gz,.gzip" hidden>
   <input id="backupFile" type="file" accept="application/json,.json" hidden>
   <input id="sqliteBackupFile" type="file" accept=".sqlite3,application/vnd.sqlite3,application/octet-stream" hidden>
   <datalist id="accountSearchOptions"></datalist>
 
   <div class="modal-backdrop hidden" id="noticeModal" role="dialog" aria-modal="true" aria-labelledby="noticeTitle"><div class="modal-card"><button class="modal-close" data-close-modal aria-label="Chiudi">×</button><div class="modal-symbol" id="noticeSymbol">✓</div><h2 id="noticeTitle">Operazione completata</h2><p id="noticeText"></p><button class="button button-primary" data-close-modal>Va bene</button></div></div>
-  <div class="modal-backdrop hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle"><div class="modal-card"><button class="modal-close" data-close-modal aria-label="Chiudi">×</button><div class="modal-symbol amber">!</div><h2 id="confirmTitle">Conferma importazione</h2><p id="confirmText"></p><div class="modal-actions"><button class="button button-quiet" data-close-modal>Annulla</button><button class="button button-primary" id="confirmAction">Continua</button></div></div></div>
+  <div class="modal-backdrop hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle"><div class="modal-card"><button class="modal-close" data-close-modal aria-label="Chiudi">×</button><div class="modal-symbol amber">!</div><h2 id="confirmTitle">Conferma importazione</h2><p id="confirmText"></p><div class="modal-actions"><button class="button button-quiet" data-close-modal>Annulla</button><button class="button button-quiet hidden" id="confirmExclude">Escludi duplicati</button><button class="button button-primary" id="confirmAction">Continua</button></div></div></div>
   <div class="modal-backdrop hidden" id="splitModal" role="dialog" aria-modal="true" aria-labelledby="splitDialogTitle"><div class="modal-card split-modal-card"><button class="modal-close" id="closeSplitTop" aria-label="Chiudi">×</button><div class="modal-symbol">⇄</div><h2 id="splitDialogTitle">Ripartisci il movimento</h2><p id="splitTitle" class="split-transaction-title"></p><p id="splitSubtitle"></p><div class="split-rows-head"><span>Categoria o contropartita</span><span>Importo assegnato</span><span></span></div><div id="splitRows" class="split-rows"></div><button class="text-button split-add" id="addSplitRow">＋ Aggiungi riga</button><div class="split-totals"><span>Totale assegnato</span><strong id="splitTotal">—</strong><span>Da assegnare</span><strong id="splitRemaining">—</strong></div><div class="modal-actions"><button class="button button-quiet" id="cancelSplit">Annulla</button><button class="button button-primary" id="saveSplit">Salva riparto</button></div></div></div>
   <div class="modal-backdrop hidden" id="manualTransactionModal" role="dialog" aria-modal="true" aria-labelledby="manualTransactionTitle"><div class="modal-card split-modal-card"><button class="modal-close" id="closeManualTransaction" aria-label="Chiudi">×</button><div class="modal-symbol">＋</div><h2 id="manualTransactionTitle">Nuovo movimento</h2><p>Inseriscilo direttamente nel registro del conto.</p><div class="manual-fields"><label>Data<input id="manualDate" type="date" required></label><label>Descrizione<input id="manualPayee" type="text" maxlength="160" placeholder="Es. Spesa supermercato" required></label><label>Importo<input id="manualAmount" type="text" inputmode="decimal" placeholder="Es. 1.234,56; usa il segno meno per un’uscita" autocomplete="off" required></label><label>Conto corrente<select id="manualBankAccount" required></select></label><label>Categoria o contropartita<input id="manualCounterAccount" type="text" list="accountSearchOptions" placeholder="Scrivi per cercare o lascia da classificare" autocomplete="off"></label></div><div class="modal-actions"><button class="button button-quiet" id="cancelManualTransaction">Annulla</button><button class="button button-primary" id="saveManualTransaction">Aggiungi movimento</button></div></div></div>
 </body>
