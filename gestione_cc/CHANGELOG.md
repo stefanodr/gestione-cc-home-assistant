@@ -1,21 +1,23 @@
 # Gestione C/C Home Assistant App — Changelog
 
-## 1.0.0
+## 1.0.0 — 8 novembre 2026
 
-- First public distribution baseline.
-- Persistent central SQLite archive in the Home Assistant App data directory.
-- Six-digit administrator PIN authentication and HTTPS interface.
-- GnuCash and bank transaction import workflows.
-- Hierarchical chart of accounts, categorisation and split transactions.
-- Financial overview, historical comparisons and period-based reports.
-- XLSX export and browser-based PDF print/export workflow.
-- JSON and SQLite backup/restore workflows.
-- Bilingual documentation and fictional-data screenshots.
+- Prima versione di distribuzione documentata.
+- Archivio SQLite centralizzato e persistente nella directory dati dell'App Home Assistant.
+- Accesso amministratore tramite PIN di sei cifre e interfaccia HTTPS.
+- Importazione di archivi GnuCash e movimenti bancari nei formati supportati.
+- Piano dei conti gerarchico, classificazione e movimenti suddivisi.
+- Panoramica finanziaria, confronti storici e report per periodo.
+- Esportazione XLSX e flusso di stampa/esportazione PDF tramite browser.
+- Backup e ripristino JSON e SQLite.
+- Documentazione italiana/inglese e licenza proprietaria d'uso personale.
 
-### Important deployment notes
+### Note importanti per l'installazione
 
-- Intended for local-network use only.
-- Configure and verify the actual LAN CIDR before entering personal accounting data.
-- Keep protected backups outside the Home Assistant host.
-- No independent security audit is claimed.
-- A licence must be selected and added by the repository owner before public redistribution under an open-source licence.
+- Progettata per l'utilizzo in rete locale; non configurare esposizione pubblica su Internet.
+- Configurare e verificare la subnet LAN effettiva prima di inserire dati contabili personali.
+- Conservare backup protetti anche fuori dal server Home Assistant.
+- Non è stato eseguito un audit di sicurezza indipendente.
+- La licenza proprietaria si applica esclusivamente ai materiali originali per i quali l'autore detiene i diritti pertinenti. I componenti di terze parti restano soggetti alle rispettive licenze.
+- La versione dell'applicazione Windows e quella della distribuzione Home Assistant sono numerazioni distinte.
+- Le schermate dimostrative del README saranno aggiunte dopo la cattura dall'interfaccia effettiva con dati fittizi; non vengono usate immagini illustrative o simulate.
