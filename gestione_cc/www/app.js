@@ -1337,54 +1337,31 @@
   }
 
   async function onGnuCashFile(event) {
-    const file = event.target.files?.[0]; if (!file) return;
-    try {
-      let text;
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      // GnuCash can store a book as SQLite as well as XML. This prototype's
-      // browser importer currently understands XML only; fail with a useful
-      // local conversion path instead of a confusing generic XML parse error.
-      const signature = new TextDecoder('ascii').decode(bytes.subarray(0, 16));
-      if (signature.startsWith('SQLite format 3')) {
-        throw new Error('Questo salvataggio GnuCash è in formato SQLite. Il prototipo importa XML: in GnuCash apri il libro e usa File → Salva con nome…, scegli formato XML e salva una copia in una cartella locale; poi importa quella copia. Non sovrascrivere il file originale.');
-      }
-      if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
-        if (!('DecompressionStream' in window)) throw new Error('Questo browser non supporta la decompressione gzip. Salva una copia XML non compressa da GnuCash e riprova.');
-        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-        text = await new Response(stream).text();
-      } else text = new TextDecoder('utf-8').decode(bytes);
-      if (!text.trimStart().startsWith('<?xml') && !text.trimStart().startsWith('<gnc-v2')) {
-        throw new Error('Il file non sembra un libro GnuCash XML leggibile. Se il formato è SQLite, aprilo in GnuCash e usa File → Salva con nome… per creare una copia in formato XML, senza sovrascrivere l’originale.');
-      }
-      const parsed = parseGnuCashXml(text);
-      if (!parsed.accounts.length) throw new Error('Nel file non ho trovato un piano dei conti leggibile.');
-      showConfirm('Importare il libro GnuCash in questo prototipo?', `Verranno importati ${parsed.accounts.length} conti e ${parsed.transactions.length} movimenti storici. L’elaborazione avviene in questo browser e i dati saranno salvati nel suo archivio locale. Il file originale non verrà modificato.`, async () => {
-        state.accounts = parsed.accounts; state.transactions = parsed.transactions; state.rules = parsed.rules; state.demo = false;
-        state.bankAccountId = parsed.bankAccountId || parsed.accounts.find(a => a.type === 'BANK')?.id || state.bankAccountId;
-        state.reportAccountId = 'all';
-        state.reportAccountDefaultMigrated = true;
-        state.openingBalance = 0;
-        const importedDates = parsed.transactions.map(item => parseDate(item.date)).filter(Boolean).sort();
-        if (importedDates.length) state.selectedMonth = importedDates.at(-1).slice(0, 7);
-        const saved = await saveState(); transactionPage = 0;
-        if (importedDates.length) {
-          const latestMonth = importedDates.at(-1).slice(0, 7);
-          $('#monthPicker').value = latestMonth; syncReportPeriodPicker(latestMonth); $('#statementMonth').value = latestMonth;
-        }
-        $$('.content-view').forEach(section => section.classList.toggle('active', section.id === 'view-transactions'));
-        $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === 'transactions'));
-        $('#currentSection').textContent = 'Movimenti';
-        renderTransactions(); renderAccounts(); renderRules(); renderPendingPreview();
-        $('#pendingNavCount').textContent = String(pendingTransactions().length);
-        $('#demoBanner').classList.toggle('hidden', !state.demo);
-        const dates = importedDates;
-        const dateRange = dates.length ? ` Intervallo date importato: ${formatDate(dates[0])}–${formatDate(dates.at(-1))}.` : ' Non sono state riconosciute date nei movimenti.';
-        showNotice(saved ? 'Libro importato' : 'Importato ma non salvato', `${parsed.accounts.length} conti e ${parsed.transactions.length} movimenti sono stati caricati.${dateRange} ${saved ? 'Sono salvati nel browser: vedi i primi 100 movimenti, ordinati dal più recente; usa Successivi per continuare.' : 'L’archivio locale del browser non è disponibile; esporta subito un backup JSON e non chiudere la pagina finché non l’hai salvato.'}`);
-      });
-    } catch (error) { showNotice('Importazione GnuCash non riuscita', error.message || 'Non riesco a leggere il file.'); }
-    event.target.value = '';
-  }
-  function parseGnuCashXml(text) {
+    const file=event.target.files?.[0];if(!file)return;
+    try{
+      const bytes=new Uint8Array(await file.arrayBuffer());const sig=new TextDecoder('ascii').decode(bytes.subarray(0,16));
+      if(sig.startsWith('SQLite format 3'))throw new Error('Il file GnuCash è SQLite. Aprilo in GnuCash e salva una copia XML, senza sovrascrivere l’originale.');
+      let xml;if(bytes[0]===0x1f&&bytes[1]===0x8b){if(!('DecompressionStream'in window))throw new Error('Browser senza supporto gzip.');xml=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();}else xml=new TextDecoder('utf-8').decode(bytes);
+      if(!xml.trimStart().startsWith('<?xml')&&!xml.trimStart().startsWith('<gnc-v2'))throw new Error('Il file non sembra un libro GnuCash XML leggibile.');
+      const parsed=parseGnuCashXml(xml);if(!parsed.accounts.length)throw new Error('Nel file non ho trovato un piano dei conti leggibile.');
+      const duplicateCount=parsed.transactions.filter(tx=>state.transactions.some(old=>old.status!=='duplicate'&&transactionFingerprint(old)===transactionFingerprint(tx))).length;
+      const merge=include=>{
+        const byPath=new Map(state.accounts.map(ac=>[ac.path,ac]));const idMap=new Map();
+        parsed.accounts.forEach(ac=>{if(ac.type==='ROOT'){idMap.set(ac.id,state.accounts.find(x=>x.type==='ROOT')?.id||'root');return;}const old=byPath.get(ac.path);idMap.set(ac.id,old?old.id:uid('a'));});
+        const additions=parsed.accounts.filter(ac=>ac.type!=='ROOT'&&!byPath.has(ac.path)).map(ac=>({...ac,id:idMap.get(ac.id),parentId:idMap.get(ac.parentId)||'root'}));state.accounts.push(...additions);
+        const keys=new Set(state.transactions.filter(tx=>tx.status!=='duplicate').map(transactionFingerprint));const seen=new Set();
+        const chosen=parsed.transactions.filter(tx=>{const key=transactionFingerprint(tx);const duplicate=keys.has(key)||seen.has(key);seen.add(key);return include||!duplicate;});
+        const imported=chosen.map(tx=>({...tx,id:uid('g'),bankAccountId:idMap.get(tx.bankAccountId)||tx.bankAccountId,counterpartAccountId:idMap.get(tx.counterpartAccountId)||tx.counterpartAccountId,counterpartSplits:(tx.counterpartSplits||[]).map(sp=>({...sp,accountId:idMap.get(sp.accountId)||sp.accountId})),duplicateOverride:keys.has(transactionFingerprint(tx))}));
+        state.transactions.push(...imported);const ruleKeys=new Set(state.rules.map(r=>[r.field,r.token,r.accountId].join('|')));
+        parsed.rules.forEach(rule=>{const accountId=idMap.get(rule.accountId)||rule.accountId;const key=[rule.field,rule.token,accountId].join('|');if(!ruleKeys.has(key)){state.rules.push({...rule,id:uid('r'),accountId});ruleKeys.add(key);}});
+        state.demo=false;state.bankAccountId=parsed.bankAccountId?(idMap.get(parsed.bankAccountId)||state.bankAccountId):state.bankAccountId;state.reportAccountId='all';state.reportAccountDefaultMigrated=true;
+        const dates=imported.map(tx=>parseDate(tx.date)).filter(Boolean).sort();if(dates.length)state.selectedMonth=dates.at(-1).slice(0,7);
+        saveState().then(saved=>{transactionPage=0;if(dates.length){const m=dates.at(-1).slice(0,7);$('#monthPicker').value=m;syncReportPeriodPicker(m);$('#statementMonth').value=m;}renderAll();navigate('transactions');showNotice(saved?'Libro GnuCash importato':'Importazione non salvata',additions.length+' conti aggiunti; '+imported.length+' movimenti importati. '+(duplicateCount?(include?duplicateCount+' duplicati inseriti comunque.':duplicateCount+' duplicati esclusi.'):'')+' I dati esistenti sono stati conservati.');}).catch(error=>showNotice('Salvataggio non riuscito',error.message||'Errore nel database.'));
+      };
+      if(duplicateCount)showDuplicateChoice('Movimenti GnuCash già presenti','Trovati '+duplicateCount+' possibili duplicati su '+parsed.transactions.length+' movimenti. Scegli se escluderli oppure importarli comunque.',merge);
+      else showConfirm('Importare il libro GnuCash?','Saranno aggiunti '+parsed.accounts.length+' conti e '+parsed.transactions.length+' movimenti. I dati esistenti non saranno sostituiti.',()=>merge(false));
+    }catch(error){showNotice('Importazione GnuCash non riuscita',error.message||'Non riesco a leggere il file.');}event.target.value='';
+  }  function parseGnuCashXml(text) {
     const doc = parseXml(text);
     const all = [...doc.getElementsByTagName('*')];
     const accountNodes = all.filter(el => el.localName === 'account' && childText(el, 'name') !== null && childText(el, 'type') !== null);
