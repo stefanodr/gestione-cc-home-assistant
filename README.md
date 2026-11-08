@@ -73,7 +73,7 @@ Le copie automatiche locali non sostituiscono un backup esterno: un guasto del d
 
 ## Supporto
 
-- Licenza: [MIT](LICENSE)
+- Diritti d'autore: Copyright © 2026 Stefano Di Ricco (`stefanodr`). Tutti i diritti riservati; non è attualmente concessa una licenza generale d'uso, modifica, distribuzione o sfruttamento commerciale.
 - Avvisi dipendenze: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 - Repository: https://github.com/stefanodr/gestione-cc-home-assistant
@@ -85,7 +85,7 @@ Quando apri una segnalazione indica versioni Home Assistant/App, architettura e 
 
 ## Stato e licenza
 
-Versione di distribuzione dichiarata: **1.0.0**. Il progetto adotta la licenza MIT; il file `LICENSE` e gli avvisi delle dipendenze di terze parti devono essere presenti nella release pubblica. La pubblicazione non sostituisce i test nel sistema dell'utente.
+Versione di distribuzione dichiarata: **1.0.0**. Il progetto non è attualmente rilasciato con una licenza open source. Il codice originale è protetto dal diritto d'autore; tutti i diritti sono riservati. Qualsiasi utilizzo, modifica, ridistribuzione o sfruttamento commerciale richiede una preventiva autorizzazione scritta del titolare, salvo i diritti concessi dalle licenze dei componenti di terze parti. La strategia di licenza commerciale è in valutazione. La pubblicazione non sostituisce i test nel sistema dell'utente.
 
 ---
 
@@ -158,7 +158,7 @@ Local automatic snapshots are not a substitute for off-host backups. A disk or h
 
 ## Support
 
-- Licence: [MIT](LICENSE)
+- Copyright: Copyright © 2026 Stefano Di Ricco (`stefanodr`). All rights reserved; no general licence to use, modify, distribute or commercially exploit the software is currently granted.
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 - Repository: https://github.com/stefanodr/gestione-cc-home-assistant
@@ -170,4 +170,4 @@ When reporting an issue, include Home Assistant/App versions, architecture and r
 
 ## Status and licence
 
-Declared distribution version: **1.0.0**. The project adopts the MIT License; the `LICENSE` file and third-party notices must accompany the public release. A version number does not replace testing on the user's own system.
+Declared distribution version: **1.0.0**. The project is not currently released under an open-source licence. The original code is protected by copyright; all rights are reserved. Any use, modification, redistribution or commercial exploitation requires the copyright holder's prior written permission, except for rights granted by third-party component licences. The commercial licensing strategy is under review. A version number does not replace testing on the user's own system.
