@@ -73,12 +73,15 @@ Nessuna applicazione può garantire sicurezza assoluta. Verifica rete, backup e 
 
 ## Backup
 
-1. Usa periodicamente **Esporta backup JSON** e/o **Scarica database SQLite** dalle Impostazioni.
-2. Conserva almeno una copia fuori dal server Home Assistant, in un luogo protetto.
-3. Prima degli aggiornamenti importanti crea una copia manuale.
-4. Prova il ripristino solo su un'installazione di test o dopo aver salvato una copia aggiornata.
+- I backup automatici locali restano disponibili sul server Home Assistant.
+- In **Impostazioni → Backup · Google Drive** puoi collegare facoltativamente il tuo account Google.
+- Il collegamento usa un OAuth Client di tipo Desktop e un token generato una tantum da rclone sul PC Windows; Gestione C/C conserva il token solo nel volume dati privato dell’App.
+- Se collegato, l’App mantiene un backup di sessione e gli ultimi tre backup notturni (ore 03:00, fuso Europe/Rome). Il comando **Esci** attende il backup se l’archivio è cambiato; la chiusura diretta della scheda è solo un tentativo.
+- I file SQLite su Google Drive **non sono cifrati**: chiunque abbia accesso al tuo Drive e ai relativi backup può leggerne il contenuto. Proteggi l’account Google e non condividere i file.
+- Il ripristino da Google Drive crea prima una copia preventiva locale e poi verifica l’integrità SQLite e la struttura dell’archivio.
+- Conserva comunque una copia indipendente e prova il ripristino in modo prudente.
 
-Le copie automatiche locali non sostituiscono un backup esterno: un guasto del disco può coinvolgere sia il database sia le copie sullo stesso host.
+La connessione a Google Drive è facoltativa e in uscita: non rende l’interfaccia Gestione C/C accessibile da Internet.
 
 ## Supporto
 
