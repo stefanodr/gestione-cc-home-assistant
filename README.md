@@ -1,14 +1,23 @@
 # Gestione C/C — Home Assistant App
 
-
 **Italiano · English**
+
+> <strong>DEMO — DATI COMPLETAMENTE FITTIZI</strong>  
+> Le schermate qui sotto mostrano l'interfaccia reale di Gestione C/C popolata esclusivamente con dati inventati a scopo dimostrativo. Nomi, conti, saldi, date, movimenti e importi non appartengono a utenti reali e non provengono da archivi bancari o GnuCash. Le immagini non costituiscono esempi di risultati finanziari reali.
+
+## Guarda Gestione C/C in azione
+
+| Panoramica | Movimenti | Report |
+|---|---|---|
+| ![Schermata dimostrativa della panoramica finanziaria, con dati fittizi](docs/screenshots/panoramica.png) | ![Schermata dimostrativa del registro movimenti, con dati fittizi](docs/screenshots/movimenti.png) | ![Schermata dimostrativa dei report finanziari, con dati fittizi](docs/screenshots/report.png) |
+| Entrate, uscite, saldo e andamento dei conti. | Registro, classificazione e stato dei movimenti. | Analisi dei flussi e confronti tra periodi. |
 
 Gestione C/C è un'applicazione web self-hosted per la gestione dei conti personali, distribuita come Home Assistant App (in precedenza add-on). I dati sono conservati in un database SQLite persistente sul server Home Assistant. È progettata per l'uso personale in rete locale e non richiede un servizio cloud esterno.
 
 > **Importante:** Gestione C/C è una **Home Assistant App**, non un'integrazione, una dashboard card o un plugin del Marketplace. Si installa dal catalogo delle App di Home Assistant.
 
-
 ---
+
 
 # Italiano
 
