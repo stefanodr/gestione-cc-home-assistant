@@ -11,6 +11,7 @@ import secrets
 import sqlite3
 import ssl
 import time
+import urllib.error
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -102,6 +103,235 @@ def maybe_auto_backup():
     if now - last_auto_backup >= 900:
         create_sqlite_backup("auto")
         last_auto_backup = now
+
+
+# Google Drive backup configuration is stored only in the persistent /data volume.
+DRIVE_CONFIG = DATA / "google_drive.json"
+DRIVE_LOCK = __import__("threading").RLock()
+DRIVE_API = "https://www.googleapis.com/drive/v3"
+DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+def drive_read_config():
+    try:
+        value = json.loads(DRIVE_CONFIG.read_text())
+        return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
+def drive_write_config(value):
+    temporary = DRIVE_CONFIG.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(value, ensure_ascii=False))
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, DRIVE_CONFIG)
+    os.chmod(DRIVE_CONFIG, 0o600)
+
+def drive_parse_token(value):
+    if isinstance(value, dict):
+        return value
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError("Token Google mancante.")
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        try:
+            decoded = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode("utf-8")
+            parsed = json.loads(decoded)
+        except Exception as error:
+            raise ValueError("Token non riconosciuto. Incolla il blocco JSON completo prodotto da rclone authorize.") from error
+    if not isinstance(parsed, dict) or not parsed.get("refresh_token"):
+        raise ValueError("Il token non contiene un refresh_token valido. Ripeti l'autorizzazione Google.")
+    return parsed
+
+def drive_access_token(force_refresh=False):
+    cfg = drive_read_config()
+    token = cfg.get("token") or {}
+    if not cfg.get("client_id") or not cfg.get("client_secret") or not token.get("refresh_token"):
+        raise RuntimeError("Google Drive non è collegato. Completa prima l'autorizzazione.")
+    expiry = 0
+    try:
+        from datetime import datetime
+        expiry = datetime.fromisoformat(str(token.get("expiry", "")).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        pass
+    if not force_refresh and token.get("access_token") and expiry > time.time() + 90:
+        return token["access_token"]
+    from urllib.parse import urlencode
+    body = urlencode({
+        "client_id": cfg["client_id"],
+        "client_secret": cfg["client_secret"],
+        "refresh_token": token["refresh_token"],
+        "grant_type": "refresh_token",
+    }).encode()
+    request = __import__("urllib.request", fromlist=["Request"]).Request(
+        GOOGLE_TOKEN_URL, data=body, headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST")
+    try:
+        with __import__("urllib.request", fromlist=["urlopen"]).urlopen(request, timeout=30) as response:
+            renewed = json.loads(response.read().decode("utf-8"))
+    except Exception as error:
+        raise RuntimeError("Google non ha rinnovato l'autorizzazione. Ricollega Google Drive dalle Impostazioni.") from error
+    token["access_token"] = renewed.get("access_token", "")
+    token["token_type"] = renewed.get("token_type", "Bearer")
+    token["expiry"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + int(renewed.get("expires_in", 3600))))
+    cfg["token"] = token
+    drive_write_config(cfg)
+    return token["access_token"]
+
+def drive_http(method, url, data=None, headers=None, retry=True):
+    import urllib.request
+    token = drive_access_token()
+    request_headers = {"Authorization": "Bearer " + token}
+    request_headers.update(headers or {})
+    request = urllib.request.Request(url, data=data, headers=request_headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            raw = response.read()
+            return json.loads(raw.decode("utf-8")) if raw else {}
+    except urllib.error.HTTPError as error:
+        if error.code == 401 and retry:
+            drive_access_token(force_refresh=True)
+            return drive_http(method, url, data, headers, False)
+        detail = error.read().decode("utf-8", "replace")[:500]
+        raise RuntimeError("Google Drive ha restituito un errore HTTP " + str(error.code) + (": " + detail if detail else "")) from error
+
+def drive_api_url(path, params=None, upload=False):
+    from urllib.parse import urlencode
+    base = DRIVE_UPLOAD_API if upload else DRIVE_API
+    return base + path + (("?" + urlencode(params)) if params else "")
+
+def drive_ensure_folder():
+    cfg = drive_read_config()
+    if cfg.get("folder_id"):
+        return cfg["folder_id"]
+    query = "mimeType='application/vnd.google-apps.folder' and name='Gestione C-C Backup' and trashed=false"
+    result = drive_http("GET", drive_api_url("/files", {"q": query, "fields": "files(id,name)", "pageSize": "10"}))
+    files = result.get("files", [])
+    if files:
+        folder_id = files[0]["id"]
+    else:
+        created = drive_http("POST", drive_api_url("/files", {"fields": "id,name"}), json.dumps({
+            "name": "Gestione C-C Backup", "mimeType": "application/vnd.google-apps.folder"
+        }).encode(), {"Content-Type": "application/json"})
+        folder_id = created["id"]
+    cfg["folder_id"] = folder_id
+    drive_write_config(cfg)
+    return folder_id
+
+def drive_list_backups():
+    folder_id = drive_ensure_folder()
+    query = "'" + folder_id + "' in parents and trashed=false"
+    result = drive_http("GET", drive_api_url("/files", {
+        "q": query, "fields": "files(id,name,size,mimeType,modifiedTime,createdTime)", "pageSize": "100",
+        "orderBy": "modifiedTime desc"
+    }))
+    return result.get("files", [])
+
+def drive_upload_file(local_path, remote_name, replace_existing=False):
+    folder_id = drive_ensure_folder()
+    content = Path(local_path).read_bytes()
+    existing = []
+    if replace_existing:
+        existing = [item for item in drive_list_backups() if item.get("name") == remote_name]
+    metadata = {"name": remote_name, "mimeType": "application/vnd.sqlite3"}
+    if not existing:
+        metadata["parents"] = [folder_id]
+    boundary = "gestionecc" + secrets.token_hex(12)
+    body = (("--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n").encode()
+            + json.dumps(metadata).encode()
+            + ("\r\n--" + boundary + "\r\nContent-Type: application/vnd.sqlite3\r\n\r\n").encode()
+            + content + ("\r\n--" + boundary + "--").encode())
+    if existing:
+        url = drive_api_url("/files/" + existing[0]["id"], {"uploadType": "multipart", "fields": "id,name,modifiedTime"}, upload=True)
+        result = drive_http("PATCH", url, body, {"Content-Type": "multipart/related; boundary=" + boundary})
+        for duplicate in existing[1:]:
+            drive_http("DELETE", drive_api_url("/files/" + duplicate["id"]))
+    else:
+        url = drive_api_url("/files", {"uploadType": "multipart", "fields": "id,name,modifiedTime"}, upload=True)
+        result = drive_http("POST", url, body, {"Content-Type": "multipart/related; boundary=" + boundary})
+    return result
+
+def drive_delete_file(file_id):
+    drive_http("DELETE", drive_api_url("/files/" + file_id))
+
+def drive_download_file(file_id):
+    import urllib.request
+    url = drive_api_url("/files/" + file_id, {"alt": "media"})
+    token = drive_access_token()
+    request = urllib.request.Request(url, headers={"Authorization": "Bearer " + token})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return response.read()
+    except urllib.error.HTTPError as error:
+        if error.code == 401:
+            drive_access_token(force_refresh=True)
+            return drive_download_file(file_id)
+        raise RuntimeError("Impossibile scaricare il backup da Google Drive (HTTP " + str(error.code) + ").") from error
+
+def current_db_revision():
+    with db() as connection:
+        row = connection.execute("SELECT revision FROM app_state WHERE id=1").fetchone()
+    return int(row["revision"]) if row else 0
+
+def drive_session_backup(force=False):
+    with DRIVE_LOCK:
+        cfg = drive_read_config()
+        if not cfg.get("token"):
+            return {"ok": False, "skipped": True, "reason": "Google Drive non collegato"}
+        revision = current_db_revision()
+        if not force and revision <= int(cfg.get("last_session_revision", -1)):
+            return {"ok": True, "skipped": True, "reason": "Nessuna modifica dall'ultimo backup di sessione"}
+        local = create_sqlite_backup("drive-session")
+        try:
+            drive_upload_file(local, "GestioneCC_sessione.sqlite3", True)
+            cfg = drive_read_config()
+            cfg["last_session_revision"] = revision
+            cfg["last_session_backup"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            drive_write_config(cfg)
+            return {"ok": True, "skipped": False, "revision": revision}
+        finally:
+            try: local.unlink()
+            except OSError: pass
+
+def drive_nightly_backup():
+    with DRIVE_LOCK:
+        cfg = drive_read_config()
+        if not cfg.get("token"):
+            return
+        local = create_sqlite_backup("drive-nightly")
+        stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        try:
+            drive_upload_file(local, "GestioneCC_notturno_" + stamp + ".sqlite3")
+            backups = [item for item in drive_list_backups() if item.get("name", "").startswith("GestioneCC_notturno_")]
+            backups.sort(key=lambda item: item.get("modifiedTime", ""), reverse=True)
+            for old in backups[3:]:
+                drive_delete_file(old["id"])
+            cfg = drive_read_config()
+            cfg["last_nightly_backup"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            drive_write_config(cfg)
+        finally:
+            try: local.unlink()
+            except OSError: pass
+
+def drive_backup_scheduler():
+    from datetime import datetime, timedelta
+    try:
+        from zoneinfo import ZoneInfo
+        zone = ZoneInfo("Europe/Rome")
+    except Exception:
+        zone = None
+    while True:
+        now = datetime.now(zone) if zone else datetime.now()
+        next_run = now.replace(hour=3, minute=0, second=0, microsecond=0)
+        if next_run <= now:
+            next_run += timedelta(days=1)
+        time.sleep(max(1, (next_run - now).total_seconds()))
+        try:
+            drive_nightly_backup()
+            print("GestioneCC: backup notturno Google Drive completato")
+        except Exception as error:
+            print("GestioneCC: backup notturno Google Drive non riuscito: " + str(error))
+
 
 def valid_state(state):
     if not isinstance(state, dict): return False
