@@ -242,6 +242,23 @@
     const result = await apiRequest('/api/state', { method: 'POST', body: JSON.stringify({ state: value, revision: stateRevision }) });
     stateRevision = result.revision;
   }
+  async function refreshStorageInfo() {
+    try {
+      const info = await apiRequest('/api/storage-info');
+      const path = $('#databasePath'), size = $('#databaseSize');
+      if (path) path.textContent = info.path || 'Non disponibile';
+      if (size) {
+        const bytes = Math.max(0, Number(info.size_bytes) || 0);
+        if (!info.exists) size.textContent = 'file non ancora creato';
+        else if (bytes < 1024) size.textContent = bytes + ' B';
+        else if (bytes < 1024 * 1024) size.textContent = (bytes / 1024).toLocaleString('it-IT', { maximumFractionDigits: 1 }) + ' KB';
+        else size.textContent = (bytes / (1024 * 1024)).toLocaleString('it-IT', { maximumFractionDigits: 2 }) + ' MB';
+      }
+    } catch (error) {
+      const size = $('#databaseSize');
+      if (size) size.textContent = 'non disponibile';
+    }
+  }
   async function saveState() {
     if (!state) return false;
     state.lastSaved = new Date().toISOString();
@@ -252,6 +269,7 @@
     });
     try {
       await saveQueue;
+      void refreshStorageInfo();
       return true;
     } catch (error) {
       $('#saveStatus').textContent = 'Salvataggio non riuscito: ' + (error.message || 'verifica la connessione');
@@ -268,6 +286,8 @@
     showNotice('Ripristino centralizzato', 'Per ripristinare i dati usa Ripristina da file JSON.');
   }
   async function initialize() {
+    $('#retryAppLoading')?.addEventListener('click', () => location.reload());
+    let needsSave = false;
     try {
       const status = await fetch('/api/status', { credentials: 'same-origin', cache: 'no-store' });
       if (!status.ok) throw new Error('Impossibile verificare la sessione.');
@@ -277,46 +297,59 @@
       state = await dbGet('state');
       if (!state) {
         state = { version: 1, demo: false, accounts: defaultAccounts(), transactions: [], rules: [], bankAccountId: 'bank', openingBalance: 0, lastSaved: new Date().toISOString() };
-        await saveState();
+        needsSave = true;
       }
     } catch (error) {
-      $('#saveStatus').textContent = 'Server non raggiungibile: ' + (error.message || 'verifica la rete');
-      showNotice('Archivio non disponibile', 'Non è stato possibile caricare il database centralizzato. Nessun dato dimostrativo è stato creato.');
+      $('#appLoading')?.classList.add('app-loading-error');
+      $('#appLoadingTitle').textContent = 'Archivio non disponibile';
+      $('#appLoadingText').textContent = 'Non è stato possibile caricare il database centralizzato. Nessun dato dimostrativo è stato creato. Dettaglio: ' + (error.message || 'verifica la rete');
+      $('#retryAppLoading').hidden = false;
+      $('#saveStatus').textContent = 'Server non raggiungibile';
       return;
     }
-    normalizeState();
+    if (normalizeState()) needsSave = true;
     reportMode = ['monthly', 'quarterly', 'halfyearly', 'annual'].includes(state.reportMode) ? state.reportMode : 'monthly';
     $('#reportPeriodMode').value = reportMode;
-    if (state.reportAccountDefaultMigrated) await saveState();
     setupControls();
-    const versionLabel = $('#appVersion'); if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 0.2.0-beta.7';
+    const versionLabel = $('#appVersion');
+    if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 0.2.0-beta.8';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
-    const initialMonth = currentMonth;
-    $('#monthPicker').value = initialMonth;
-    state.selectedMonth = initialMonth;
-    syncReportPeriodPicker(initialMonth);
-    await saveState();
-    $('#statementMonth').value = initialMonth;
+    const storedMonth = String(state.selectedMonth || '');
+    const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
+    if (state.selectedMonth !== selectedMonth) { state.selectedMonth = selectedMonth; needsSave = true; }
+    $('#monthPicker').value = selectedMonth;
+    syncReportPeriodPicker(selectedMonth);
+    if (needsSave) await saveState();
+    $('#statementMonth').value = selectedMonth;
     $('#welcomeDate').textContent = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()).toUpperCase();
+    document.body.classList.add('app-ready');
+    $('#appLoading')?.classList.add('hidden');
     navigate('overview');
+    void refreshStorageInfo();
     const refreshOverview = () => requestAnimationFrame(() => requestAnimationFrame(() => {
       if ($('#view-overview')?.classList.contains('active')) { renderOverview(); drawFlowChart(); }
     }));
     if (document.fonts?.ready) document.fonts.ready.then(refreshOverview); else refreshOverview();
   }
   function normalizeState() {
-    state.accounts ||= defaultAccounts();
-    state.transactions ||= [];
-    state.rules ||= [];
-    state.openingBalance ||= 0;
-    if (!state.bankAccountId) state.bankAccountId = state.accounts.find(a => a.type === 'BANK')?.id || state.accounts[0]?.id;
-    if (!state.reportAccountId) state.reportAccountId = state.bankAccountId;
+    let changed = false;
+    if (!state.accounts) { state.accounts = defaultAccounts(); changed = true; }
+    if (!state.transactions) { state.transactions = []; changed = true; }
+    if (!state.rules) { state.rules = []; changed = true; }
+    if (state.openingBalance == null) { state.openingBalance = 0; changed = true; }
+    if (!state.bankAccountId) {
+      state.bankAccountId = state.accounts.find(a => a.type === 'BANK')?.id || state.accounts[0]?.id;
+      changed = true;
+    }
+    if (!state.reportAccountId) { state.reportAccountId = state.bankAccountId; changed = true; }
     // GnuCash books may have several successive checking accounts. The report
     // default must include them all; retain an explicit user selection.
     if (state.transactions.some(tx => tx.source === 'gnucash') && !state.reportAccountDefaultMigrated) {
       state.reportAccountId = 'all';
       state.reportAccountDefaultMigrated = true;
+      changed = true;
     }
+    return changed;
   }
 
   function setupControls() {
@@ -388,7 +421,8 @@
     $('#restoreDriveBackup')?.addEventListener('click', restoreDriveBackup);
     $('#exportStatementPdf')?.addEventListener('click', exportStatementPdf);
     $('#exportStatementXlsx')?.addEventListener('click', exportStatementXlsx);
-    $('#exportReportPdf')?.addEventListener('click', exportReportPdf);
+    $('#printReport')?.addEventListener('click', () => exportReportPdf('print'));
+    $('#exportReportPdf')?.addEventListener('click', () => exportReportPdf('pdf'));
     $('#exportReportXlsx')?.addEventListener('click', exportReportXlsx);
     $('#exitApp')?.addEventListener('click', exitApp);
     $('#deletePersonalData')?.addEventListener('click', deletePersonalData);
@@ -1678,7 +1712,7 @@
     const content = `<h1>Prospetto movimenti mensile</h1><div class="sub">${safeText(monthName(monthKey))} · ${safeText(accountName)}</div><div class="summary"><div>Entrate<strong>${euro.format(totals.income)}</strong></div><div>Uscite<strong>${euro.format(totals.expense)}</strong></div><div>Saldo netto del periodo<strong>${euro.format(totals.net)}</strong></div></div><table><thead><tr><th>Data</th><th>Descrizione</th><th>Causale</th><th>Contropartita</th><th class="num">Entrate</th><th class="num">Uscite</th></tr></thead><tbody>${rows || '<tr><td colspan="6">Nessun movimento nel periodo selezionato.</td></tr>'}</tbody></table><div class="foot">${transactions.length} movimenti. Prospetto personale non sostitutivo dell’estratto ufficiale della banca.</div>`;
     printHtml(`Movimenti ${monthKey}`, content);
   }
-  function exportReportPdf() {
+  function exportReportPdf(outputMode = 'pdf') {
     const comparisons = selectedComparisons(), current = comparisons[0].data, previous = comparisons[1].data;
     const deviations = reportDeviationRows(comparisons);
     const averageDeviations = deviations.filter(row => row.delta >= 0.01).sort((a, b) => b.delta - a.delta);
@@ -1690,7 +1724,8 @@
     const baselineText = reportMode === 'monthly' && Number(monthSelection().slice(5, 7)) <= 2 ? 'Confronto con lo stesso mese dell’anno precedente' : 'Media degli altri periodi completi disponibili dello stesso anno';
     const chart = reportChartSvg();
     const content = `<h1>Report Gestione C/C</h1><div class="sub">${safeText(code)} · ${safeText(label)} · ${safeText(scope)}</div><div class="summary"><div>Entrate<strong>${euro.format(current.income)}</strong><span style="color:${current.income - previous.income < 0 ? '#b00020' : '#171b1a'}">Confronto precedente: ${signedEuro(current.income - previous.income)}</span></div><div>Uscite<strong>${euro.format(current.expense)}</strong><span style="color:${current.expense - previous.expense < 0 ? '#b00020' : '#171b1a'}">Confronto precedente: ${signedEuro(current.expense - previous.expense)}</span></div><div>Saldo netto<strong style="color:${current.net < 0 ? '#b00020' : '#171b1a'};font-weight:${current.net < 0 ? '700' : '400'}">${euro.format(current.net)}</strong><span style="color:${current.net - previous.net < 0 ? '#b00020' : '#171b1a'}">${verdict} · variazione ${signedEuro(current.net - previous.net)}</span></div></div><h2>Flusso del periodo</h2><div class="chart">${chart}</div><h2>Valutazione e scostamenti</h2><p><strong style="color:${current.net < 0 ? '#b00020' : '#171b1a'}">${verdict}</strong>: ${current.net > .005 ? 'le entrate hanno superato le uscite.' : current.net < -.005 ? 'le uscite hanno superato le entrate.' : 'entrate e uscite sono in pareggio.'} I trasferimenti sono separati dall’analisi delle spese.</p><p>${averageDeviations[0] ? `Lo scostamento maggiore è ${safeText(averageDeviations[0].name)}: ${averageDeviations[0].delta > 0 ? 'sopra' : 'sotto'} la media di ${euro.format(Math.abs(averageDeviations[0].delta))}.` : 'Non emergono scostamenti confrontabili dalla media.'}</p><h2>Scostamenti di spesa · ${safeText(baselineText)}</h2><table><thead><tr><th>Categoria</th><th class="num">Spesa periodo</th><th class="num">Anno prec.</th><th class="num">Var. annua</th><th class="num">Media attesa</th><th class="num">Scostamento</th><th class="num">Var. % media</th></tr></thead><tbody>${rows || '<tr><td colspan="7">Nessuno scostamento calcolabile.</td></tr>'}</tbody></table><h2>Confronto con gli anni precedenti</h2><table><thead><tr><th>Anno</th><th class="num">Entrate</th><th class="num">Uscite</th><th class="num">Netto</th><th class="num">Trasferimenti</th></tr></thead><tbody>${periodRows}</tbody></table>`;
-    printHtml(code, content);
+    const documentTitle = outputMode === 'print' ? 'Stampa-' + code : 'Report-' + code;
+    printHtml(documentTitle, content);
   }
   function exportStatementXlsx() {
     const { monthKey, transactions, totals, accountName } = statementContext();
