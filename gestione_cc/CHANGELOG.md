@@ -1,5 +1,13 @@
 # Gestione C/C Home Assistant App — Changelog
 
+## 1.0.1 — in preparazione
+
+- Migliorata la disposizione responsive della barra superiore e del comando Esci su smartphone in verticale.
+- Aggiunti in Panoramica i pulsanti PDF ed Excel per l'estratto conto del mese selezionato.
+- L'estratto conto riporta saldo iniziale, entrate, uscite in colonne separate, saldo progressivo e saldo finale.
+- Gli export rispettano il conto selezionato ed escludono i movimenti duplicati.
+
+
 ## 1.0.0 — 8 novembre 2026
 
 - Prima versione di distribuzione documentata.
