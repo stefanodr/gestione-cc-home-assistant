@@ -139,7 +139,7 @@ def drive_parse_token(value):
             decoded = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode("utf-8")
             parsed = json.loads(decoded)
         except Exception as error:
-            raise ValueError("Token non riconosciuto. Incolla il blocco JSON completo prodotto da rclone authorize.") from error
+            raise ValueError("Token non riconosciuto. Incolla esattamente il token restituito da rclone authorize.") from error
     if not isinstance(parsed, dict) or not parsed.get("refresh_token"):
         raise ValueError("Il token non contiene un refresh_token valido. Ripeti l'autorizzazione Google.")
     return parsed
@@ -639,6 +639,10 @@ class Handler(BaseHTTPRequestHandler):
                     destination.close()
                     source.close()
                 sessions.clear()
+                drive_cfg = drive_read_config()
+                if drive_cfg.get("token"):
+                    drive_cfg["last_session_revision"] = -1
+                    drive_write_config(drive_cfg)
                 self.send_json(200, {"ok": True}, {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
             except Exception as error:
                 self.send_json(400, {"error": "Ripristino Google Drive non riuscito: " + str(error)})
@@ -673,6 +677,10 @@ class Handler(BaseHTTPRequestHandler):
                 destination.close()
                 source.close()
                 sessions.clear()
+                drive_cfg = drive_read_config()
+                if drive_cfg.get("token"):
+                    drive_cfg["last_session_revision"] = -1
+                    drive_write_config(drive_cfg)
                 self.send_json(200, {"ok":True}, {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
             except Exception as error:
                 self.send_json(400, {"error":str(error)})
