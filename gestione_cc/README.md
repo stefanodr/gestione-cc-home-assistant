@@ -55,3 +55,10 @@ La versione beta 0.2.0-beta.5 accetta connessioni HTTPS soltanto dagli indirizzi
 
 ## Nome host e certificato
 L'add-on beta.5 usa `hostname` (predefinito `homeassistant.local`) per il nome DNS nel certificato HTTPS. Il nome deve risolversi sulla LAN dai dispositivi client; se la rete usa un nome differente, configurarlo nelle opzioni dell'add-on e riavviare. Il certificato server viene rigenerato se il SAN DNS non corrisponde. Dopo la rigenerazione, scaricare e installare la CA aggiornata dalla pagina di login (`/ca.crt`) o dalle Impostazioni. Il pulsante Supervisor continua a usare `https://[HOST]:[PORT:8443]`: il nome con cui è aperto Home Assistant determina il valore di `[HOST]`.
+
+
+## Funzioni beta.5
+- Piano dei conti: modello Excel scaricabile e importazione XLSX/CSV con percorso gerarchico e tipo GnuCash. I conti già esistenti non vengono sovrascritti.
+- Importazioni bancarie e GnuCash: controllo duplicati secondo data, importo, descrizione e causale; scelta esplicita tra escludere i duplicati e importarli comunque.
+- Importazione GnuCash in modalità aggiunta: conti mappati per percorso, movimenti e regole aggiunti senza sostituire l'archivio già presente.
+- Versioni visibili in basso a sinistra: versione dell'app e versione dell'add-on.
