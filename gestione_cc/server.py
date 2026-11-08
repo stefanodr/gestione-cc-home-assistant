@@ -199,6 +199,15 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/" and self.session():
             path = "/index.html"
+        if path == "/api/storage-info":
+            item = self.require_auth()
+            if not item: return
+            try:
+                info = DB_PATH.stat()
+                self.send_json(200, {"path": str(DB_PATH), "size_bytes": info.st_size, "exists": True})
+            except FileNotFoundError:
+                self.send_json(200, {"path": str(DB_PATH), "size_bytes": 0, "exists": False})
+            return
         if path == "/api/state":
             item = self.require_auth()
             if not item: return
