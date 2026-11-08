@@ -189,4 +189,4 @@ When reporting an issue, include Home Assistant/App versions, architecture and r
 
 ## Status and licence
 
-Declared distribution version: **1.0.0**. The project is distributed under a proprietary personal-use licence, not an open-source licence. Free personal use by individuals is permitted under `LICENSE`; professional or business use, modification, redistribution and commercial exploitation require a written agreement, subject to mandatory legal rights and third-party component licences. See `COMMERCIAL-LICENSING.md`. A version number does not replace testing on the user's own system.
+Declared distribution version: **1.0.5**. The project is distributed under a proprietary personal-use licence, not an open-source licence. Free personal use by individuals is permitted under `LICENSE`; professional or business use, modification, redistribution and commercial exploitation require a written agreement, subject to mandatory legal rights and third-party component licences. See `COMMERCIAL-LICENSING.md`. A version number does not replace testing on the user's own system.
