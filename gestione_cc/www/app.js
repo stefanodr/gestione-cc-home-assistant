@@ -1124,7 +1124,7 @@
       const start=replaceDemo=>{
         if(replaceDemo) state={...createDemoState(),accounts:defaultAccounts(),transactions:[],rules:[],demo:false,openingBalance:0};
         const known=new Set(state.transactions.filter(tx=>tx.status!=='duplicate').map(transactionFingerprint));
-        const duplicates=imported.filter(tx=>known.has(transactionFingerprint(tx)));
+        const duplicates=findImportDuplicates(imported);
         const commit=include=>{
           const selected=state.reportAccountId&&state.reportAccountId!=='all'&&isLiquidAccount(accountById(state.reportAccountId))?state.reportAccountId:state.bankAccountId;
           const batchKeys=new Set();
@@ -1143,7 +1143,13 @@
     const key = transactionFingerprint(candidate);
     return state.transactions.some(tx => tx.status !== 'duplicate' && transactionFingerprint(tx) === key);
   }
-  function transactionFingerprint(tx) { return [tx.date, Number(tx.amount).toFixed(2), normalize(tx.payee), normalize(tx.memo)].join('|'); }
+  function transactionFingerprint(tx) { return [parseDate(tx.date), Number(tx.amount).toFixed(2), normalize(transactionDescription(tx)), normalize(transactionCausale(tx))].join('|'); }
+  function findImportDuplicates(rows) {
+    const seen = new Set(state.transactions.filter(tx => tx.status !== 'duplicate').map(transactionFingerprint));
+    const duplicates = [];
+    rows.forEach(tx => { const key = transactionFingerprint(tx); if (seen.has(key)) duplicates.push(tx); seen.add(key); });
+    return duplicates;
+  }
   function parseQif(content) {
     const records = []; let record = {};
     const append = (field, value) => { if (!value) return; record[field] = record[field] ? `${record[field]} ${value}` : value; };
@@ -1344,7 +1350,7 @@
       let xml;if(bytes[0]===0x1f&&bytes[1]===0x8b){if(!('DecompressionStream'in window))throw new Error('Browser senza supporto gzip.');xml=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();}else xml=new TextDecoder('utf-8').decode(bytes);
       if(!xml.trimStart().startsWith('<?xml')&&!xml.trimStart().startsWith('<gnc-v2'))throw new Error('Il file non sembra un libro GnuCash XML leggibile.');
       const parsed=parseGnuCashXml(xml);if(!parsed.accounts.length)throw new Error('Nel file non ho trovato un piano dei conti leggibile.');
-      const duplicateCount=parsed.transactions.filter(tx=>state.transactions.some(old=>old.status!=='duplicate'&&transactionFingerprint(old)===transactionFingerprint(tx))).length;
+      const duplicateCount=findImportDuplicates(parsed.transactions).length;
       const merge=include=>{
         const byPath=new Map(state.accounts.map(ac=>[ac.path,ac]));const idMap=new Map();
         parsed.accounts.forEach(ac=>{if(ac.type==='ROOT'){idMap.set(ac.id,state.accounts.find(x=>x.type==='ROOT')?.id||'root');return;}const old=byPath.get(ac.path);idMap.set(ac.id,old?old.id:uid('a'));});
