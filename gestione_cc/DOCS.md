@@ -73,6 +73,9 @@ Esporta lo stato applicativo in un file JSON, utile per migrazioni compatibili.
 Scarica una copia del database SQLite. Le copie automatiche vengono create prima delle scritture quando è trascorso l'intervallo previsto; vengono conservate fino a 30 copie in `/data/backups`.
 
 ### Backup facoltativo su Google Drive
+
+Per la procedura dettagliata, con schermate e passaggi per Google Cloud, OAuth e rclone su Windows, consulta la [Guida Google Drive Backup (italiano e inglese)](../docs/GOOGLE_DRIVE_BACKUP.md).
+
 Da **Impostazioni → Backup · Google Drive** puoi collegare il tuo account Google. L'autorizzazione viene generata sul PC Windows con un OAuth Client di tipo Desktop e rclone; Home Assistant non deve essere esposto su Internet e non richiede un URL di callback pubblico.
 
 1. Nella Google Cloud Console crea un progetto e abilita **Google Drive API**.
@@ -211,6 +214,9 @@ Exports the application state to JSON for compatible data migration or transfer.
 Downloads a copy of the SQLite database. Automatic snapshots are created before writes when the configured interval has elapsed; up to 30 local copies are retained under `/data/backups`.
 
 ### Optional Google Drive backup
+
+For the complete step-by-step procedure covering Google Cloud, OAuth and rclone on Windows, see the [Google Drive Backup Guide (Italian and English)](../docs/GOOGLE_DRIVE_BACKUP.md).
+
 You can connect your Google account from **Settings → Backup · Google Drive**. Authorization is generated on a Windows PC with a Desktop OAuth client and rclone; Home Assistant does not need to be exposed to the Internet and no public callback URL is required.
 
 1. Create a project in Google Cloud Console and enable **Google Drive API**.
