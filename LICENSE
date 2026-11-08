@@ -1,0 +1,134 @@
+GESTIONE C/C
+LICENZA PROPRIETARIA D'USO PERSONALE E CONDIZIONI DI UTILIZZO
+Versione 1.0 — 8 novembre 2026
+
+TITOLARE DEI DIRITTI
+Copyright © 2026 Stefano Di Ricco (stefanodr). Tutti i diritti riservati.
+
+IMPORTANTE
+Questo documento disciplina il codice originale di Gestione C/C. Non è una licenza open source. I componenti di terze parti sono esclusi nella misura in cui siano regolati dalle rispettive licenze, riportate negli avvisi dedicati.
+
+1. DEFINIZIONI
+“Software” indica il programma Gestione C/C, il relativo codice sorgente e oggetto, l'interfaccia, la documentazione e i materiali originali distribuiti dal Titolare, con esclusione dei componenti di terze parti.
+“Titolare” indica Stefano Di Ricco (account GitHub: stefanodr).
+“Uso personale” indica l'utilizzo da parte di una persona fisica esclusivamente per esigenze proprie o del proprio nucleo familiare, senza finalità professionali, imprenditoriali o commerciali.
+“Uso commerciale” comprende, a titolo esemplificativo, l'utilizzo nell'ambito di un'impresa, società, studio professionale o attività economica; l'erogazione del Software come servizio a terzi; la rivendita, distribuzione, sublicenza, integrazione in un prodotto o servizio, commercializzazione o sfruttamento economico del Software.
+
+2. CONCESSIONE LIMITATA PER USO PERSONALE
+A condizione che l'utente rispetti questa licenza, il Titolare concede alla persona fisica che ottiene il Software da una fonte autorizzata una licenza gratuita, personale, non esclusiva, non trasferibile e non sublicenziabile per:
+a) installare ed eseguire una copia del Software per uso personale;
+b) utilizzare le funzioni del Software per gestire i propri dati;
+c) conservare una copia di sicurezza del Software per il solo ripristino personale.
+
+La concessione non trasferisce la proprietà del Software né attribuisce diritti sul codice oltre a quelli espressamente indicati.
+
+3. DIVIETI E ATTIVITÀ RISERVATE
+Salvo preventiva autorizzazione scritta del Titolare o quanto inderogabilmente consentito dalla legge applicabile, l'utente non può:
+a) utilizzare il Software per finalità commerciali o professionali;
+b) vendere, noleggiare, concedere in sublicenza, distribuire o rendere disponibile a terzi il Software o copie sostanziali dello stesso;
+c) pubblicare, distribuire o commercializzare versioni modificate, opere derivate, fork o prodotti basati sul Software;
+d) rimuovere o alterare avvisi di copyright, attribuzione o proprietà;
+e) utilizzare il nome, il logo o i segni distintivi Gestione C/C in modo da suggerire un'approvazione, affiliazione o distribuzione ufficiale non autorizzata;
+f) trasferire a terzi i diritti concessi da questa licenza.
+
+La consultazione del codice e la possibilità tecnica di creare un fork sulla piattaforma GitHub non costituiscono, da sole, una concessione del diritto di utilizzare, distribuire, modificare o sfruttare commercialmente il Software al di fuori dei diritti e delle condizioni inderogabili previsti dai termini della piattaforma e dalla legge applicabile.
+
+4. LICENZA COMMERCIALE
+Qualsiasi uso commerciale, professionale, aziendale, redistribuzione, integrazione, rivendita, erogazione a terzi o sfruttamento economico richiede un separato accordo scritto con il Titolare.
+Prezzi, durata, ambito, numero di installazioni o utenti, supporto, aggiornamenti, eventuali diritti di modifica e modalità di attribuzione saranno definiti caso per caso nell'accordo commerciale. Nessun diritto commerciale è concesso per implicito.
+
+5. MODIFICHE E DECOMPILAZIONE
+Questa licenza non concede il diritto di modificare o creare opere derivate dal Software. Restano salve le eccezioni e i diritti che la normativa applicabile riconosce inderogabilmente, inclusi, ove applicabili, quelli relativi all'interoperabilità e alla decompilazione nei limiti di legge. Nessuna disposizione intende escludere o limitare tali diritti inderogabili.
+
+6. COMPONENTI DI TERZE PARTI
+Librerie, framework, immagini, strumenti e altri componenti di terze parti restano soggetti alle rispettive licenze e ai relativi avvisi. In caso di conflitto, la licenza del componente di terze parti governa esclusivamente quel componente. Questa licenza non modifica né revoca i diritti già concessi dai rispettivi titolari. Consultare THIRD_PARTY_NOTICES.md e i file di licenza associati.
+
+7. TITOLARITÀ E ATTRIBUZIONE
+Il Software originale è protetto dalla normativa sul diritto d'autore e dagli altri diritti applicabili. Tutti i diritti non espressamente concessi restano riservati al Titolare. L'attribuzione dell'autore non sostituisce né costituisce una licenza d'uso.
+
+8. DATI DELL'UTENTE
+I dati contabili, i documenti importati e i backup inseriti o generati dall'utente non diventano proprietà del Titolare per effetto di questa licenza. L'utente resta responsabile della liceità, sicurezza e conservazione dei propri dati.
+
+9. DURATA E RISOLUZIONE
+La licenza personale decorre dall'accettazione e rimane valida finché l'utente ne rispetta le condizioni. In caso di violazione sostanziale, i diritti concessi cessano nei limiti consentiti dalla legge, fatto salvo il diritto del Titolare di richiedere la cessazione dell'uso e di tutelare i propri diritti. La cessazione non pregiudica i diritti inderogabili dell'utente.
+
+10. ESCLUSIONE DI GARANZIE
+Nei limiti consentiti dalla legge, il Software è fornito “così com'è” e senza garanzie espresse o implicite di funzionamento ininterrotto, assenza di errori, idoneità a uno scopo particolare o adeguatezza a specifici obblighi contabili, fiscali o normativi. L'utente deve effettuare backup indipendenti e verificare i risultati. Nulla in questa clausola limita garanzie o responsabilità che non possano essere escluse per legge.
+
+11. LIMITAZIONE DI RESPONSABILITÀ
+Nei limiti massimi consentiti dalla legge applicabile, il Titolare non risponde di danni indiretti o consequenziali derivanti dall'uso o dall'impossibilità di usare il Software. Nulla esclude o limita la responsabilità nei casi in cui tale esclusione o limitazione sia vietata dalla legge, inclusi dolo, colpa grave o altri casi inderogabili.
+
+12. LEGGE APPLICABILE E DISPOSIZIONI FINALI
+La presente licenza è interpretata secondo la legge italiana, fatti salvi i diritti inderogabili eventualmente applicabili all'utente in base alla normativa del proprio luogo di residenza. Se una disposizione è invalida o inefficace, le restanti disposizioni rimangono applicabili nella misura consentita. Eventuali autorizzazioni diverse devono risultare da un accordo scritto del Titolare.
+
+CONTATTI
+Per richieste di autorizzazione o licenza commerciale, contattare il Titolare tramite il profilo GitHub:
+https://github.com/stefanodr
+
+
+GESTIONE C/C
+PROPRIETARY PERSONAL-USE LICENCE AND TERMS OF USE
+Version 1.0 — 8 November 2026
+
+RIGHTS HOLDER
+Copyright © 2026 Stefano Di Ricco (stefanodr). All rights reserved.
+
+IMPORTANT
+This document governs the original Gestione C/C code. It is not an open-source licence. Third-party components are excluded to the extent that they are governed by their own licences, identified in the applicable notices.
+
+1. DEFINITIONS
+“Software” means the Gestione C/C program, its source and object code, interface, documentation and original materials distributed by the Rights Holder, excluding third-party components.
+“Rights Holder” means Stefano Di Ricco (GitHub account: stefanodr).
+“Personal Use” means use by an individual solely for that individual's or household's own purposes, with no professional, business or commercial purpose.
+“Commercial Use” includes, without limitation, use in a business, company or professional practice; providing the Software as a service to third parties; resale, distribution, sublicensing, integration into a product or service, commercialisation or other economic exploitation of the Software.
+
+2. LIMITED PERSONAL-USE GRANT
+Provided that the user complies with this licence, the Rights Holder grants the individual who obtains the Software from an authorised source a free, personal, non-exclusive, non-transferable and non-sublicensable licence to:
+a) install and run one copy of the Software for Personal Use;
+b) use the Software's features to manage the user's own data;
+c) keep one backup copy of the Software solely for personal recovery.
+
+This grant does not transfer ownership of the Software or grant any rights in the code beyond those expressly stated.
+
+3. RESTRICTIONS AND RESERVED ACTIVITIES
+Unless the Rights Holder gives prior written permission or applicable law makes an exception mandatory, the user may not:
+a) use the Software for commercial or professional purposes;
+b) sell, rent, sublicense, distribute or make the Software or substantial copies available to third parties;
+c) publish, distribute or commercialise modified versions, derivative works, forks or products based on the Software;
+d) remove or alter copyright, attribution or proprietary notices;
+e) use the Gestione C/C name, logo or marks in a way that suggests unauthorised approval, affiliation or official distribution;
+f) transfer to third parties the rights granted by this licence.
+
+The ability to view the code or technically create a fork on GitHub does not, by itself, grant a right to use, distribute, modify or commercially exploit the Software outside the rights and mandatory conditions provided by the platform's terms and applicable law.
+
+4. COMMERCIAL LICENCE
+Any Commercial Use, professional or business use, redistribution, integration, resale, provision to third parties or economic exploitation requires a separate written agreement with the Rights Holder.
+Fees, term, scope, number of installations or users, support, updates, modification rights and attribution requirements will be agreed individually in that commercial agreement. No commercial rights are granted by implication.
+
+5. MODIFICATIONS AND DECOMPILATION
+This licence does not grant the right to modify or create derivative works of the Software. Mandatory exceptions and rights under applicable law remain unaffected, including, where applicable, rights concerning interoperability and decompilation within statutory limits. Nothing in this clause is intended to exclude or restrict such mandatory rights.
+
+6. THIRD-PARTY COMPONENTS
+Libraries, frameworks, images, tools and other third-party components remain subject to their respective licences and notices. In case of conflict, a third-party licence governs that component only. This licence does not amend or revoke rights already granted by the relevant rights holders. See THIRD_PARTY_NOTICES.md and the associated licence files.
+
+7. OWNERSHIP AND ATTRIBUTION
+The original Software is protected by copyright and other applicable rights. All rights not expressly granted remain reserved to the Rights Holder. Attribution of authorship does not replace or constitute a licence to use the Software.
+
+8. USER DATA
+Accounting data, imported documents and backups supplied or generated by the user do not become the Rights Holder's property under this licence. The user remains responsible for the lawfulness, security and preservation of their data.
+
+9. TERM AND TERMINATION
+The personal licence takes effect upon acceptance and remains valid while the user complies with its terms. In the event of a material breach, the granted rights terminate to the extent permitted by law, without prejudice to the Rights Holder's right to seek cessation of the unauthorised use and protect their rights. Termination does not affect mandatory user rights.
+
+10. DISCLAIMER OF WARRANTIES
+To the extent permitted by law, the Software is provided “as is”, without express or implied warranties of uninterrupted operation, absence of errors, fitness for a particular purpose or suitability for specific accounting, tax or regulatory obligations. The user must maintain independent backups and verify results. Nothing in this clause limits warranties or liabilities that cannot lawfully be excluded.
+
+11. LIMITATION OF LIABILITY
+To the maximum extent permitted by applicable law, the Rights Holder shall not be liable for indirect or consequential damages arising from use of, or inability to use, the Software. Nothing excludes or limits liability where such exclusion or limitation is prohibited by law, including in cases of wilful misconduct, gross negligence or other mandatory cases.
+
+12. GOVERNING LAW AND FINAL PROVISIONS
+This licence is interpreted under Italian law, without prejudice to any mandatory rights that may apply to the user under the laws of their place of residence. If any provision is invalid or unenforceable, the remaining provisions remain effective to the extent permitted. Any different permission must be set out in a written agreement signed by the Rights Holder.
+
+CONTACT
+For permission requests or commercial licensing enquiries, contact the Rights Holder through the GitHub profile:
+https://github.com/stefanodr
