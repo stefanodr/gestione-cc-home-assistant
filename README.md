@@ -74,7 +74,7 @@ Nessuna applicazione può garantire sicurezza assoluta. Verifica rete, backup e 
 ## Backup
 
 - I backup automatici locali restano disponibili sul server Home Assistant.
-- In **Impostazioni → Backup · Google Drive** puoi collegare facoltativamente il tuo account Google.
+- In **Impostazioni → Backup · Google Drive** puoi collegare facoltativamente il tuo account Google. [Guida passo-passo in italiano e inglese](docs/GOOGLE_DRIVE_BACKUP.md).
 - Il collegamento usa un OAuth Client di tipo Desktop e un token generato una tantum da rclone sul PC Windows; Gestione C/C conserva il token solo nel volume dati privato dell’App.
 - Se collegato, l’App mantiene un backup di sessione e gli ultimi tre backup notturni (ore 03:00, fuso Europe/Rome). Il comando **Esci** attende il backup se l’archivio è cambiato; la chiusura diretta della scheda è solo un tentativo.
 - I file SQLite su Google Drive **non sono cifrati**: chiunque abbia accesso al tuo Drive e ai relativi backup può leggerne il contenuto. Proteggi l’account Google e non condividere i file.
@@ -94,6 +94,7 @@ La connessione a Google Drive è facoltativa e in uscita: non rende l’interfac
 - Segnalazioni: https://github.com/stefanodr/gestione-cc-home-assistant/issues
 - Note di rilascio: [CHANGELOG.md](CHANGELOG.md)
 - Manuale: [gestione_cc/DOCS.md](gestione_cc/DOCS.md)
+- Guida backup Google Drive (IT/EN): [docs/GOOGLE_DRIVE_BACKUP.md](docs/GOOGLE_DRIVE_BACKUP.md)
 
 Quando apri una segnalazione indica versioni Home Assistant/App, architettura e passaggi per riprodurre il problema. **Non allegare database, backup, PIN, certificati privati, cookie o dati bancari reali.** Usa dati dimostrativi.
 
@@ -164,7 +165,7 @@ No application can guarantee absolute security. Verify networking, backup and re
 ## Backups
 
 - Local automatic snapshots remain available on the Home Assistant host.
-- Under **Settings → Backup · Google Drive**, you can optionally connect your Google account.
+- Under **Settings → Backup · Google Drive**, you can optionally connect your Google account. [Step-by-step guide in Italian and English](docs/GOOGLE_DRIVE_BACKUP.md).
 - Authorization uses a Desktop OAuth client and a one-time token generated with rclone on a Windows PC; credentials are stored only in the App's private data volume.
 - When connected, the App retains one session backup and the latest three nightly backups (03:00, Europe/Rome). **Exit** waits for a backup when the archive has changed; closing the browser tab is best-effort only.
 - Google Drive SQLite files are **not encrypted**. Anyone with access to your Drive and the backup files can read their contents.
@@ -184,6 +185,7 @@ Google Drive is optional and uses outbound connections only; it does not make th
 - Issues: https://github.com/stefanodr/gestione-cc-home-assistant/issues
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Full manual: [gestione_cc/DOCS.md](gestione_cc/DOCS.md)
+- Google Drive backup guide (IT/EN): [docs/GOOGLE_DRIVE_BACKUP.md](docs/GOOGLE_DRIVE_BACKUP.md)
 
 When reporting an issue, include Home Assistant/App versions, architecture and reproduction steps. **Never upload databases, backups, PINs, private certificates, cookies or real banking data.** Use fictional demo data.
 
