@@ -2,6 +2,13 @@
 
 Notable changes for Gestione C/C Home Assistant App.
 
+## [1.0.3] - 2026-11-08
+
+- Simplified the archive loading screen to the exact message “Caricamento archivio in corso.....” with an animated indicator.
+- Retry remains hidden while loading and appears only after an error or timeout.
+- Added a 15-second request timeout and protection against repeated retry clicks.
+
+
 ## [1.0.2] - 2026-11-08
 
 - Improved multi-page A4 PDF bank-statement pagination.
