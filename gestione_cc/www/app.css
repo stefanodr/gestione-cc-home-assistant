@@ -124,3 +124,5 @@ body.app-ready .app-shell{visibility:visible}
 
 .app-loading-error .app-loading-spinner{display:none}
 .app-loading-text{font-size:11px;line-height:1.6;color:#81908d}
+
+#appLoadingText{font-size:11px;line-height:1.6;color:#81908d}
