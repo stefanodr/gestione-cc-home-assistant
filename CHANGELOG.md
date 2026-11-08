@@ -2,12 +2,19 @@
 
 Notable changes for Gestione C/C Home Assistant App.
 
+## [1.0.4] - 2026-11-08
+
+- Unified the PDF preview toolbar: both the Gestione C/C report and the bank statement now use a single “STAMPA/ESPORTA PDF” command.
+- The command opens the browser's standard print dialog, where users can select a printer or “Save as PDF”.
+- Improved bank-statement spreadsheet formatting with cell borders and grid lines, highlighted headers, formatted dates and amounts, tuned column widths, and aligned numeric values.
+- Reorganised the Excel summary: opening balance at the top and income, expense, and closing-balance totals at the end.
+- Kept summary totals outside the transaction auto-filter range.
+
 ## [1.0.3] - 2026-11-08
 
 - Simplified the archive loading screen to the exact message “Caricamento archivio in corso.....” with an animated indicator.
 - Retry remains hidden while loading and appears only after an error or timeout.
 - Added a 15-second request timeout and protection against repeated retry clicks.
-
 
 ## [1.0.2] - 2026-11-08
 
