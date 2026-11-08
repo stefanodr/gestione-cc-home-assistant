@@ -1,0 +1,73 @@
+name: Demo screenshots and v1.0.0 release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gestione_cc/www/**"
+      - ".github/workflows/demo-screenshots.yml"
+      - ".github/scripts/capture-demo.mjs"
+      - "README.md"
+      - "gestione_cc/CHANGELOG.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install browser automation
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Start the real app frontend in isolated preview mode
+        run: |
+          python3 -m http.server 8765 --directory gestione_cc/www >/tmp/gestione-cc-demo-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8765/index.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/gestione-cc-demo-http.log
+          exit 1
+
+      - name: Capture screenshots with fictional demo data
+        run: node .github/scripts/capture-demo.mjs
+
+      - name: Commit screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/*.png
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: add real app screenshots with fictional demo data"
+            git push origin HEAD:main
+          else
+            echo "Screenshots are already up to date."
+          fi
+
+      - name: Publish GitHub Release 1.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.0.0 >/dev/null 2>&1; then
+            echo "Release v1.0.0 already exists; leaving it unchanged."
+          else
+            gh release create v1.0.0 \
+              --target main \
+              --title "Gestione C/C 1.0.0" \
+              --notes-file gestione_cc/CHANGELOG.md
+          fi
