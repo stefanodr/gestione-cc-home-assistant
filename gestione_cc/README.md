@@ -3,6 +3,10 @@
 ## Stato
 Prototipo avanzato in sviluppo, NON ancora approvato per dati contabili reali. Frontend collegato al database SQLite server, login amministratore, HTTPS locale, backup e ripristino predisposti. Mancano il collaudo runtime su Home Assistant OS e la verifica completa di tutte le funzioni dell'app.
 
+## Note beta.6
+- Corretto un errore JavaScript durante il rendering delle Impostazioni: il frontend server non contiene il vecchio elemento di stato del backup Google Drive, quindi il relativo aggiornamento ora è facoltativo.
+- Aggiornata la versione visualizzata nell'interfaccia a 0.2.0-beta.6.
+
 ## Funzioni incluse
 - App Home Assistant OS per amd64 e aarch64; porta HTTPS LAN 8443, nessun Ingress e nessuna voce nel menu laterale HA.
 - SQLite persistente in /data, separato da IndexedDB della versione browser.
