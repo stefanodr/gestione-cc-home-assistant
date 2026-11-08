@@ -588,6 +588,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/drive/restore":
             item = self.require_auth(csrf=True)
             if not item: return
+            temp = None
             try:
                 file_id = str(payload.get("file_id", ""))
                 if not file_id: raise ValueError("Backup non specificato.")
@@ -624,8 +625,9 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as error:
                 self.send_json(400, {"error": "Ripristino Google Drive non riuscito: " + str(error)})
             finally:
-                try: temp.unlink()
-                except Exception: pass
+                if temp is not None:
+                    try: temp.unlink()
+                    except Exception: pass
             return
         if path == "/api/sqlite-restore":
             item = self.require_auth(csrf=True)
