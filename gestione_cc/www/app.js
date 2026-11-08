@@ -276,14 +276,84 @@
       return false;
     }
   }
+  async function refreshDriveStatus() {
+    try {
+      const result = await apiRequest('/api/drive/status');
+      const status = $('#driveBackupStatus');
+      if (status) status.textContent = result.connected ? 'Collegato' : 'Non collegato';
+      const sessionAt = $('#driveSessionBackupAt');
+      const nightlyAt = $('#driveNightlyBackupAt');
+      if (sessionAt) sessionAt.textContent = result.last_session_backup || 'Non ancora eseguito';
+      if (nightlyAt) nightlyAt.textContent = result.last_nightly_backup || 'Non ancora eseguito';
+      const select = $('#driveBackupSelect');
+      if (select) {
+        const selected = select.value;
+        select.innerHTML = '<option value="">Seleziona un backup…</option>';
+        (result.backups || []).sort((a,b) => String(b.modifiedTime || '').localeCompare(String(a.modifiedTime || ''))).forEach(file => {
+          const option = document.createElement('option');
+          option.value = file.id;
+          option.textContent = file.name + (file.modifiedTime ? ' · ' + new Date(file.modifiedTime).toLocaleString('it-IT') : '');
+          select.append(option);
+        });
+        if ([...select.options].some(option => option.value === selected)) select.value = selected;
+      }
+      const connected = !!result.connected;
+      const connectDetails = document.querySelector('.drive-connect-details');
+      if (connectDetails) connectDetails.hidden = connected;
+      ['driveBackupNow','restoreDriveBackup','disconnectDrive','driveBackupSelect'].forEach(id => {
+        const element = $('#' + id);
+        if (element) element.disabled = !connected || (id === 'restoreDriveBackup' && !result.backups?.length);
+      });
+    } catch (error) {
+      const status = $('#driveBackupStatus');
+      if (status) status.textContent = 'Stato non disponibile';
+    }
+  }
   async function writeDriveBackup() {
-    showNotice('Backup centralizzato', 'Il backup è gestito dal server Home Assistant. Usa Esporta backup JSON per scaricare una copia.');
+    try {
+      const result = await apiRequest('/api/drive/backup', { method: 'POST', body: '{}' });
+      await refreshDriveStatus();
+      showNotice('Backup Google Drive completato', result.skipped ? result.reason : 'Il backup di sessione è stato aggiornato su Google Drive.');
+    } catch (error) { showNotice('Backup Google Drive non riuscito', error.message || String(error)); }
   }
   async function connectDriveFolder() {
-    showNotice('Backup centralizzato', 'La cartella Google Drive del browser non viene usata nell’edizione server. Usa Esporta backup JSON.');
+    const clientId = $('#driveClientId')?.value.trim() || '';
+    const clientSecret = $('#driveClientSecret')?.value.trim() || '';
+    const token = $('#driveTokenJson')?.value.trim() || '';
+    if (!clientId || !clientSecret || !token) {
+      showNotice('Dati mancanti', 'Inserisci Client ID, Client Secret e token JSON generato da rclone authorize.');
+      return;
+    }
+    const button = $('#connectDriveFolder');
+    if (button) button.disabled = true;
+    try {
+      await apiRequest('/api/drive/connect', { method: 'POST', body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, token }) });
+      $('#driveClientSecret').value = '';
+      $('#driveTokenJson').value = '';
+      await refreshDriveStatus();
+      showNotice('Google Drive collegato', 'Autorizzazione verificata. La cartella Gestione C-C Backup è pronta nel tuo Google Drive.');
+    } catch (error) {
+      showNotice('Collegamento non riuscito', error.message || String(error));
+    } finally { if (button) button.disabled = false; }
   }
   async function restoreDriveBackup() {
-    showNotice('Ripristino centralizzato', 'Per ripristinare i dati usa Ripristina da file JSON.');
+    const fileId = $('#driveBackupSelect')?.value || '';
+    if (!fileId) {
+      showNotice('Seleziona un backup', 'Scegli prima il file da ripristinare dall’elenco di Google Drive.');
+      return;
+    }
+    const fileName = $('#driveBackupSelect').selectedOptions[0]?.textContent || 'backup selezionato';
+    showConfirm('Ripristinare il backup da Google Drive?', 'Il database corrente sarà sostituito con "' + fileName + '". Prima del ripristino il server creerà una copia preventiva locale. Dopo il ripristino dovrai accedere nuovamente con il PIN contenuto nel backup.', async () => {
+      const result = await apiRequest('/api/drive/restore', { method: 'POST', body: JSON.stringify({ file_id: fileId }) });
+      if (result.ok) location.replace('/login');
+    });
+  }
+  async function disconnectDrive() {
+    showConfirm('Scollegare Google Drive?', 'Verrà rimossa dal server l’autorizzazione salvata. I backup già presenti su Google Drive non verranno cancellati.', async () => {
+      await apiRequest('/api/drive/disconnect', { method: 'POST', body: '{}' });
+      await refreshDriveStatus();
+      showNotice('Google Drive scollegato', 'I file di backup già presenti nel tuo Drive sono rimasti intatti.');
+    });
   }
   async function initialize() {
     const retryButton = $('#retryAppLoading');
@@ -344,6 +414,7 @@
     $('#appLoading')?.classList.add('hidden');
     navigate('overview');
     void refreshStorageInfo();
+    void refreshDriveStatus();
     const refreshOverview = () => requestAnimationFrame(() => requestAnimationFrame(() => {
       if ($('#view-overview')?.classList.contains('active')) { renderOverview(); drawFlowChart(); }
     }));
@@ -428,15 +499,24 @@
       finally { button.disabled = false; }
     });
     $('#serverLogout')?.addEventListener('click', async () => {
-      try { await apiRequest('/api/logout', { method: 'POST', body: '{}' }); }
-      finally { location.replace('/login'); }
+      const button = $('#serverLogout');
+      if (button) { button.disabled = true; button.textContent = 'Backup…'; }
+      try {
+        await apiRequest('/api/logout', { method: 'POST', body: '{}' });
+        location.replace('/login');
+      } catch (error) {
+        if (button) { button.disabled = false; button.textContent = 'Esci'; }
+        showNotice('Uscita non completata', error.message || 'Il backup non è riuscito. La sessione resta aperta.');
+      }
     });
     $('#exportBackupSecondary').addEventListener('click', exportBackup);
     $('#exportSqliteBackup')?.addEventListener('click', downloadSqliteBackup);
     $('#restoreSqliteBackup')?.addEventListener('click', () => $('#sqliteBackupFile')?.click());
     $('#sqliteBackupFile')?.addEventListener('change', restoreSqliteBackup);
     $('#connectDriveFolder')?.addEventListener('click', connectDriveFolder);
+    $('#driveBackupNow')?.addEventListener('click', writeDriveBackup);
     $('#restoreDriveBackup')?.addEventListener('click', restoreDriveBackup);
+    $('#disconnectDrive')?.addEventListener('click', disconnectDrive);
     $('#exportStatementPdf')?.addEventListener('click', exportStatementPdf);
     $('#exportOverviewStatementPdf')?.addEventListener('click', exportOverviewStatementPdf);
     $('#exportOverviewStatementXlsx')?.addEventListener('click', exportOverviewStatementXlsx);
@@ -1923,6 +2003,14 @@
     $('#confirmAction').textContent='Inserisci comunque';$('#confirmExclude')?.classList.remove('hidden');$('#confirmModal').classList.remove('hidden');
   }
   function closeModals() { $$('.modal-backdrop').forEach(m => m.classList.add('hidden')); confirmCallback = null; $('#confirmExclude')?.classList.add('hidden'); if($('#confirmAction')) $('#confirmAction').textContent='Continua'; }
+
+  window.addEventListener('pagehide', () => {
+    if (!csrfToken) return;
+    try {
+      const payload = new Blob([JSON.stringify({})], { type: 'application/json' });
+      fetch('/api/drive/session-backup', { method: 'POST', body: payload, credentials: 'same-origin', keepalive: true, headers: { 'X-CSRF-Token': csrfToken } }).catch(() => {});
+    } catch (_) {}
+  });
 
   initialize();
 })();
