@@ -66,7 +66,7 @@ Gestione C/C è un'applicazione web self-hosted per la gestione dei conti person
 - Il PIN è elaborato con PBKDF2-HMAC-SHA256 e salt casuale.
 - Cookie di sessione HttpOnly, Secure e SameSite=Strict; protezione CSRF sulle modifiche.
 - Limitazione dei tentativi di accesso e controllo di revisione per ridurre le sovrascritture silenziose tra sessioni concorrenti.
-- I dati contabili restano nel volume persistente dell'App; l'applicazione non è progettata per inviarli a servizi cloud esterni.
+- I dati contabili restano nel volume persistente dell'App. Solo se l’utente collega esplicitamente Google Drive, i backup SQLite vengono trasferiti al proprio account Google tramite HTTPS; il database operativo resta sul server Home Assistant.
 - La CA privata è una credenziale di fiducia: installala solo sui dispositivi autorizzati e proteggi i backup.
 
 Nessuna applicazione può garantire sicurezza assoluta. Verifica rete, backup e ripristino nel tuo ambiente prima di affidarle dati importanti. Non è stato eseguito un audit di sicurezza indipendente.
@@ -99,7 +99,7 @@ Quando apri una segnalazione indica versioni Home Assistant/App, architettura e 
 
 ## Stato e licenza
 
-Versione di distribuzione dichiarata: **1.0.0**. Il progetto è distribuito con licenza proprietaria d'uso personale, non con una licenza open source. L'uso personale gratuito è consentito alle persone fisiche nei limiti di `LICENSE`; l'uso professionale, aziendale, la modifica, la redistribuzione e lo sfruttamento commerciale richiedono un accordo scritto, salvo i diritti inderogabili e quelli dei componenti di terze parti. Consultare `COMMERCIAL-LICENSING.md`. La pubblicazione non sostituisce i test nel sistema dell'utente.
+Versione di distribuzione dichiarata: **1.0.5**. Il progetto è distribuito con licenza proprietaria d'uso personale, non con una licenza open source. L'uso personale gratuito è consentito alle persone fisiche nei limiti di `LICENSE`; l'uso professionale, aziendale, la modifica, la redistribuzione e lo sfruttamento commerciale richiedono un accordo scritto, salvo i diritti inderogabili e quelli dei componenti di terze parti. Consultare `COMMERCIAL-LICENSING.md`. La pubblicazione non sostituisce i test nel sistema dell'utente.
 
 ---
 
@@ -122,7 +122,7 @@ Gestione C/C is a self-hosted personal finance web application distributed as a 
 - **Reports:** monthly, quarterly, half-yearly and annual analysis, historical comparisons and category variances.
 - **Exports:** XLSX reports and printable PDF preview; use the browser's “Save as PDF” destination to create a PDF.
 - **Centralised storage:** persistent SQLite database shared by authorised devices.
-- **Backup and restore:** JSON and SQLite backups, local automatic snapshots and integrity-checked restore.
+- **Backup and restore:** JSON and SQLite backups, local automatic snapshots, optional Google Drive retention and integrity-checked restore.
 - **Protected access:** six-digit administrator PIN and HTTPS.
 
 ## Requirements
@@ -163,12 +163,15 @@ No application can guarantee absolute security. Verify networking, backup and re
 
 ## Backups
 
-1. Periodically use **Export JSON backup** and/or **Download SQLite database** in Settings.
-2. Keep at least one protected copy outside the Home Assistant host.
-3. Create a manual backup before major updates.
-4. Test restore only on a test installation or after creating a fresh backup of the current archive.
+- Local automatic snapshots remain available on the Home Assistant host.
+- Under **Settings → Backup · Google Drive**, you can optionally connect your Google account.
+- Authorization uses a Desktop OAuth client and a one-time token generated with rclone on a Windows PC; credentials are stored only in the App's private data volume.
+- When connected, the App retains one session backup and the latest three nightly backups (03:00, Europe/Rome). **Exit** waits for a backup when the archive has changed; closing the browser tab is best-effort only.
+- Google Drive SQLite files are **not encrypted**. Anyone with access to your Drive and the backup files can read their contents.
+- Restore from Drive creates a local pre-restore snapshot and checks SQLite integrity and archive structure.
+- Keep an independent backup and test restore procedures carefully.
 
-Local automatic snapshots are not a substitute for off-host backups. A disk or host failure may affect both the database and snapshots stored on the same machine.
+Google Drive is optional and uses outbound connections only; it does not make the Gestione C/C web interface accessible from the Internet.
 
 ## Support
 
