@@ -14,6 +14,12 @@ on:
 permissions:
   contents: write
 
+# Evita che due esecuzioni di questo workflow provino a pubblicare
+# contemporaneamente screenshot sul ramo main.
+concurrency:
+  group: demo-screenshots-main
+  cancel-in-progress: false
+
 jobs:
   capture-and-release:
     runs-on: ubuntu-latest
@@ -54,7 +60,21 @@ jobs:
           git add docs/screenshots/*.png
           if ! git diff --cached --quiet; then
             git commit -m "docs: add real app screenshots with fictional demo data"
-            git push origin HEAD:main
+
+            # main potrebbe essere avanzato durante la cattura degli screenshot.
+            # Recupera gli aggiornamenti e riprova il push senza forzarlo.
+            for attempt in 1 2 3 4 5; do
+              git fetch origin main
+              git rebase origin/main
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+              echo "Push non riuscito (tentativo $attempt/5); nuovo tentativo dopo aggiornamento di main."
+              sleep 2
+            done
+
+            echo "Impossibile pubblicare gli screenshot dopo 5 tentativi."
+            exit 1
           else
             echo "Screenshots are already up to date."
           fi
