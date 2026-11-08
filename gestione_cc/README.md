@@ -8,14 +8,7 @@ Features include GnuCash and bank-file import, transaction categorisation and sp
 
 > This is a Home Assistant **App**, not a Marketplace integration or dashboard card. Install it through the Home Assistant App repository catalogue.
 
-## Screenshots
 
-All images are illustrative mockups containing fictional data only.
-
-![Overview — fictional data](images/overview-demo.svg)
-![Transactions — fictional data](images/movements-demo.svg)
-![Reports — fictional data](images/report-dashboard-demo.svg)
-![PDF preview — fictional data](images/report-pdf-demo.svg)
 
 ## Installation
 
