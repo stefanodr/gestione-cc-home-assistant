@@ -204,9 +204,13 @@ class Handler(BaseHTTPRequestHandler):
             if not item: return
             try:
                 info = DB_PATH.stat()
-                self.send_json(200, {"path": str(DB_PATH), "size_bytes": info.st_size, "exists": True})
+                # SQLite runs in WAL mode: include the live write-ahead log
+                # so the displayed size reflects the complete active database.
+                wal_path = Path(str(DB_PATH) + "-wal")
+                wal_size = wal_path.stat().st_size if wal_path.is_file() else 0
+                self.send_json(200, {"path": str(DB_PATH), "size_bytes": info.st_size + wal_size, "exists": True, "includes_wal": True})
             except FileNotFoundError:
-                self.send_json(200, {"path": str(DB_PATH), "size_bytes": 0, "exists": False})
+                self.send_json(200, {"path": str(DB_PATH), "size_bytes": 0, "exists": False, "includes_wal": True})
             return
         if path == "/api/state":
             item = self.require_auth()
