@@ -418,6 +418,8 @@
     $('#connectDriveFolder')?.addEventListener('click', connectDriveFolder);
     $('#restoreDriveBackup')?.addEventListener('click', restoreDriveBackup);
     $('#exportStatementPdf')?.addEventListener('click', exportStatementPdf);
+    $('#exportOverviewStatementPdf')?.addEventListener('click', exportOverviewStatementPdf);
+    $('#exportOverviewStatementXlsx')?.addEventListener('click', exportOverviewStatementXlsx);
     $('#exportStatementXlsx')?.addEventListener('click', exportStatementXlsx);
     $('#exportReportPdf')?.addEventListener('click', exportReportPdf);
     $('#exportReportXlsx')?.addEventListener('click', exportReportXlsx);
@@ -1713,6 +1715,57 @@
     const monthKey = $('#statementMonth').value || monthSelection();
     const transactions = exportPeriodTransactions(monthKey);
     return { monthKey, transactions, totals: cashFlowTotals(transactions), accountName: state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountLabel(state.reportAccountId) };
+  }
+  function overviewStatementContext() {
+    const monthKey = monthSelection();
+    const [year, month] = monthKey.split('-').map(Number);
+    const start = year + '-' + String(month).padStart(2, '0') + '-01';
+    const end = year + '-' + String(month).padStart(2, '0') + '-' + String(new Date(year, month, 0).getDate()).padStart(2, '0');
+    const accountFilter = state.reportAccountId || state.bankAccountId || 'all';
+    const belongsToAccount = tx => accountFilter === 'all' || tx.bankAccountId === accountFilter;
+    const validTransactions = state.transactions.filter(tx => tx.status !== 'duplicate' && belongsToAccount(tx) && parseDate(tx.date));
+    const opening = Number(state.openingBalance || 0) + validTransactions.filter(tx => tx.date < start).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const transactions = validTransactions.filter(tx => tx.date >= start && tx.date <= end)
+      .sort((a, b) => parseDate(a.date).localeCompare(parseDate(b.date)) || String(a.id || '').localeCompare(String(b.id || '')));
+    let running = opening;
+    const rows = transactions.map(tx => {
+      const amount = Number(tx.amount) || 0;
+      running += amount;
+      return { tx, income: amount > 0 ? amount : 0, expense: amount < 0 ? Math.abs(amount) : 0, balance: running };
+    });
+    return { monthKey, start, end, opening, closing: running, transactions, rows,
+      accountName: accountFilter === 'all' ? 'Tutti i conti liquidi' : accountLabel(accountFilter),
+      totals: cashFlowTotals(transactions) };
+  }
+  function exportOverviewStatementPdf() {
+    const ctx = overviewStatementContext();
+    const rows = ctx.rows.map(({ tx, income, expense, balance }) => {
+      const description = transactionDescription(tx) || transactionCausale(tx) || 'Movimento';
+      return '<tr><td>' + formatDate(tx.date) + '</td><td>' + safeText(description) + '</td><td class="num">' + (income ? euro.format(income) : '') + '</td><td class="num">' + (expense ? euro.format(expense) : '') + '</td><td class="num">' + euro.format(balance) + '</td></tr>';
+    }).join('');
+    const content = '<h1>Estratto conto</h1><div class="sub">' + safeText(monthName(ctx.monthKey)) + ' · ' + safeText(ctx.accountName) + '</div><div class="summary"><div>Saldo iniziale<strong>' + euro.format(ctx.opening) + '</strong></div><div>Entrate<strong>' + euro.format(ctx.totals.income) + '</strong></div><div>Uscite<strong>' + euro.format(ctx.totals.expense) + '</strong></div><div>Saldo finale<strong>' + euro.format(ctx.closing) + '</strong></div></div><table><thead><tr><th>Data</th><th>Descrizione</th><th class="num">Entrate</th><th class="num">Uscite</th><th class="num">Saldo progressivo</th></tr></thead><tbody>' + (rows || '<tr><td colspan="5">Nessun movimento nel periodo selezionato.</td></tr>') + '</tbody></table><div class="foot">' + ctx.transactions.length + ' movimenti · Periodo dal ' + formatDate(ctx.start) + ' al ' + formatDate(ctx.end) + '. Prospetto personale non sostitutivo dell’estratto ufficiale della banca.</div>';
+    printHtml('Estratto-conto-' + ctx.monthKey, content);
+  }
+  function exportOverviewStatementXlsx() {
+    const ctx = overviewStatementContext();
+    const rows = [
+      ['ESTRATTO CONTO · GESTIONE C/C'], ['Periodo', monthName(ctx.monthKey)], ['Conto', ctx.accountName],
+      ['Saldo iniziale', ctx.opening], [],
+      ['Data', 'Descrizione', 'Causale', 'Entrate', 'Uscite', 'Saldo progressivo', 'Contropartita', 'Stato'],
+      ...ctx.rows.map(({ tx, income, expense, balance }) => [
+        tx.date, transactionDescription(tx) || transactionCausale(tx) || 'Movimento',
+        transactionCausale(tx), income || '', expense || '', balance,
+        tx.counterpartSplits?.length ? tx.counterpartSplits.map(s => accountLabel(s.accountId)).join('; ') : accountLabel(tx.counterpartAccountId),
+        tx.status || ''
+      ]),
+      [], ['Totale entrate', ctx.totals.income], ['Totale uscite', ctx.totals.expense],
+      ['Saldo iniziale', ctx.opening], ['Saldo finale', ctx.closing]
+    ];
+    downloadXlsx('Estratto-conto-' + ctx.monthKey + '.xlsx', [{
+      name: 'Estratto conto', rows, titleRow: 0, headerRow: 5,
+      currencyColumns: [3, 4, 5], dateColumns: [0],
+      widths: [15, 42, 38, 18, 18, 21, 42, 16], autoFilter: true
+    }]);
   }
   function exportStatementPdf() {
     const { monthKey, transactions, totals, accountName } = statementContext();
