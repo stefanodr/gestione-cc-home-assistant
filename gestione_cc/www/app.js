@@ -423,6 +423,18 @@
     if (!state.accounts) { state.accounts = defaultAccounts(); changed = true; }
     if (!state.transactions) { state.transactions = []; changed = true; }
     if (!state.rules) { state.rules = []; changed = true; }
+    // Additive finance-feature state: preserve existing archives and unknown fields.
+    if (!Array.isArray(state.budgets)) { state.budgets = []; changed = true; }
+    if (!Array.isArray(state.recurringRules)) { state.recurringRules = []; changed = true; }
+    if (!Array.isArray(state.savedFilters)) { state.savedFilters = []; changed = true; }
+    if (!Array.isArray(state.importProfiles)) { state.importProfiles = []; changed = true; }
+    if (!state.forecastSettings || typeof state.forecastSettings !== 'object' || Array.isArray(state.forecastSettings)) {
+      state.forecastSettings = { horizonMonths: 12, accountIds: [] };
+      changed = true;
+    } else {
+      if (state.forecastSettings.horizonMonths !== 12) { state.forecastSettings.horizonMonths = 12; changed = true; }
+      if (!Array.isArray(state.forecastSettings.accountIds)) { state.forecastSettings.accountIds = []; changed = true; }
+    }
     if (state.openingBalance == null) { state.openingBalance = 0; changed = true; }
     if (!state.bankAccountId) {
       state.bankAccountId = state.accounts.find(a => a.type === 'BANK')?.id || state.accounts[0]?.id;
