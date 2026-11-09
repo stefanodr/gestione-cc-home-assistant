@@ -793,7 +793,9 @@
   function renderBudgetView() {
     const body=$('#budgetBody');if(!body)return;
     const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7);
-    const snapshot=activeBudgetSnapshot(month);
+    let snapshot=activeBudgetSnapshot(month);
+    const currentMonth=localDateKey(new Date()).slice(0,7);
+    if(!snapshot&&month>=currentMonth){snapshot=generateBudgetSnapshot(month);state.budgetSnapshots.push(snapshot);void saveState().then(()=>renderBudgetView());}
     const categories=state.accounts.filter(a=>a.type==='EXPENSE'&&a.hierarchyType!=='Mastro').sort((a,b)=>a.path.localeCompare(b.path,'it'));
     const actuals=new Map(categories.map(a=>[a.id,budgetActualDirect(month,a.id)]));
     const lines=new Map((snapshot?.lines||[]).map(x=>[x.accountId,x]));
