@@ -85,7 +85,7 @@
       for (const split of splits) {
         const amount = Math.abs(Number(split.value) || 0);
         if (!amount) continue;
-        const key = [description, split.accountId || '', amount.toFixed(2)].join('|');
+        const key = [description, split.accountId || ''].join('|');
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push({ date: tx.date, amount, accountId: split.accountId || null, description: tx.description || tx.payee || '' });
       }
