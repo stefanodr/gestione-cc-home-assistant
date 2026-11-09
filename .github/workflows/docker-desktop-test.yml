@@ -1,0 +1,43 @@
+name: Docker Desktop standalone test
+
+on:
+  push:
+    branches:
+      - test/docker-desktop-standalone
+  pull_request:
+    branches:
+      - test/docker-desktop-standalone
+  workflow_dispatch:
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build standalone image
+        run: docker build -f docker-test/Dockerfile -t gestione-cc-test .
+      - name: Start isolated test container
+        run: |
+          docker volume create gestione-cc-ci-data
+          docker run -d --name gestione-cc-ci \
+            -p 127.0.0.1:18444:8443 \
+            -e BOOTSTRAP_PIN=123456 \
+            -e TZ=Europe/Rome \
+            -v gestione-cc-ci-data:/data \
+            gestione-cc-test
+      - name: Check HTTPS login page and database initialization
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -kfsS https://127.0.0.1:18444/login -o /tmp/login.html; then break; fi
+            sleep 2
+          done
+          grep -q 'PIN' /tmp/login.html
+          docker exec gestione-cc-ci test -s /data/gestione_cc.sqlite3
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs gestione-cc-ci
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f gestione-cc-ci || true
+          docker volume rm gestione-cc-ci-data || true
