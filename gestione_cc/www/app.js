@@ -618,6 +618,8 @@
     if (results.length > 1000) $('#searchResultCount').textContent += ' · mostrati i primi 1.000';
   }
   function setupFinanceViews() {
+    if (setupFinanceViews.listenersBound) { renderBudgetView(); renderForecastSelection(); return; }
+    setupFinanceViews.listenersBound = true;
     const account = $('#searchAccount');
     if (account) {
       const old = account.value;
@@ -677,7 +679,7 @@
       if(tx.status!=='confirmed'||String(tx.date||'').slice(0,7)!==month)continue;
       const splits=Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.length?tx.counterpartSplits:null;
       if(splits){for(const split of splits){const a=accountById(split.accountId);if(a?.type==='EXPENSE')totals.set(a.id,(totals.get(a.id)||0)+Math.abs(Number(split.value)||0));}}
-      else {const a=accountById(tx.counterpartAccountId);if(a?.type==='EXPENSE')totals.set(a.id,(totals.get(a.id)||0)+Math.abs(Number(tx.amount)||0);}
+      else {const a=accountById(tx.counterpartAccountId);if(a?.type==='EXPENSE')totals.set(a.id,(totals.get(a.id)||0)+Math.abs(Number(tx.amount)||0));}
     }
     body.innerHTML=categories.map(a=>{
       const budget=Number(state.budgets.find(x=>x.accountId===a.id)?.amount)||0,spent=totals.get(a.id)||0,remaining=budget-spent,pct=budget>0?spent/budget*100:0;
