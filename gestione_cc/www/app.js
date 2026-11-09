@@ -743,12 +743,23 @@
     const historySource = hasCurrentData >= 3 ? 'anno_corrente' : 'anno_precedente';
     const categories = state.accounts.filter(a => a.type === 'EXPENSE' && a.hierarchyType !== 'Mastro').sort((a,b)=>a.path.localeCompare(b.path,'it'));
     const lines = categories.map(account => {
-      const history = sourceMonths.map(key => budgetActualDirect(key, account.id));
-      const nonZero = history.filter(value => value > 0);
-      const avg = nonZero.length ? history.reduce((sum,value)=>sum+value,0) / history.length : 0;
-      const budget = Math.round((avg + Number.EPSILON) * 100) / 100;
+      const fixedForMonth = key => state.recurringRules.filter(rule=>rule.active&&rule.categoryId===account.id&&Number(rule.amount)<0)
+        .flatMap(rule=>recurringOccurrenceDates(rule,key).map(date=>({rule,date})))
+        .reduce((sum,item)=>sum+Math.abs(Number(item.rule.amount)||0),0);
+      const variableHistory = sourceMonths.map(key => {
+        const actual=budgetActualDirect(key,account.id);
+        const realizedFixed=state.recurringRules.filter(rule=>rule.active&&rule.categoryId===account.id&&Number(rule.amount)<0)
+          .flatMap(rule=>recurringOccurrenceDates(rule,key).map(date=>({rule,date})))
+          .filter(item=>recurringAlreadyRealized(item.rule,item.date))
+          .reduce((sum,item)=>sum+Math.abs(Number(item.rule.amount)||0),0);
+        return Math.max(0,actual-realizedFixed);
+      });
+      const variable = variableHistory.reduce((sum,value)=>sum+value,0)/Math.max(1,variableHistory.length);
+      const recurring = fixedForMonth(month);
+      const budget = Math.round((variable+recurring+Number.EPSILON)*100)/100;
       const spent = budgetActualDirect(month, account.id);
-      return { accountId: account.id, budget, spent, remaining: Math.round((budget-spent)*100)/100,
+      return { accountId: account.id, budget, recurring:Math.round(recurring*100)/100, variable:Math.round(variable*100)/100,
+        spent, remaining: Math.round((budget-spent)*100)/100,
         utilization: budget > 0 ? Math.round(spent/budget*10000)/100 : null, historySource };
     });
     const previous = activeBudgetSnapshot(month);
@@ -765,7 +776,7 @@
     const lines=new Map((snapshot?.lines||[]).map(x=>[x.accountId,x]));
     body.innerHTML=categories.map(a=>{
       const line=lines.get(a.id),budget=Number(line?.budget)||0,spent=actuals.get(a.id)||0,remaining=budget-spent,pct=budget>0?spent/budget*100:null;
-      return '<tr><td class="name-primary">'+safeText(a.path)+(a.hierarchyType==='Mastro e conto'?' <small>· conto e mastro</small>':'')+'</td><td><input type="number" min="0" step="0.01" data-budget-account="'+safeText(a.id)+'" value="'+(line?budget:'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px" '+(snapshot?'':'disabled')+'></td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(line?euro.format(remaining):'—')+'</td><td>'+(line&&budget>0?Math.round(pct)+'%':'—')+'</td></tr>';
+      return '<tr><td class="name-primary">'+safeText(a.path)+(a.hierarchyType==='Mastro e conto'?' <small>· conto e mastro</small>':'')+'</td><td><input type="number" min="0" step="0.01" data-budget-account="'+safeText(a.id)+'" value="'+(line?budget:'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px" '+(snapshot?'':'disabled')+'>'+(line?'<small style="display:block;color:#71817d">Fisse '+euro.format(line.recurring||0)+' · Variabili '+euro.format(line.variable||0)+'</small>':'')+'</td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(line?euro.format(remaining):'—')+'</td><td>'+(line&&budget>0?Math.round(pct)+'%':'—')+'</td></tr>';
     }).join('')||'<tr><td colspan="5" class="empty-inline">Nessuna categoria di spesa utilizzabile nel budget.</td></tr>';
     const status=$('#budgetSnapshotStatus');
     if(status)status.textContent=snapshot?'Versione '+snapshot.version+' · '+(snapshot.status==='confermato'?'Confermato':'Proposta')+' · base: '+(snapshot.historySource==='anno_corrente'?'anno corrente':'anno precedente')+' · '+snapshot.historyMonths+' mesi':'Nessun budget salvato per questo mese. Genera una proposta per iniziare.';
