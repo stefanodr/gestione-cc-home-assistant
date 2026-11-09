@@ -786,7 +786,13 @@
     const previous = activeBudgetSnapshot(month);
     const version = (previous?.version || 0) + 1;
     return { month, version, createdAt: new Date().toISOString(), status: 'proposta', historySource, historyMonths: sourceMonths.length,
-      lines, totalBudget: lines.reduce((sum,x)=>sum+x.budget,0), totalActual: lines.reduce((sum,x)=>sum+x.spent,0) };
+      lines, totalBudget: lines.reduce((sum,x)=>sum+x.budget,0), totalActual: lines.reduce((sum,x)=>sum+x.spent,0),
+      totalRecurringExpenses:lines.reduce((sum,x)=>sum+(x.recurring||0),0), totalVariableExpenses:lines.reduce((sum,x)=>sum+(x.variable||0),0),
+      incomeForecast:state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').reduce((sum,account)=>{
+        const history=sourceMonths.map(key=>budgetActualDirect(key,account.id));
+        return sum+(history.reduce((total,value)=>total+value,0)/Math.max(1,history.length));
+      },0),
+      actualIncome:state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').reduce((sum,account)=>sum+budgetActualDirect(month,account.id),0) };
   }
   function renderBudgetView() {
     const body=$('#budgetBody');if(!body)return;
@@ -797,6 +803,16 @@
     const categories=state.accounts.filter(a=>a.type==='EXPENSE'&&a.hierarchyType!=='Mastro').sort((a,b)=>a.path.localeCompare(b.path,'it'));
     const actuals=new Map(categories.map(a=>[a.id,budgetActualDirect(month,a.id)]));
     const lines=new Map((snapshot?.lines||[]).map(x=>[x.accountId,x]));
+    const totalActual=categories.reduce((sum,account)=>sum+(actuals.get(account.id)||0),0);
+    const totalBudget=snapshot?.totalBudget||0;
+    const incomeActual=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').reduce((sum,account)=>sum+budgetActualDirect(month,account.id),0);
+    const summaryValues={
+      budgetIncome:snapshot?.incomeForecast||0,budgetRecurring:snapshot?.totalRecurringExpenses||0,
+      budgetVariable:snapshot?.totalVariableExpenses||0,budgetActual:totalActual,
+      budgetRemaining:totalBudget-totalActual,budgetNet:(snapshot?.incomeForecast||0)-totalBudget,
+      budgetIncomeActual:incomeActual
+    };
+    Object.entries(summaryValues).forEach(([id,value])=>{const el=$('#'+id);if(el)el.textContent=euro.format(value);});
     body.innerHTML=categories.map(a=>{
       const line=lines.get(a.id),budget=Number(line?.budget)||0,spent=actuals.get(a.id)||0,remaining=budget-spent,pct=budget>0?spent/budget*100:null;
       return '<tr><td class="name-primary">'+safeText(a.path)+(a.hierarchyType==='Mastro e conto'?' <small>· conto e mastro</small>':'')+'</td><td><input type="number" min="0" step="0.01" data-budget-account="'+safeText(a.id)+'" value="'+(line?budget:'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px" '+(snapshot?'':'disabled')+'>'+(line?'<small style="display:block;color:#71817d">'+(line.manualOverride?'Modificato manualmente':'Fisse '+euro.format(line.recurring||0)+' · Variabili '+euro.format(line.variable||0))+'</small>':'')+'</td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(line?euro.format(remaining):'—')+'</td><td>'+(line&&budget>0?Math.round(pct)+'%':'—')+'</td></tr>';
@@ -821,7 +837,7 @@
     const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7),snapshot=activeBudgetSnapshot(month);if(!snapshot)return;
     const next=JSON.parse(JSON.stringify(snapshot));next.version=Number(snapshot.version||1)+1;next.createdAt=new Date().toISOString();next.status='proposta';delete next.confirmedAt;
     $('#budgetBody').querySelectorAll('[data-budget-account]').forEach(input=>{const line=next.lines.find(x=>x.accountId===input.dataset.budgetAccount);if(line){line.budget=Math.max(0,Number(input.value)||0);line.manualOverride=true;line.remaining=Math.round((line.budget-line.spent)*100)/100;line.utilization=line.budget>0?Math.round(line.spent/line.budget*10000)/100:null;}});
-    next.totalBudget=next.lines.reduce((sum,x)=>sum+x.budget,0);state.budgetSnapshots.push(next);await saveState();renderBudgetView();
+    next.totalBudget=next.lines.reduce((sum,x)=>sum+x.budget,0);next.totalRecurringExpenses=next.lines.reduce((sum,x)=>sum+(x.recurring||0),0);next.totalVariableExpenses=next.lines.reduce((sum,x)=>sum+(x.manualOverride?Math.max(0,x.budget-(x.recurring||0)):(x.variable||0)),0);state.budgetSnapshots.push(next);await saveState();renderBudgetView();
   }
 
   function forecastSelectedAccounts() {
