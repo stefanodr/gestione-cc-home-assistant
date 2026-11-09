@@ -834,16 +834,31 @@
       Math.abs(Math.abs(Number(tx.amount)||0)-Math.abs(Number(rule.amount)||0))<=tolerance &&
       Boolean(target) && normalize(transactionDescription(tx))===target;
   }
-  function recurringAlreadyRealized(rule,key) {
-    return state.transactions.some(tx=>String(tx.date||'').slice(0,7)===key&&transactionMatchesRecurringRule(tx,rule));
+  function recurringOccurrenceDates(rule,key) {
+    if(!recurringOccursInMonth(rule,key))return [];
+    const start=String(rule.startDate||''),end=String(rule.endDate||'');
+    const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number);
+    if(rule.frequency==='weekly'||rule.frequency==='biweekly'){
+      const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd),step=rule.frequency==='weekly'?7:14,dates=[];
+      let due=new Date(origin);while(due<first)due.setDate(due.getDate()+step);
+      while(due<=last){const date=localDateKey(due);if(date>=start&&(!end||date<=end))dates.push(date);due.setDate(due.getDate()+step);}
+      return dates;
+    }
+    const date=monthOccurrence(rule,key);
+    return date>=start&&(!end||date<=end)?[date]:[];
+  }
+  function recurringAlreadyRealized(rule,date) {
+    return state.transactions.some(tx=>{
+      if(tx.status!=='confirmed'||!tx.date||!transactionMatchesRecurringRule(tx,rule))return false;
+      const days=Math.abs((Date.parse(tx.date+'T12:00:00Z')-Date.parse(date+'T12:00:00Z'))/86400000);
+      return days<=5;
+    });
   }
   function forecastRecurringItems(key,selectedIds) {
     const today=localDateKey(new Date());
-    return state.recurringRules.filter(r=>{
-      if(!r.active||!selectedIds.has(r.bankAccountId)||!recurringOccursInMonth(r,key)||recurringAlreadyRealized(r,key))return false;
-      // In the current month, never project an occurrence whose due date has already passed.
-      return key!==today.slice(0,7)||monthOccurrence(r,key)>=today;
-    });
+    return state.recurringRules.filter(r=>r.active&&selectedIds.has(r.bankAccountId))
+      .flatMap(rule=>recurringOccurrenceDates(rule,key).filter(date=>(key!==today.slice(0,7)||date>=today)&&!recurringAlreadyRealized(rule,date))
+        .map(date=>({...rule,occurrenceDate:date})));
   }
   function transactionIsExplicitlyRecurring(tx,categoryId,key,selectedIds) {
     return state.recurringRules.some(rule=>rule.active&&rule.categoryId===categoryId&&selectedIds.has(rule.bankAccountId)&&
@@ -962,7 +977,7 @@
     let balance=currentBalance;
     for(let i=0;i<12;i++){
       const key=shiftMonthKey(currentMonth,i),rules=forecastRecurringItems(key,ids);
-      const due=rules.filter(rule=>i!==0||monthOccurrence(rule,key)>=today);
+      const due=rules.filter(rule=>i!==0||rule.occurrenceDate>=today);
       const programmedIncome=due.filter(rule=>Number(rule.amount)>0).reduce((sum,rule)=>sum+Number(rule.amount),0);
       const programmedExpense=due.filter(rule=>Number(rule.amount)<0).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)),0);
       const estimateIncome=i===0?0:estimates.income;
