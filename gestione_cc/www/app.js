@@ -818,7 +818,7 @@
     const totalBudget=snapshot?.totalBudget||0;
     const incomeActual=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').reduce((sum,account)=>sum+budgetActualDirect(month,account.id),0);
     const summaryValues={
-      budgetIncome:snapshot?.incomeForecast??budgetIncomeForecastForMonth(month).amount,budgetRecurring:snapshot?.totalRecurringExpenses||0,
+      budgetIncome:snapshot?.incomeForecast??budgetIncomeForecastForMonth(month).amount,budgetTotal:totalBudget,budgetRecurring:snapshot?.totalRecurringExpenses||0,
       budgetVariable:snapshot?.totalVariableExpenses||0,budgetActual:totalActual,
       budgetRemaining:totalBudget-totalActual,budgetNet:(snapshot?.incomeForecast||0)-totalBudget,
       budgetIncomeActual:incomeActual
