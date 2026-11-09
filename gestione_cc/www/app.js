@@ -748,6 +748,7 @@
     });
     $('#budgetMonth')?.addEventListener('change',renderBudgetView);
     $('#generateBudgetProposal')?.addEventListener('click',generateBudgetForSelectedMonth);
+    $('#generateHistoricalBudgets')?.addEventListener('click',generateHistoricalBudgets);
     $('#confirmBudgetSnapshot')?.addEventListener('click',confirmBudgetForSelectedMonth);
     $('#saveBudgetEdits')?.addEventListener('click',saveBudgetEdits);
     renderBudgetView();
@@ -778,16 +779,18 @@
     return totals;
   }
 
-  function budgetIncomeHistory() {
-    const now=new Date(),year=now.getFullYear();
-    const currentMonths=Array.from({length:now.getMonth()},(_,i)=>year+'-'+String(i+1).padStart(2,'0'));
+  function budgetIncomeHistory(targetMonth) {
+    const now=new Date(),[targetYear,targetMonthNumber]=String(targetMonth||localDateKey(now).slice(0,7)).split('-').map(Number);
+    const currentYear=now.getFullYear();
+    const cutoff=targetYear<currentYear?targetMonthNumber-1:Math.min(targetMonthNumber-1,now.getMonth());
+    const currentMonths=Array.from({length:Math.max(0,cutoff)},(_,i)=>targetYear+'-'+String(i+1).padStart(2,'0'));
     const accounts=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro');
     const coverage=currentMonths.filter(key=>accounts.some(account=>budgetActualDirect(key,account.id)>0)).length;
-    const months=coverage>=3?currentMonths:Array.from({length:12},(_,i)=>(year-1)+'-'+String(i+1).padStart(2,'0'));
+    const months=coverage>=3?currentMonths:Array.from({length:12},(_,i)=>(targetYear-1)+'-'+String(i+1).padStart(2,'0'));
     return {accounts,months,source:coverage>=3?'anno_corrente':'anno_precedente'};
   }
   function budgetIncomeForecastForMonth(month) {
-    const history=budgetIncomeHistory();
+    const history=budgetIncomeHistory(month);
     const amount=history.accounts.reduce((sum,account)=>sum+history.months.reduce((total,key)=>total+budgetActualDirect(key,account.id),0)/Math.max(1,history.months.length),0);
     return {amount:Math.round(amount*100)/100,source:history.source,months:history.months.length};
   }
@@ -804,14 +807,23 @@
   function activeBudgetSnapshot(month) {
     return state.budgetSnapshots.filter(x => x.month === month).sort((a,b) => Number(b.version || 0) - Number(a.version || 0))[0] || null;
   }
+  function budgetEligibleAccounts() {
+    return state.accounts.filter(a => a.hierarchyType !== 'Mastro' &&
+      (a.type === 'EXPENSE' || (a.classification === 'Patrimoniale' && a.includeInBudget === true && !isLiquidAccount(a))));
+  }
+  function budgetExpenseHistory(month, accounts) {
+    const now=new Date(),[year,targetMonth]=month.split('-').map(Number),currentYear=now.getFullYear();
+    const cutoff=year<currentYear?targetMonth-1:Math.min(targetMonth-1,now.getMonth());
+    const currentMonths=Array.from({length:Math.max(0,cutoff)},(_,i)=>year+'-'+String(i+1).padStart(2,'0'));
+    const coverage=currentMonths.filter(key=>accounts.some(account=>budgetActualDirect(key,account.id)>0)).length;
+    const months=coverage>=3?currentMonths:Array.from({length:12},(_,i)=>(year-1)+'-'+String(i+1).padStart(2,'0'));
+    return {months,source:coverage>=3?'anno_corrente':'anno_precedente'};
+  }
   function generateBudgetSnapshot(month) {
-    const now = new Date(), currentYear = now.getFullYear(), year = Number(month.slice(0,4));
-    const currentYearMonths = Array.from({length: Math.max(0, now.getMonth())}, (_,i) => currentYear + '-' + String(i+1).padStart(2,'0'));
-    const expenseAccounts=state.accounts.filter(a=>a.type==='EXPENSE'&&a.hierarchyType!=='Mastro');
-    const hasCurrentData = currentYearMonths.filter(key => expenseAccounts.some(account=>budgetActualDirect(key,account.id)>0)).length;
-    const sourceMonths = hasCurrentData >= 3 ? currentYearMonths : Array.from({length:12},(_,i)=>(currentYear-1)+'-'+String(i+1).padStart(2,'0'));
-    const historySource = hasCurrentData >= 3 ? 'anno_corrente' : 'anno_precedente';
-    const categories = state.accounts.filter(a => a.type === 'EXPENSE' && a.hierarchyType !== 'Mastro').sort((a,b)=>a.path.localeCompare(b.path,'it'));
+    const categories = budgetEligibleAccounts().sort((a,b)=>a.path.localeCompare(b.path,'it'));
+    const expenseHistory=budgetExpenseHistory(month,categories);
+    const sourceMonths=expenseHistory.months;
+    const historySource=expenseHistory.source;
     const lines = categories.map(account => {
       const fixedForMonth = key => state.recurringRules.filter(rule=>rule.active&&rule.categoryId===account.id&&Number(rule.amount)<0)
         .flatMap(rule=>recurringOccurrenceDates(rule,key).map(date=>({rule,date})))
@@ -830,7 +842,7 @@
         spent, remaining: Math.round((budget-spent)*100)/100,
         utilization: budget > 0 ? Math.round(spent/budget*10000)/100 : null, historySource };
     });
-    const incomeHistory=budgetIncomeHistory();
+    const incomeHistory=budgetIncomeHistory(month);
     const incomeLines=incomeHistory.accounts.sort((a,b)=>a.path.localeCompare(b.path,'it')).map(account=>{
       const history=incomeHistory.months.map(key=>budgetActualDirect(key,account.id));
       const budget=Math.round((history.reduce((sum,value)=>sum+value,0)/Math.max(1,history.length)+Number.EPSILON)*100)/100;
@@ -853,7 +865,7 @@
     let snapshot=activeBudgetSnapshot(month);
     const currentMonth=localDateKey(new Date()).slice(0,7);
     if(!snapshot&&month>=currentMonth){snapshot=generateBudgetSnapshot(month);state.budgetSnapshots.push(snapshot);void saveState().then(()=>renderBudgetView());}
-    const categories=state.accounts.filter(a=>a.type==='EXPENSE'&&a.hierarchyType!=='Mastro').sort((a,b)=>a.path.localeCompare(b.path,'it'));
+    const categories=budgetEligibleAccounts().sort((a,b)=>a.path.localeCompare(b.path,'it'));
     const incomeCategories=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').sort((a,b)=>a.path.localeCompare(b.path,'it'));
     const actuals=new Map(categories.map(a=>[a.id,budgetActualDirect(month,a.id)]));
     const lines=new Map((snapshot?.lines||[]).map(x=>[x.accountId,x]));
@@ -889,6 +901,16 @@
     const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7),previous=activeBudgetSnapshot(month);
     if(previous){showConfirm('Generare una nuova versione del budget?', 'La versione esistente resterà conservata nello storico. Verrà creata una nuova proposta per '+monthName(month)+'.', async()=>{state.budgetSnapshots.push(generateBudgetSnapshot(month));await saveState();renderBudgetView();});return;}
     state.budgetSnapshots.push(generateBudgetSnapshot(month));await saveState();renderBudgetView();
+  }
+  async function generateHistoricalBudgets() {
+    const now=new Date(),year=now.getFullYear(),lastCompletedMonth=now.getMonth();
+    if(lastCompletedMonth<1){showNotice('Nessun mese storico disponibile','La funzione sarà disponibile dal mese successivo.');return;}
+    const months=Array.from({length:lastCompletedMonth},(_,i)=>year+'-'+String(i+1).padStart(2,'0'));
+    showConfirm('Ricalcolare i budget storici?', 'Saranno create nuove proposte da gennaio a '+monthName(months[months.length-1])+' '+year+'. Le versioni già presenti non verranno cancellate: resteranno nello storico.', async()=>{
+      months.forEach(month=>state.budgetSnapshots.push(generateBudgetSnapshot(month)));
+      await saveState();renderBudgetView();
+      showNotice('Budget storici generati',months.length+' nuove versioni create. Seleziona i mesi precedenti per confrontare previsto ed effettivo.');
+    });
   }
   async function confirmBudgetForSelectedMonth() {
     const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7),snapshot=activeBudgetSnapshot(month);if(!snapshot)return;
@@ -1077,7 +1099,8 @@
     const historyKeys=Array.from({length:12},(_,i)=>shiftMonthKey(currentMonth,-12+i));
     const completedCurrentYear=historyKeys.filter(key=>key.slice(0,4)===String(new Date().getFullYear())&&key<currentMonth);
     const previousYearKeys=Array.from({length:12},(_,i)=>(new Date().getFullYear()-1)+'-'+String(i+1).padStart(2,'0'));
-    const categories=state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)&&a.hierarchyType!=='Mastro');
+    const categories=state.accounts.filter(a=>a.hierarchyType!=='Mastro'&&
+      (['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))));
     const usedSources=new Set(),usedMonths=new Set();
     const estimates={income:0,expense:0,source:'',months:0};
     for(const cat of categories){
@@ -1129,7 +1152,7 @@
     const liquid=state.accounts.filter(isLiquidAccount);
     const bank=$('#recBankAccount'),category=$('#recCategory');
     if(bank){const prior=bank.value;bank.innerHTML=liquid.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(a.path)+'</option>').join('');if(liquid.some(a=>a.id===prior))bank.value=prior;}
-    if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(a.path)+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
+    if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(a.path)+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
     renderRecurringRules();
     const result=buildForecast();
     $('#forecastOpening').textContent=euro.format(result.currentBalance);
@@ -1769,13 +1792,19 @@
       const txCount = state.transactions.filter(t => t.counterpartAccountId === a.id || t.bankAccountId === a.id || (t.counterpartSplits || []).some(sp => sp.accountId === a.id)).length;
       const cls = a.classification === 'Economica' ? 'class-economic' : a.classification === 'Patrimoniale' ? 'class-balance' : a.classification === 'Tecnica' ? 'class-technical' : 'class-structural';
       const options = ['automatico','Mastro','Mastro e conto','Conto'].map(v => `<option value="${v}" ${(v === 'automatico' ? !a.hierarchyTypeOverride : a.hierarchyType === v && a.hierarchyTypeSource === 'manuale') ? 'selected' : ''}>${v === 'automatico' ? 'Automatico · ' + safeText(a.hierarchyTypeProposal || a.hierarchyType) : v}</option>`).join('');
-      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}</td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td></tr>`;
+      const budgetEligible=a.classification==='Patrimoniale'&&!isLiquidAccount(a)&&a.hierarchyType!=='Mastro';
+      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}</td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+'> Includi</label>' : '—'}</td></tr>`;
     }).join('');
     $('#accountsBody').querySelectorAll('[data-hierarchy-account]').forEach(select => select.addEventListener('change', async () => {
       const account = accountById(select.dataset.hierarchyAccount); if (!account) return;
       if (select.value === 'automatico') delete account.hierarchyTypeOverride;
       else account.hierarchyTypeOverride = select.value;
       normalizeState(); await saveState(); renderAccounts(); renderBudgetView(); renderForecastSelection();
+    }));
+    $('#accountsBody').querySelectorAll('[data-budget-include-account]').forEach(input=>input.addEventListener('change',async()=>{
+      const account=accountById(input.dataset.budgetIncludeAccount);if(!account)return;
+      account.includeInBudget=input.checked;
+      await saveState();renderAccounts();renderBudgetView();renderForecastSelection();
     }));
   }
   function renderRules() {
