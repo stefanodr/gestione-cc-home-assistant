@@ -427,6 +427,7 @@
     if (!Array.isArray(state.budgets)) { state.budgets = []; changed = true; }
     if (!Array.isArray(state.budgetSnapshots)) { state.budgetSnapshots = []; changed = true; }
     if (!Array.isArray(state.recurringRules)) { state.recurringRules = []; changed = true; }
+    if (!Array.isArray(state.recurringProposals)) { state.recurringProposals = []; changed = true; }
     if (!Array.isArray(state.savedFilters)) { state.savedFilters = []; changed = true; }
     if (!Array.isArray(state.importProfiles)) { state.importProfiles = []; changed = true; }
     if (!state.forecastSettings || typeof state.forecastSettings !== 'object' || Array.isArray(state.forecastSettings)) {
@@ -696,6 +697,8 @@
     $('#saveBudgetEdits')?.addEventListener('click',saveBudgetEdits);
     renderBudgetView();
     $('#addRecurringRule')?.addEventListener('click',addRecurringRule);
+    $('#detectRecurringRules')?.addEventListener('click',detectRecurringProposals);
+    renderRecurringProposals();
     if ($('#recStart') && !$('#recStart').value) $('#recStart').value=localDateKey(new Date());
     renderForecastSelection();
   }
@@ -807,19 +810,22 @@
   }
   function recurringOccursInMonth(rule,key) {
     if(!rule.active)return false;
-    const start=String(rule.startDate||'');
-    const end=String(rule.endDate||'');
-    const date=monthOccurrence(rule,key);
-    if(date<start || (end && date>end))return false;
-    if(rule.frequency==='monthly')return true;
-    const [sy,sm,sd]=start.split('-').map(Number);
-    const [y,m]=key.split('-').map(Number);
-    if(rule.frequency==='yearly')return sm===m;
-    if(rule.frequency==='weekly'){
-      const startDate=new Date(sy,sm-1,sd), target=new Date(y,m-1,Number(rule.day)||1);
-      return Math.floor((target-startDate)/86400000)>=0 && Math.floor((target-startDate)/86400000)%7===0;
+    const start=String(rule.startDate||''),end=String(rule.endDate||'');
+    const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number);
+    if(!sy||!sm||!sd)return false;
+    const monthDiff=(y-sy)*12+(m-sm);
+    const periods={monthly:1,bimonthly:2,quarterly:3,fourmonthly:4,halfyearly:6,yearly:12};
+    if(rule.frequency==='weekly'||rule.frequency==='biweekly'){
+      const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd);
+      const step=rule.frequency==='weekly'?7:14;
+      let due=new Date(origin);while(due<first)due.setDate(due.getDate()+step);
+      while(due<=last){const keyDate=localDateKey(due);if(keyDate>=start&&(!end||keyDate<=end))return true;due.setDate(due.getDate()+step);}
+      return false;
     }
-    return false;
+    const period=periods[rule.frequency];
+    if(!period||monthDiff<0||monthDiff%period!==0)return false;
+    const date=monthOccurrence(rule,key);
+    return date>=start&&(!end||date<=end);
   }
   function transactionMatchesRecurringRule(tx,rule) {
     const target=normalize(rule.description);
@@ -867,10 +873,49 @@
   }
   function renderRecurringRules() {
     const body=$('#recurringBody');if(!body)return;
-    const labels={monthly:'Mensile',weekly:'Settimanale',yearly:'Annuale'};
+    const labels={weekly:'Settimanale',biweekly:'Quindicinale',monthly:'Mensile',bimonthly:'Bimestrale',quarterly:'Trimestrale',fourmonthly:'Quadrimestrale',halfyearly:'Semestrale',yearly:'Annuale'};
     body.innerHTML=state.recurringRules.map(r=>'<tr><td>'+safeText(r.description)+'</td><td>'+euro.format(r.amount)+'</td><td>'+labels[r.frequency]+'</td><td>'+safeText(r.startDate)+'</td><td>'+(r.active?'Attiva':'Sospesa')+'</td><td><button class="row-action" data-toggle-rec="'+safeText(r.id)+'">'+(r.active?'Sospendi':'Attiva')+'</button> <button class="row-action row-action-danger" data-delete-rec="'+safeText(r.id)+'">Elimina</button></td></tr>').join('')||'<tr><td colspan="6" class="empty-inline">Nessuna ricorrenza configurata.</td></tr>';
     body.querySelectorAll('[data-toggle-rec]').forEach(b=>b.addEventListener('click',()=>{const r=state.recurringRules.find(x=>x.id===b.dataset.toggleRec);if(r)r.active=!r.active;saveState();renderForecastSelection();}));
     body.querySelectorAll('[data-delete-rec]').forEach(b=>b.addEventListener('click',()=>{state.recurringRules=state.recurringRules.filter(x=>x.id!==b.dataset.deleteRec);saveState();renderForecastSelection();}));
+  }
+  function detectRecurringProposals() {
+    const groups=new Map();
+    for(const tx of state.transactions){
+      if(tx.status!=='confirmed'||!tx.date||tx.status==='duplicate')continue;
+      const description=transactionDescription(tx)||transactionCausale(tx);if(!description)continue;
+      const counterpart=tx.counterpartSplits?.length===1?tx.counterpartSplits[0].accountId:tx.counterpartAccountId;
+      if(!counterpart)continue;
+      const key=[normalize(description),tx.bankAccountId||'',counterpart,Math.sign(Number(tx.amount)||0)].join('|');
+      if(!groups.has(key))groups.set(key,[]);
+      groups.get(key).push(tx);
+    }
+    const labels=[['weekly',7],['biweekly',14],['monthly',30.44],['bimonthly',60.88],['quarterly',91.31],['fourmonthly',121.75],['halfyearly',182.63],['yearly',365.25]];
+    const proposals=[];
+    for(const items of groups.values()){
+      const sorted=items.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+      if(sorted.length<3)continue;
+      const gaps=[];for(let i=1;i<sorted.length;i++){const days=(Date.parse(sorted[i].date+'T12:00:00Z')-Date.parse(sorted[i-1].date+'T12:00:00Z'))/86400000;if(days>0)gaps.push(days);}
+      if(gaps.length<2)continue;
+      const ordered=[...gaps].sort((a,b)=>a-b),mid=Math.floor(ordered.length/2),typical=ordered.length%2?ordered[mid]:(ordered[mid-1]+ordered[mid])/2;
+      const candidate=labels.map(([frequency,days])=>({frequency,days,error:Math.abs(typical-days)/days})).sort((a,b)=>a.error-b.error)[0];
+      if(candidate.error>.22)continue;
+      const amounts=sorted.map(tx=>Number(tx.amount)||0).sort((a,b)=>a-b),am= Math.floor(amounts.length/2);
+      const amount=amounts.length%2?amounts[am]:(amounts[am-1]+amounts[am])/2;
+      const last=sorted[sorted.length-1].date,next=new Date(last+'T12:00:00');
+      next.setDate(next.getDate()+Math.round(candidate.days));
+      const description=transactionDescription(sorted[0])||transactionCausale(sorted[0]);
+      proposals.push({id:uid('rp'),description,amount,bankAccountId:sorted[0].bankAccountId,categoryId:sorted[0].counterpartSplits?.length===1?sorted[0].counterpartSplits[0].accountId:sorted[0].counterpartAccountId,
+        frequency:candidate.frequency,day:Number(last.slice(8,10)),startDate:last,nextDate:localDateKey(next),endDate:null,occurrences:sorted.length,confidence:Math.round((1-candidate.error)*100),status:'proposta'});
+    }
+    state.recurringProposals=proposals.sort((a,b)=>b.confidence-a.confidence);
+    renderRecurringProposals();saveState();
+  }
+  function renderRecurringProposals() {
+    const body=$('#recurringProposalsBody');if(!body)return;
+    const labels={weekly:'Settimanale',biweekly:'Quindicinale',monthly:'Mensile',bimonthly:'Bimestrale',quarterly:'Trimestrale',fourmonthly:'Quadrimestrale',halfyearly:'Semestrale',yearly:'Annuale'};
+    body.innerHTML=state.recurringProposals.map(p=>'<tr><td>'+safeText(p.description)+'</td><td>'+euro.format(p.amount)+'</td><td>'+labels[p.frequency]+'</td><td>'+safeText(formatDate(p.nextDate))+'</td><td>'+p.occurrences+'</td><td><button class="row-action" data-accept-proposal="'+safeText(p.id)+'">Conferma</button> <button class="row-action row-action-danger" data-dismiss-proposal="'+safeText(p.id)+'">Ignora</button></td></tr>').join('')||'<tr><td colspan="6" class="empty-inline">Nessuna proposta. Analizza i movimenti confermati per cercare ricorrenze.</td></tr>';
+    body.querySelectorAll('[data-accept-proposal]').forEach(button=>button.addEventListener('click',async()=>{const p=state.recurringProposals.find(x=>x.id===button.dataset.acceptProposal);if(!p)return;state.recurringRules.push({id:uid('r'),description:p.description,amount:p.amount,bankAccountId:p.bankAccountId,categoryId:p.categoryId,frequency:p.frequency,day:p.day,startDate:p.nextDate,endDate:p.endDate,active:true,createdAt:new Date().toISOString(),source:'rilevata'});state.recurringProposals=state.recurringProposals.filter(x=>x.id!==p.id);await saveState();renderForecastSelection();}));
+    body.querySelectorAll('[data-dismiss-proposal]').forEach(button=>button.addEventListener('click',async()=>{state.recurringProposals=state.recurringProposals.filter(x=>x.id!==button.dataset.dismissProposal);await saveState();renderRecurringProposals();}));
   }
   function addRecurringRule() {
     const description=$('#recDescription').value.trim(),amount=Number($('#recAmount').value),bankAccountId=$('#recBankAccount').value,categoryId=$('#recCategory').value;
