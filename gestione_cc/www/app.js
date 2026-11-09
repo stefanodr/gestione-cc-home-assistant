@@ -954,13 +954,17 @@
       const ordered=[...gaps].sort((a,b)=>a-b),mid=Math.floor(ordered.length/2),typical=ordered.length%2?ordered[mid]:(ordered[mid-1]+ordered[mid])/2;
       const candidate=labels.map(([frequency,days])=>({frequency,days,error:Math.abs(typical-days)/days})).sort((a,b)=>a.error-b.error)[0];
       if(candidate.error>.22)continue;
-      const amounts=sorted.map(tx=>Number(tx.amount)||0).sort((a,b)=>a-b),am= Math.floor(amounts.length/2);
-      const amount=amounts.length%2?amounts[am]:(amounts[am-1]+amounts[am])/2;
+      const amounts=sorted.map(tx=>Math.abs(Number(tx.amount)||0)).sort((a,b)=>a-b),am= Math.floor(amounts.length/2);
+      const amountMagnitude=amounts.length%2?amounts[am]:(amounts[am-1]+amounts[am])/2;
+      if(!amountMagnitude)continue;
+      const amountDeviation=amounts.reduce((sum,value)=>sum+Math.abs(value-amountMagnitude),0)/amounts.length/amountMagnitude;
+      if(amountDeviation>0.35)continue;
+      const amount=Math.sign(Number(sorted[sorted.length-1].amount)||1)*amountMagnitude;
       const last=sorted[sorted.length-1].date,next=new Date(last+'T12:00:00');
       next.setDate(next.getDate()+Math.round(candidate.days));
       const description=transactionDescription(sorted[0])||transactionCausale(sorted[0]);
       proposals.push({id:uid('rp'),description,amount,bankAccountId:sorted[0].bankAccountId,categoryId:sorted[0].counterpartSplits?.length===1?sorted[0].counterpartSplits[0].accountId:sorted[0].counterpartAccountId,
-        frequency:candidate.frequency,day:Number(last.slice(8,10)),startDate:sorted[0].date,historyStartDate:sorted[0].date,nextDate:localDateKey(next),endDate:null,occurrences:sorted.length,confidence:Math.round((1-candidate.error)*100),status:'proposta'});
+        frequency:candidate.frequency,day:Number(last.slice(8,10)),startDate:sorted[0].date,historyStartDate:sorted[0].date,nextDate:localDateKey(next),endDate:null,occurrences:sorted.length,confidence:Math.round((1-candidate.error)*(1-amountDeviation)*100),status:'proposta'});
     }
     state.recurringProposals=proposals.sort((a,b)=>b.confidence-a.confidence);
     renderRecurringProposals();saveState();
