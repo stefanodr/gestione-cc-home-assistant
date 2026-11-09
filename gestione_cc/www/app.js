@@ -703,7 +703,7 @@
     const account = $('#searchAccount');
     if (account) {
       const old = account.value;
-      account.innerHTML = '<option value="all">Tutti i conti</option>' + state.accounts.filter(a=>a.type!=='ROOT').map(a=>'<option value="' + safeText(a.id) + '">' + safeText(a.path) + '</option>').join('');
+      account.innerHTML = '<option value="all">Tutti i conti</option>' + state.accounts.filter(a=>a.type!=='ROOT').map(a=>'<option value="' + safeText(a.id) + '">' + safeText(accountDisplayLabel(a)) + '</option>').join('');
       if ([...account.options].some(o=>o.value===old)) account.value=old;
     }
     renderSavedFilters();
@@ -715,7 +715,7 @@
       const eligible = state.accounts.filter(isLiquidAccount);
       const all = ids.length === 0 || eligible.every(a=>ids.includes(a.id));
       $('#forecastAllAccounts').checked = all;
-      forecast.innerHTML = eligible.map(a=>'<label style="display:flex;gap:9px;align-items:center;margin:9px 0"><input type="checkbox" data-forecast-account="' + safeText(a.id) + '" ' + (all || ids.includes(a.id) ? 'checked' : '') + '> ' + safeText(a.path) + '</label>').join('') || '<p class="panel-subtitle">Nessun conto liquido riconosciuto nel piano dei conti.</p>';
+      forecast.innerHTML = eligible.map(a=>'<label style="display:flex;gap:9px;align-items:center;margin:9px 0"><input type="checkbox" data-forecast-account="' + safeText(a.id) + '" ' + (all || ids.includes(a.id) ? 'checked' : '') + '> ' + safeText(accountDisplayLabel(a)) + '</label>').join('') || '<p class="panel-subtitle">Nessun conto liquido riconosciuto nel piano dei conti.</p>';
       forecast.querySelectorAll('[data-forecast-account]').forEach(box=>box.addEventListener('change',()=>{
         const selected=[...forecast.querySelectorAll('[data-forecast-account]:checked')].map(x=>x.dataset.forecastAccount);
         state.forecastSettings.accountIds=selected.length===eligible.length?[]:selected;
@@ -1151,7 +1151,7 @@
     const status=$('#forecastStatus');if(status)status.textContent='Conti inclusi: '+count+'. Selezione vuota = tutti i conti liquidi.';
     const liquid=state.accounts.filter(isLiquidAccount);
     const bank=$('#recBankAccount'),category=$('#recCategory');
-    if(bank){const prior=bank.value;bank.innerHTML=liquid.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(a.path)+'</option>').join('');if(liquid.some(a=>a.id===prior))bank.value=prior;}
+    if(bank){const prior=bank.value;bank.innerHTML=liquid.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if(liquid.some(a=>a.id===prior))bank.value=prior;}
     if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(a.path)+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
     renderRecurringRules();
     const result=buildForecast();
@@ -1581,7 +1581,7 @@
   }
   function openManualTransaction() {
     const banks = state.accounts.filter(isLiquidAccount).sort((a, b) => a.path.localeCompare(b.path, 'it'));
-    $('#manualBankAccount').innerHTML = banks.map(a => `<option value="${safeText(a.id)}">${safeText(a.path)}</option>`).join('');
+    $('#manualBankAccount').innerHTML = banks.map(a => `<option value="${safeText(a.id)}">${safeText(accountDisplayLabel(a))}</option>`).join('');
     const selected = state.reportAccountId && banks.some(a => a.id === state.reportAccountId) ? state.reportAccountId : state.bankAccountId;
     if (selected && banks.some(a => a.id === selected)) $('#manualBankAccount').value = selected;
     $('#manualDate').value = localDateKey(new Date());
