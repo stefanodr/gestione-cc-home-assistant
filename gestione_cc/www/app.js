@@ -437,7 +437,7 @@
         });
         state.budgetSnapshots.push({ month, version: 1, createdAt: new Date().toISOString(), status: 'confermato',
           historySource: 'budget_precedente', historyMonths: 0, lines, totalBudget: lines.reduce((sum,line)=>sum+line.budget,0),
-          totalActual: lines.reduce((sum,line)=>sum+line.spent,0), migrated: true });
+          totalActual: lines.reduce((sum,line)=>sum+line.spent,0), incomeForecast:budgetIncomeForecastForMonth(month).amount, actualIncome:state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').reduce((sum,account)=>sum+budgetActualDirect(month,account.id),0), migrated: true });
         changed = true;
       }
     }
@@ -745,6 +745,15 @@
     return totals;
   }
 
+  function budgetIncomeForecastForMonth(month) {
+    const now=new Date(),year=now.getFullYear();
+    const currentMonths=Array.from({length:now.getMonth()},(_,i)=>year+'-'+String(i+1).padStart(2,'0'));
+    const coverage=currentMonths.filter(key=>state.transactions.some(tx=>tx.status==='confirmed'&&String(tx.date||'').slice(0,7)===key)).length;
+    const months=coverage>=3?currentMonths:Array.from({length:12},(_,i)=>(year-1)+'-'+String(i+1).padStart(2,'0'));
+    const accounts=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro');
+    const amount=accounts.reduce((sum,account)=>sum+months.reduce((total,key)=>total+budgetActualDirect(key,account.id),0)/Math.max(1,months.length),0);
+    return {amount:Math.round(amount*100)/100,source:coverage>=3?'anno_corrente':'anno_precedente',months:months.length};
+  }
   function budgetActualDirect(month, accountId) {
     let total = 0;
     for (const tx of state.transactions) {
@@ -807,7 +816,7 @@
     const totalBudget=snapshot?.totalBudget||0;
     const incomeActual=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').reduce((sum,account)=>sum+budgetActualDirect(month,account.id),0);
     const summaryValues={
-      budgetIncome:snapshot?.incomeForecast||0,budgetRecurring:snapshot?.totalRecurringExpenses||0,
+      budgetIncome:snapshot?.incomeForecast??budgetIncomeForecastForMonth(month).amount,budgetRecurring:snapshot?.totalRecurringExpenses||0,
       budgetVariable:snapshot?.totalVariableExpenses||0,budgetActual:totalActual,
       budgetRemaining:totalBudget-totalActual,budgetNet:(snapshot?.incomeForecast||0)-totalBudget,
       budgetIncomeActual:incomeActual
