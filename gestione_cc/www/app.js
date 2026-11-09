@@ -13,6 +13,7 @@
   let transactionPage = 0;
   let confirmCallback = null;
   let resizeTimer;
+  let editingRecurringId = null;
 
   const $ = (selector, parent = document) => parent.querySelector(selector);
   const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
@@ -901,7 +902,8 @@
   function renderRecurringRules() {
     const body=$('#recurringBody');if(!body)return;
     const labels={once:'Una tantum',weekly:'Settimanale',biweekly:'Quindicinale',monthly:'Mensile',bimonthly:'Bimestrale',quarterly:'Trimestrale',fourmonthly:'Quadrimestrale',halfyearly:'Semestrale',yearly:'Annuale'};
-    body.innerHTML=state.recurringRules.map(r=>'<tr><td>'+safeText(r.description)+'</td><td>'+euro.format(r.amount)+'</td><td>'+labels[r.frequency]+'</td><td>'+safeText(r.startDate)+'</td><td>'+(r.active?'Attiva':'Sospesa')+'</td><td><button class="row-action" data-toggle-rec="'+safeText(r.id)+'">'+(r.active?'Sospendi':'Attiva')+'</button> <button class="row-action row-action-danger" data-delete-rec="'+safeText(r.id)+'">Elimina</button></td></tr>').join('')||'<tr><td colspan="6" class="empty-inline">Nessuna ricorrenza configurata.</td></tr>';
+    body.innerHTML=state.recurringRules.map(r=>'<tr><td>'+safeText(r.description)+'</td><td>'+euro.format(r.amount)+'</td><td>'+labels[r.frequency]+'</td><td>'+safeText(r.startDate)+'</td><td>'+(r.active?'Attiva':'Sospesa')+'</td><td><button class="row-action" data-edit-rec="'+safeText(r.id)+'">Modifica</button> <button class="row-action" data-toggle-rec="'+safeText(r.id)+'">'+(r.active?'Sospendi':'Attiva')+'</button> <button class="row-action row-action-danger" data-delete-rec="'+safeText(r.id)+'">Elimina</button></td></tr>').join('')||'<tr><td colspan="6" class="empty-inline">Nessuna ricorrenza configurata.</td></tr>';
+    body.querySelectorAll('[data-edit-rec]').forEach(b=>b.addEventListener('click',()=>{const r=state.recurringRules.find(x=>x.id===b.dataset.editRec);if(!r)return;editingRecurringId=r.id;$('#recDescription').value=r.description;$('#recAmount').value=r.amount;$('#recBankAccount').value=r.bankAccountId;$('#recCategory').value=r.categoryId||'';$('#recFrequency').value=r.frequency;$('#recDay').value=r.day||1;$('#recStart').value=r.startDate;$('#recEnd').value=r.endDate||'';$('#addRecurringRule').textContent='Salva modifica';$('#recDescription').focus();}));
     body.querySelectorAll('[data-toggle-rec]').forEach(b=>b.addEventListener('click',()=>{const r=state.recurringRules.find(x=>x.id===b.dataset.toggleRec);if(r)r.active=!r.active;saveState();renderForecastSelection();}));
     body.querySelectorAll('[data-delete-rec]').forEach(b=>b.addEventListener('click',()=>{state.recurringRules=state.recurringRules.filter(x=>x.id!==b.dataset.deleteRec);saveState();renderForecastSelection();}));
   }
@@ -949,8 +951,8 @@
     const frequency=$('#recFrequency').value,startDate=$('#recStart').value,endDate=$('#recEnd').value,day=frequency==='once'?Number(startDate.slice(8,10)):Math.min(31,Math.max(1,Number($('#recDay').value)||1));
     if(!description||!Number.isFinite(amount)||amount===0||!bankAccountId||!startDate){showNotice('Dati incompleti','Inserisci descrizione, importo diverso da zero, conto e prima occorrenza.');return;}
     if(endDate&&endDate<startDate){showNotice('Date non valide','L’ultima occorrenza non può precedere la prima.');return;}
-    state.recurringRules.push({id:uid('r'),description,amount,bankAccountId,categoryId:categoryId||null,frequency,day,startDate,endDate:endDate||null,active:true,createdAt:new Date().toISOString()});
-    saveState();['recDescription','recAmount','recEnd'].forEach(id=>$('#'+id).value='');renderForecastSelection();
+    if(editingRecurringId){const existing=state.recurringRules.find(rule=>rule.id===editingRecurringId);if(existing)Object.assign(existing,{description,amount,bankAccountId,categoryId:categoryId||null,frequency,day,startDate,endDate:endDate||null});editingRecurringId=null;}else state.recurringRules.push({id:uid('r'),description,amount,bankAccountId,categoryId:categoryId||null,frequency,day,startDate,endDate:endDate||null,active:true,createdAt:new Date().toISOString(),source:'manuale'});
+    saveState();['recDescription','recAmount','recEnd'].forEach(id=>$('#'+id).value='');$('#addRecurringRule').textContent='Aggiungi impegno manuale';renderForecastSelection();
   }
   function buildForecast() {
     const accounts=forecastSelectedAccounts(),ids=new Set(accounts.map(a=>a.id)),today=localDateKey(new Date()),currentMonth=today.slice(0,7);
