@@ -522,6 +522,14 @@
     $('#accountPicker').addEventListener('change', () => { state.reportAccountId = $('#accountPicker').value; $('#reportAccountPicker').value = state.reportAccountId; saveState(); renderAll(); });
     $('#reportAccountPicker').addEventListener('change', () => { state.reportAccountId = $('#reportAccountPicker').value; $('#accountPicker').value = state.reportAccountId; saveState(); renderAll(); });
     $('#transactionFilter').addEventListener('change', () => { transactionPage = 0; renderTransactions(); });
+    $('#transactionDateFrom')?.addEventListener('change', () => { transactionPage = 0; renderTransactions(); });
+    $('#transactionDateTo')?.addEventListener('change', () => { transactionPage = 0; renderTransactions(); });
+    $('#clearTransactionDates')?.addEventListener('click', () => {
+      $('#transactionDateFrom').value = '';
+      $('#transactionDateTo').value = '';
+      transactionPage = 0;
+      renderTransactions();
+    });
     $('#transactionPrev').addEventListener('click', () => { transactionPage = Math.max(0, transactionPage - 1); renderTransactions(); });
     $('#transactionNext').addEventListener('click', () => { transactionPage++; renderTransactions(); });
     $('#addManualTransaction')?.addEventListener('click', openManualTransaction);
@@ -1415,9 +1423,13 @@
   function renderTransactions() {
     refreshAccountSearchOptions();
     const filter = $('#transactionFilter')?.value || 'all';
+    const dateFrom = $('#transactionDateFrom')?.value || '';
+    const dateTo = $('#transactionDateTo')?.value || '';
     let tx = [...state.transactions].sort((a, b) => parseDate(b.date).localeCompare(parseDate(a.date)));
     if (filter === 'pending') tx = tx.filter(t => t.status === 'pending');
     if (filter === 'confirmed') tx = tx.filter(t => t.status === 'confirmed');
+    if (dateFrom) tx = tx.filter(t => parseDate(t.date) >= dateFrom);
+    if (dateTo) tx = tx.filter(t => parseDate(t.date) <= dateTo);
     const body = $('#transactionsBody'); if (!body) return;
     $('#emptyTransactions').classList.toggle('hidden', tx.length > 0);
     const pageSize = 100;
