@@ -170,8 +170,8 @@ const buildHelpers = [
   extract('forecastTransactionFlow', 'median'),
   extract('median', 'renderRecurringRules'),
   extract('buildForecast', 'renderForecastSelection')
-].join('\\n');
-vm.runInContext(buildHelpers + '\\nthis.buildForecast = buildForecast;', forecastBuildContext);
+].join('\n');
+vm.runInContext(buildHelpers + '\nthis.buildForecast = buildForecast;', forecastBuildContext);
 const allForecast = forecastBuildContext.buildForecast();
 assert.equal(allForecast.currentBalance, 1150);
 assert.equal(allForecast.openingBalanceUnknown.length, 1);
