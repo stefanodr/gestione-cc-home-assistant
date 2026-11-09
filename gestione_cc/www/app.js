@@ -867,7 +867,7 @@
     const tolerance=Math.max(1,Math.abs(Number(rule.amount)||0)*0.05);
     return tx.status==='confirmed' && tx.bankAccountId===rule.bankAccountId &&
       Math.abs(Math.abs(Number(tx.amount)||0)-Math.abs(Number(rule.amount)||0))<=tolerance &&
-      Boolean(target) && normalize(transactionDescription(tx))===target;
+      Boolean(target) && normalize(transactionDescription(tx)||transactionCausale(tx))===target;
   }
   function recurringOccurrenceDates(rule,key) {
     if(!recurringOccursInMonth(rule,key))return [];
