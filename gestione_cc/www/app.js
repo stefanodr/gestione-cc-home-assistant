@@ -666,7 +666,7 @@
     if (results.length > 1000) $('#searchResultCount').textContent += ' · mostrati i primi 1.000';
   }
   function setupFinanceViews() {
-    if (setupFinanceViews.listenersBound) { renderBudgetView(); renderForecastSelection(); return; }
+    if (setupFinanceViews.listenersBound) { if(state.transactions.length&&state.recurringDetectionLastTransactionCount!==state.transactions.length)detectRecurringProposals(); renderBudgetView(); renderForecastSelection(); return; }
     setupFinanceViews.listenersBound = true;
     const account = $('#searchAccount');
     if (account) {
