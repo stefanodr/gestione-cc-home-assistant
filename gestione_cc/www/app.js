@@ -807,6 +807,7 @@
       (ids.has(t.bankAccountId)||ids.has(t.counterpartAccountId)||(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.some(sp=>ids.has(sp.accountId)))));
     const primaryAccountId=state.bankAccountId;
     const opening=ids.has(primaryAccountId)?(Number(state.openingBalance)||0):0;
+    const openingBalanceUnknown=accounts.filter(account=>account.id!==primaryAccountId);
     const currentBalance=opening+txs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
     const historyKeys=Array.from({length:12},(_,i)=>shiftMonthKey(currentMonth,-12+i));
     const categories=state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type));
@@ -835,7 +836,7 @@
       forecast.push({key,programmed,estimate,balance});
     }
     const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:currentBalance,key:currentMonth});
-    return {accounts,currentBalance,forecast,minimum,historyCount:historyKeys.filter(k=>txs.some(t=>String(t.date).slice(0,7)===k)).length,estimatedNet};
+    return {accounts,currentBalance,forecast,minimum,historyCount:historyKeys.filter(k=>txs.some(t=>String(t.date).slice(0,7)===k)).length,estimatedNet,openingBalanceUnknown};
   }
   function renderForecastSelection() {
     const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
@@ -851,7 +852,8 @@
     $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
     $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
     $('#forecastEnding').textContent=euro.format(result.forecast.at(-1)?.balance??result.currentBalance);
-    $('#forecastReliability').textContent='Storico disponibile: '+result.historyCount+' mesi · stima indicativa';
+    $('#forecastReliability').textContent='Storico disponibile: '+result.historyCount+' mesi · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
+    if(status&&result.openingBalanceUnknown.length)status.textContent+=' ATTENZIONE: il saldo iniziale è disponibile solo per '+(accountById(state.bankAccountId)?.path||'il conto principale')+'. Per gli altri conti selezionati il saldo storico potrebbe essere incompleto.';
     $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.programmed)+'</td><td>'+euro.format(row.estimate)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
   }
 
