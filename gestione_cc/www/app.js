@@ -748,9 +748,9 @@
   function budgetIncomeForecastForMonth(month) {
     const now=new Date(),year=now.getFullYear();
     const currentMonths=Array.from({length:now.getMonth()},(_,i)=>year+'-'+String(i+1).padStart(2,'0'));
-    const coverage=currentMonths.filter(key=>state.transactions.some(tx=>tx.status==='confirmed'&&String(tx.date||'').slice(0,7)===key)).length;
-    const months=coverage>=3?currentMonths:Array.from({length:12},(_,i)=>(year-1)+'-'+String(i+1).padStart(2,'0'));
     const accounts=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro');
+    const coverage=currentMonths.filter(key=>accounts.some(account=>budgetActualDirect(key,account.id)>0)).length;
+    const months=coverage>=3?currentMonths:Array.from({length:12},(_,i)=>(year-1)+'-'+String(i+1).padStart(2,'0'));
     const amount=accounts.reduce((sum,account)=>sum+months.reduce((total,key)=>total+budgetActualDirect(key,account.id),0)/Math.max(1,months.length),0);
     return {amount:Math.round(amount*100)/100,source:coverage>=3?'anno_corrente':'anno_precedente',months:months.length};
   }
@@ -770,7 +770,8 @@
   function generateBudgetSnapshot(month) {
     const now = new Date(), currentYear = now.getFullYear(), year = Number(month.slice(0,4));
     const currentYearMonths = Array.from({length: Math.max(0, now.getMonth())}, (_,i) => currentYear + '-' + String(i+1).padStart(2,'0'));
-    const hasCurrentData = currentYearMonths.filter(key => state.transactions.some(tx => tx.status === 'confirmed' && String(tx.date || '').slice(0,7) === key && tx.source !== 'opening-balance')).length;
+    const expenseAccounts=state.accounts.filter(a=>a.type==='EXPENSE'&&a.hierarchyType!=='Mastro');
+    const hasCurrentData = currentYearMonths.filter(key => expenseAccounts.some(account=>budgetActualDirect(key,account.id)>0)).length;
     const sourceMonths = hasCurrentData >= 3 ? currentYearMonths : Array.from({length:12},(_,i)=>(currentYear-1)+'-'+String(i+1).padStart(2,'0'));
     const historySource = hasCurrentData >= 3 ? 'anno_corrente' : 'anno_precedente';
     const categories = state.accounts.filter(a => a.type === 'EXPENSE' && a.hierarchyType !== 'Mastro').sort((a,b)=>a.path.localeCompare(b.path,'it'));
