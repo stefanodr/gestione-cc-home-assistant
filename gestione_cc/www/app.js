@@ -814,6 +814,7 @@
     const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number);
     if(!sy||!sm||!sd)return false;
     const monthDiff=(y-sy)*12+(m-sm);
+    if(rule.frequency==='once')return monthDiff===0;
     const periods={monthly:1,bimonthly:2,quarterly:3,fourmonthly:4,halfyearly:6,yearly:12};
     if(rule.frequency==='weekly'||rule.frequency==='biweekly'){
       const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd);
@@ -888,7 +889,7 @@
   }
   function renderRecurringRules() {
     const body=$('#recurringBody');if(!body)return;
-    const labels={weekly:'Settimanale',biweekly:'Quindicinale',monthly:'Mensile',bimonthly:'Bimestrale',quarterly:'Trimestrale',fourmonthly:'Quadrimestrale',halfyearly:'Semestrale',yearly:'Annuale'};
+    const labels={once:'Una tantum',weekly:'Settimanale',biweekly:'Quindicinale',monthly:'Mensile',bimonthly:'Bimestrale',quarterly:'Trimestrale',fourmonthly:'Quadrimestrale',halfyearly:'Semestrale',yearly:'Annuale'};
     body.innerHTML=state.recurringRules.map(r=>'<tr><td>'+safeText(r.description)+'</td><td>'+euro.format(r.amount)+'</td><td>'+labels[r.frequency]+'</td><td>'+safeText(r.startDate)+'</td><td>'+(r.active?'Attiva':'Sospesa')+'</td><td><button class="row-action" data-toggle-rec="'+safeText(r.id)+'">'+(r.active?'Sospendi':'Attiva')+'</button> <button class="row-action row-action-danger" data-delete-rec="'+safeText(r.id)+'">Elimina</button></td></tr>').join('')||'<tr><td colspan="6" class="empty-inline">Nessuna ricorrenza configurata.</td></tr>';
     body.querySelectorAll('[data-toggle-rec]').forEach(b=>b.addEventListener('click',()=>{const r=state.recurringRules.find(x=>x.id===b.dataset.toggleRec);if(r)r.active=!r.active;saveState();renderForecastSelection();}));
     body.querySelectorAll('[data-delete-rec]').forEach(b=>b.addEventListener('click',()=>{state.recurringRules=state.recurringRules.filter(x=>x.id!==b.dataset.deleteRec);saveState();renderForecastSelection();}));
@@ -934,7 +935,7 @@
   }
   function addRecurringRule() {
     const description=$('#recDescription').value.trim(),amount=Number($('#recAmount').value),bankAccountId=$('#recBankAccount').value,categoryId=$('#recCategory').value;
-    const frequency=$('#recFrequency').value,day=Math.min(31,Math.max(1,Number($('#recDay').value)||1)),startDate=$('#recStart').value,endDate=$('#recEnd').value;
+    const frequency=$('#recFrequency').value,startDate=$('#recStart').value,endDate=$('#recEnd').value,day=frequency==='once'?Number(startDate.slice(8,10)):Math.min(31,Math.max(1,Number($('#recDay').value)||1));
     if(!description||!Number.isFinite(amount)||amount===0||!bankAccountId||!startDate){showNotice('Dati incompleti','Inserisci descrizione, importo diverso da zero, conto e prima occorrenza.');return;}
     if(endDate&&endDate<startDate){showNotice('Date non valide','L’ultima occorrenza non può precedere la prima.');return;}
     state.recurringRules.push({id:uid('r'),description,amount,bankAccountId,categoryId:categoryId||null,frequency,day,startDate,endDate:endDate||null,active:true,createdAt:new Date().toISOString()});
