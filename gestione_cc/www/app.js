@@ -1538,7 +1538,7 @@
     const key = transactionFingerprint(candidate);
     return state.transactions.some(tx => tx.status !== 'duplicate' && transactionFingerprint(tx) === key);
   }
-  function transactionFingerprint(tx) { if(tx.fitid)return 'OFX|'+String(tx.fitid).trim(); return [parseDate(tx.date), Number(tx.amount).toFixed(2), normalize(transactionDescription(tx)), normalize(transactionCausale(tx))].join('|'); }
+  function transactionFingerprint(tx) { if(tx.fitid)return 'OFX|'+String(tx.fitid).trim()+'|'+parseDate(tx.date)+'|'+Number(tx.amount).toFixed(2); return [parseDate(tx.date), Number(tx.amount).toFixed(2), normalize(transactionDescription(tx)), normalize(transactionCausale(tx))].join('|'); }
   function findImportDuplicates(rows) {
     const seen = new Set(state.transactions.filter(tx => tx.status !== 'duplicate').map(transactionFingerprint));
     const duplicates = [];
