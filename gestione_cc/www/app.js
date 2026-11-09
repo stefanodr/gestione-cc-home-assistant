@@ -692,6 +692,129 @@
       saveState();renderBudgetView();
     }));
   }
+
+  function forecastSelectedAccounts() {
+    const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
+    return state.accounts.filter(isLiquidAccount).filter(a=>ids.length===0||ids.includes(a.id));
+  }
+  function monthKeyFromDate(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+  function shiftMonthKey(key,offset) {
+    const [y,m]=key.split('-').map(Number);const d=new Date(y,m-1+offset,1);
+    return monthKeyFromDate(d);
+  }
+  function monthLabel(key) {
+    const [y,m]=key.split('-').map(Number);
+    return new Intl.DateTimeFormat('it-IT',{month:'long',year:'numeric'}).format(new Date(y,m-1,1));
+  }
+  function monthOccurrence(rule,key) {
+    const [y,m]=key.split('-').map(Number),last=new Date(y,m,0).getDate();
+    const day=Math.min(Math.max(1,Number(rule.day)||1),last);
+    return key+'-'+String(day).padStart(2,'0');
+  }
+  function recurringOccursInMonth(rule,key) {
+    if(!rule.active)return false;
+    const start=String(rule.startDate||'');
+    const end=String(rule.endDate||'');
+    const date=monthOccurrence(rule,key);
+    if(date<start || (end && date>end))return false;
+    if(rule.frequency==='monthly')return true;
+    const [sy,sm,sd]=start.split('-').map(Number);
+    const [y,m]=key.split('-').map(Number);
+    if(rule.frequency==='yearly')return sm===m;
+    if(rule.frequency==='weekly'){
+      const startDate=new Date(sy,sm-1,sd), target=new Date(y,m-1,Number(rule.day)||1);
+      return Math.floor((target-startDate)/86400000)>=0 && Math.floor((target-startDate)/86400000)%7===0;
+    }
+    return false;
+  }
+  function forecastRecurringItems(key,selectedIds) {
+    return state.recurringRules.filter(r=>r.active && selectedIds.has(r.bankAccountId) && recurringOccursInMonth(r,key));
+  }
+  function forecastTransactionFlow(tx,selectedIds) {
+    if(tx.status!=='confirmed'||tx.status==='duplicate'||!selectedIds.has(tx.bankAccountId))return 0;
+    let flow=Number(tx.amount)||0;
+    // A split assigned to another selected liquid account is an internal transfer:
+    // remove that portion from the external cash flow.
+    for(const split of (Array.isArray(tx.counterpartSplits)?tx.counterpartSplits:[])){
+      if(selectedIds.has(split.accountId) && isLiquidAccount(accountById(split.accountId)))flow+=Number(split.value)||0;
+    }
+    return flow;
+  }
+  function median(values) {
+    if(!values.length)return 0;
+    const sorted=[...values].sort((a,b)=>a-b),mid=Math.floor(sorted.length/2);
+    return sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2;
+  }
+  function renderRecurringRules() {
+    const body=$('#recurringBody');if(!body)return;
+    const labels={monthly:'Mensile',weekly:'Settimanale',yearly:'Annuale'};
+    body.innerHTML=state.recurringRules.map(r=>'<tr><td>'+safeText(r.description)+'</td><td>'+euro.format(r.amount)+'</td><td>'+labels[r.frequency]+'</td><td>'+safeText(r.startDate)+'</td><td>'+(r.active?'Attiva':'Sospesa')+'</td><td><button class="row-action" data-toggle-rec="'+safeText(r.id)+'">'+(r.active?'Sospendi':'Attiva')+'</button> <button class="row-action row-action-danger" data-delete-rec="'+safeText(r.id)+'">Elimina</button></td></tr>').join('')||'<tr><td colspan="6" class="empty-inline">Nessuna ricorrenza configurata.</td></tr>';
+    body.querySelectorAll('[data-toggle-rec]').forEach(b=>b.addEventListener('click',()=>{const r=state.recurringRules.find(x=>x.id===b.dataset.toggleRec);if(r)r.active=!r.active;saveState();renderForecastSelection();}));
+    body.querySelectorAll('[data-delete-rec]').forEach(b=>b.addEventListener('click',()=>{state.recurringRules=state.recurringRules.filter(x=>x.id!==b.dataset.deleteRec);saveState();renderForecastSelection();}));
+  }
+  function addRecurringRule() {
+    const description=$('#recDescription').value.trim(),amount=Number($('#recAmount').value),bankAccountId=$('#recBankAccount').value,categoryId=$('#recCategory').value;
+    const frequency=$('#recFrequency').value,day=Math.min(31,Math.max(1,Number($('#recDay').value)||1)),startDate=$('#recStart').value,endDate=$('#recEnd').value;
+    if(!description||!Number.isFinite(amount)||amount===0||!bankAccountId||!startDate){showNotice('Dati incompleti','Inserisci descrizione, importo diverso da zero, conto e prima occorrenza.');return;}
+    if(endDate&&endDate<startDate){showNotice('Date non valide','L’ultima occorrenza non può precedere la prima.');return;}
+    state.recurringRules.push({id:uid('r'),description,amount,bankAccountId,categoryId:categoryId||null,frequency,day,startDate,endDate:endDate||null,active:true,createdAt:new Date().toISOString()});
+    saveState();['recDescription','recAmount','recEnd'].forEach(id=>$('#'+id).value='');renderForecastSelection();
+  }
+  function buildForecast() {
+    const accounts=forecastSelectedAccounts(),ids=new Set(accounts.map(a=>a.id)),today=localDateKey(new Date()),currentMonth=today.slice(0,7);
+    const txs=state.transactions.filter(t=>t.status==='confirmed'&&t.date<=today&&t.status!=='duplicate'&&ids.has(t.bankAccountId));
+    const opening=Number(state.openingBalance)||0;
+    const currentBalance=opening+txs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
+    const historyKeys=Array.from({length:12},(_,i)=>shiftMonthKey(currentMonth,-12+i));
+    const recurringCategoryIds=new Set(state.recurringRules.filter(r=>r.active&&ids.has(r.bankAccountId)&&r.categoryId).map(r=>r.categoryId));
+    const categories=state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type));
+    const estimates=new Map();
+    for(const cat of categories){
+      if(recurringCategoryIds.has(cat.id))continue;
+      const monthly=historyKeys.map(key=>{
+        let total=0;
+        for(const tx of txs){
+          if(String(tx.date).slice(0,7)!==key)continue;
+          if(tx.counterpartSplits?.length){
+            for(const sp of tx.counterpartSplits)if(sp.accountId===cat.id)total+=Math.abs(Number(sp.value)||0)*(cat.type==='INCOME'?1:-1);
+          }else if(tx.counterpartAccountId===cat.id)total+=Math.abs(Number(tx.amount)||0)*(cat.type==='INCOME'?1:-1);
+        }
+        return total;
+      });
+      const nonzero=monthly.filter(v=>v!==0);
+      estimates.set(cat.id,median(nonzero));
+    }
+    const estimatedNet=[...estimates.values()].reduce((a,b)=>a+b,0);
+    const forecast=[];
+    let balance=currentBalance;
+    for(let i=0;i<12;i++){
+      const key=shiftMonthKey(currentMonth,i),rules=forecastRecurringItems(key,ids);
+      const programmed=rules.reduce((sum,r)=>sum+Number(r.amount||0),0);
+      const estimate=i===0?0:estimatedNet;
+      balance+=programmed+estimate;
+      forecast.push({key,programmed,estimate,balance});
+    }
+    const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:currentBalance,key:currentMonth});
+    return {accounts,currentBalance,forecast,minimum,historyCount:historyKeys.filter(k=>txs.some(t=>String(t.date).slice(0,7)===k)).length,estimatedNet};
+  }
+  function renderForecastSelection() {
+    const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
+    const count=forecastSelectedAccounts().length;
+    const status=$('#forecastStatus');if(status)status.textContent='Conti inclusi: '+count+'. Selezione vuota = tutti i conti liquidi.';
+    const liquid=state.accounts.filter(isLiquidAccount);
+    const bank=$('#recBankAccount'),category=$('#recCategory');
+    if(bank){const prior=bank.value;bank.innerHTML=liquid.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(a.path)+'</option>').join('');if(liquid.some(a=>a.id===prior))bank.value=prior;}
+    if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(a.path)+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
+    renderRecurringRules();
+    const result=buildForecast();
+    $('#forecastOpening').textContent=euro.format(result.currentBalance);
+    $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
+    $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
+    $('#forecastEnding').textContent=euro.format(result.forecast.at(-1)?.balance??result.currentBalance);
+    $('#forecastReliability').textContent='Storico disponibile: '+result.historyCount+' mesi · stima indicativa';
+    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.programmed)+'</td><td>'+euro.format(row.estimate)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
+  }
+
   function renderForecastSelection() {
     const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
     const count=state.accounts.filter(isLiquidAccount).filter(a=>ids.length===0||ids.includes(a.id)).length;
