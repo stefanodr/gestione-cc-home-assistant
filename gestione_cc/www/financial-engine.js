@@ -21,7 +21,7 @@
     }
     const direct = new Set();
     for (const tx of transactions || []) {
-      if (tx.status && tx.status !== 'confirmed') continue;
+      if (tx.status !== 'confirmed') continue;
       if (tx.counterpartAccountId != null) direct.add(String(tx.counterpartAccountId));
       for (const split of tx.counterpartSplits || []) if (split.accountId != null) direct.add(String(split.accountId));
     }
@@ -113,7 +113,7 @@
         const estimate = round2(median(history));
         const fixed = round2(recurring.filter(r => r.status === 'confermato' && r.accountId === category.id && monthOf(r.nextDate) === month)
           .reduce((sum, r) => sum + Math.abs(Number(r.amount) || 0), 0));
-        const budget = round2(Math.max(estimate, fixed));
+        const budget = round2(estimate + fixed);
         const spent = round2(Number(actuals[category.id]) || 0);
         return { accountId: category.id, budget, spent, remaining: round2(budget - spent),
           utilization: budget > 0 ? round2(spent / budget * 100) : null, historySource: values.length >= minHistoryMonths ? 'anno_corrente' : 'anno_precedente' };
@@ -125,7 +125,7 @@
   }
 
   function isDuplicateOccurrence(occurrence, transactions, tolerance = 0.02, windowDays = 5) {
-    const target = Date.parse(occurrence.date + 'T12:00:00Z');
+    const occurrenceDate = occurrence.date || occurrence.nextDate;\n    if (!occurrenceDate) return false;\n    const target = Date.parse(occurrenceDate + 'T12:00:00Z');
     return (transactions || []).some(tx => {
       if (tx.status !== 'confirmed' || !tx.date) return false;
       const splits = tx.counterpartSplits?.length ? tx.counterpartSplits : [{ accountId: tx.counterpartAccountId, value: tx.amount }];
@@ -137,13 +137,13 @@
     });
   }
 
-  function buildLiquidityForecast({ openingBalance, startMonth, horizonMonths = 12, transactions = [], commitments = [], recurring = [], estimates = {} }) {
+  function buildLiquidityForecast({ openingBalance, startMonth, asOfDate = startMonth + '-01', horizonMonths = 12, transactions = [], commitments = [], recurring = [], estimates = {} }) {
     let balance = Number(openingBalance) || 0;
     const rows = [];
     for (let i = 0; i < horizonMonths; i++) {
       const date = new Date(Number(startMonth.slice(0, 4)), Number(startMonth.slice(5, 7)) - 1 + i, 1);
       const month = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
-      const actual = transactions.filter(t => t.status === 'confirmed' && monthOf(t.date) === month)
+      const actual = transactions.filter(t => t.status === 'confirmed' && monthOf(t.date) === month && t.date > asOfDate)
         .reduce((s, t) => s + (Number(t.signedAmount) || 0), 0);
       const planned = [...commitments, ...recurring].filter(x => x.status === 'confermato' && monthOf(x.date || x.nextDate) === month && !isDuplicateOccurrence(x, transactions));
       const incomeCertain = round2(planned.filter(x => Number(x.signedAmount ?? x.amount) > 0).reduce((s, x) => s + Math.abs(Number(x.signedAmount ?? x.amount)), 0));
