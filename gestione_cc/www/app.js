@@ -1152,7 +1152,7 @@
     const liquid=state.accounts.filter(isLiquidAccount);
     const bank=$('#recBankAccount'),category=$('#recCategory');
     if(bank){const prior=bank.value;bank.innerHTML=liquid.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if(liquid.some(a=>a.id===prior))bank.value=prior;}
-    if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(a.path)+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
+    if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
     renderRecurringRules();
     const result=buildForecast();
     $('#forecastOpening').textContent=euro.format(result.currentBalance);
