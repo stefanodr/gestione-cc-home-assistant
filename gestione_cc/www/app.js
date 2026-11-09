@@ -1663,15 +1663,22 @@
   }
   function economicExpenseTotals(transactions) {
     const totals = new Map();
+    const addExpenseWithAncestors = (accountId, rawAmount) => {
+      const amount = Math.abs(Number(rawAmount) || 0);
+      if (!amount) return;
+      let account = accountById(accountId);
+      const visited = new Set();
+      while (account && !visited.has(String(account.id))) {
+        visited.add(String(account.id));
+        if (account.type === 'EXPENSE') totals.set(account.id, (totals.get(account.id) || 0) + amount);
+        account = account.parentId ? accountById(account.parentId) : null;
+      }
+    };
     for (const tx of transactions) {
       if (tx.counterpartSplits?.length) {
-        for (const split of tx.counterpartSplits) {
-          const account = accountById(split.accountId);
-          if (account?.type === 'EXPENSE') totals.set(account.id, (totals.get(account.id) || 0) + Math.abs(Number(split.value) || 0));
-        }
+        for (const split of tx.counterpartSplits) addExpenseWithAncestors(split.accountId, split.value);
       } else {
-        const account = accountById(tx.counterpartAccountId);
-        if (account?.type === 'EXPENSE') totals.set(account.id, (totals.get(account.id) || 0) + Math.abs(tx.amount));
+        addExpenseWithAncestors(tx.counterpartAccountId, tx.amount);
       }
     }
     return totals;
