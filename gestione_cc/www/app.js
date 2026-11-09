@@ -646,23 +646,47 @@
     picker.innerHTML = '<option value="">Filtri salvati…</option>' + state.savedFilters.map(f => '<option value="' + safeText(f.id) + '">' + safeText(f.name) + '</option>').join('');
     if (state.savedFilters.some(f => f.id === current)) picker.value = current;
   }
+  function searchAccountAllocation(tx, accountId) {
+    if (accountId === 'all') return { matches: true, amount: Number(tx.amount) || 0, labels: [] };
+    if (tx.bankAccountId === accountId) return { matches: true, amount: Number(tx.amount) || 0, labels: [] };
+    const splits = Array.isArray(tx.counterpartSplits) ? tx.counterpartSplits : [];
+    if (splits.length) {
+      const isWithinSelectedAccount = splitAccountId => {
+        let account = accountById(splitAccountId), guard = new Set();
+        while (account && !guard.has(String(account.id))) {
+          if (String(account.id) === String(accountId)) return true;
+          guard.add(String(account.id));
+          account = account.parentId ? accountById(account.parentId) : null;
+        }
+        return false;
+      };
+      const matched = splits.filter(split => isWithinSelectedAccount(split.accountId));
+      if (!matched.length) return { matches: false, amount: 0, labels: [] };
+      // Nel riparto il valore è opposto al movimento bancario: lo invertiamo
+      // per mostrare l'importo e il segno dal punto di vista dell'entrata/uscita.
+      return { matches: true, amount: -matched.reduce((sum, split) => sum + (Number(split.value) || 0), 0),
+        labels: matched.map(split => accountLabel(split.accountId)) };
+    }
+    if (tx.counterpartAccountId === accountId) return { matches: true, amount: Number(tx.amount) || 0, labels: [] };
+    return { matches: false, amount: 0, labels: [] };
+  }
   function runAdvancedSearch() {
     const f = searchControls();
-    const results = state.transactions.filter(tx => {
+    const results = state.transactions.map(tx => ({ tx, allocation: searchAccountAllocation(tx, f.account) })).filter(({tx, allocation}) => {
       const date = String(tx.date || '');
-      const amount = Math.abs(Number(tx.amount) || 0);
+      const amount = Math.abs(allocation.amount);
       const haystack = [transactionDescription(tx), transactionCausale(tx), tx.payee, tx.memo].join(' ').toLocaleLowerCase('it');
       if (f.from && date < f.from || f.to && date > f.to) return false;
       if (f.text && !haystack.includes(f.text)) return false;
+      if (!allocation.matches) return false;
       if (f.min !== null && Number.isFinite(f.min) && amount < f.min) return false;
       if (f.max !== null && Number.isFinite(f.max) && amount > f.max) return false;
-      if (f.direction === 'income' && Number(tx.amount) <= 0 || f.direction === 'expense' && Number(tx.amount) >= 0) return false;
+      if (f.direction === 'income' && allocation.amount <= 0 || f.direction === 'expense' && allocation.amount >= 0) return false;
       if (f.status !== 'all' && tx.status !== f.status) return false;
-      if (f.account !== 'all' && tx.bankAccountId !== f.account && tx.counterpartAccountId !== f.account) return false;
       return true;
-    }).sort((a,b) => String(b.date).localeCompare(String(a.date)));
+    }).sort((a,b) => String(b.tx.date).localeCompare(String(a.tx.date)));
     $('#searchResultCount').textContent = results.length + ' movimenti trovati';
-    $('#advancedSearchBody').innerHTML = results.slice(0,1000).map(tx => '<tr><td>' + safeText(formatDate(tx.date)) + '</td><td class="name-cell">' + safeText(transactionDescription(tx) || transactionCausale(tx) || 'Movimento') + '</td><td class="' + (Number(tx.amount)>=0?'amount-in':'amount-out') + '">' + euro.format(Number(tx.amount)||0) + '</td><td>' + safeText(accountLabel(tx.bankAccountId)) + '</td><td>' + safeText(accountLabel(tx.counterpartAccountId)) + '</td><td>' + (tx.status === 'confirmed' ? 'Confermato' : 'Da classificare') + '</td></tr>').join('') || '<tr><td colspan="6" class="empty-inline">Nessun movimento corrisponde ai filtri.</td></tr>';
+    $('#advancedSearchBody').innerHTML = results.slice(0,1000).map(({tx,allocation}) => '<tr><td>' + safeText(formatDate(tx.date)) + '</td><td class="name-cell">' + safeText(transactionDescription(tx) || transactionCausale(tx) || 'Movimento') + (allocation.labels.length ? '<small class="name-secondary">Riparto: ' + safeText(allocation.labels.join(' · ')) + '</small>' : '') + '</td><td class="' + (allocation.amount>=0?'amount-in':'amount-out') + '">' + euro.format(allocation.amount) + '</td><td>' + safeText(accountLabel(tx.bankAccountId)) + '</td><td>' + safeText(allocation.labels.length ? allocation.labels.join(' · ') : accountLabel(tx.counterpartAccountId)) + '</td><td>' + (tx.status === 'confirmed' ? 'Confermato' : 'Da classificare') + '</td></tr>').join('') || '<tr><td colspan="6" class="empty-inline">Nessun movimento corrisponde ai filtri.</td></tr>';
     if (results.length > 1000) $('#searchResultCount').textContent += ' · mostrati i primi 1.000';
   }
   function setupFinanceViews() {
