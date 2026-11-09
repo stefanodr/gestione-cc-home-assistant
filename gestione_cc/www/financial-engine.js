@@ -148,8 +148,8 @@
       const actual = transactions.filter(t => t.status === 'confirmed' && monthOf(t.date) === month && t.date > asOfDate)
         .reduce((s, t) => s + (Number(t.signedAmount) || 0), 0);
       const planned = [...commitments, ...recurring].filter(x => x.status === 'confermato' && monthOf(x.date || x.nextDate) === month && !isDuplicateOccurrence(x, transactions));
-      const incomeCertain = round2(planned.filter(x => Number(x.signedAmount ?? x.amount) > 0).reduce((s, x) => s + Math.abs(Number(x.signedAmount ?? x.amount)), 0));
-      const expenseCertain = round2(planned.filter(x => Number(x.signedAmount ?? x.amount) < 0 || x.direction === 'uscita').reduce((s, x) => s + Math.abs(Number(x.signedAmount ?? x.amount)), 0));
+      const incomeCertain = round2(planned.filter(x => x.direction === 'entrata' || (!x.direction && Number(x.signedAmount ?? x.amount) > 0)).reduce((s, x) => s + Math.abs(Number(x.signedAmount ?? x.amount)), 0));
+      const expenseCertain = round2(planned.filter(x => x.direction === 'uscita' || (!x.direction && Number(x.signedAmount ?? x.amount) < 0)).reduce((s, x) => s + Math.abs(Number(x.signedAmount ?? x.amount)), 0));
       const estimate = estimates[month] || {};
       const estimatedIncome = round2(Number(estimate.income) || 0), estimatedExpense = round2(Number(estimate.expense) || 0);
       const netActual = i === 0 ? actual : 0;
