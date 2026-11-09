@@ -581,10 +581,125 @@
     const reportDate = new Date(ry, rm - 1, 1);
     if ($('#reportPeriodNext')) $('#reportPeriodNext').disabled = reportDate >= currentMonth;
   }
+
+  function searchControls() {
+    const get = id => document.getElementById(id);
+    const text = get('searchText')?.value.trim().toLocaleLowerCase('it') || '';
+    const from = get('searchFrom')?.value || '', to = get('searchTo')?.value || '';
+    const min = get('searchMin')?.value === '' ? null : Number(get('searchMin').value);
+    const max = get('searchMax')?.value === '' ? null : Number(get('searchMax').value);
+    const direction = get('searchDirection')?.value || 'all', status = get('searchStatus')?.value || 'all';
+    const account = get('searchAccount')?.value || 'all';
+    return { text, from, to, min, max, direction, status, account };
+  }
+  function renderSavedFilters() {
+    const picker = $('#savedFilterPicker'); if (!picker) return;
+    const current = picker.value;
+    picker.innerHTML = '<option value="">Filtri salvati…</option>' + state.savedFilters.map(f => '<option value="' + safeText(f.id) + '">' + safeText(f.name) + '</option>').join('');
+    if (state.savedFilters.some(f => f.id === current)) picker.value = current;
+  }
+  function runAdvancedSearch() {
+    const f = searchControls();
+    const results = state.transactions.filter(tx => {
+      const date = String(tx.date || '');
+      const amount = Math.abs(Number(tx.amount) || 0);
+      const haystack = [transactionDescription(tx), transactionCausale(tx), tx.payee, tx.memo].join(' ').toLocaleLowerCase('it');
+      if (f.from && date < f.from || f.to && date > f.to) return false;
+      if (f.text && !haystack.includes(f.text)) return false;
+      if (f.min !== null && Number.isFinite(f.min) && amount < f.min) return false;
+      if (f.max !== null && Number.isFinite(f.max) && amount > f.max) return false;
+      if (f.direction === 'income' && Number(tx.amount) <= 0 || f.direction === 'expense' && Number(tx.amount) >= 0) return false;
+      if (f.status !== 'all' && tx.status !== f.status) return false;
+      if (f.account !== 'all' && tx.bankAccountId !== f.account && tx.counterpartAccountId !== f.account) return false;
+      return true;
+    }).sort((a,b) => String(b.date).localeCompare(String(a.date)));
+    $('#searchResultCount').textContent = results.length + ' movimenti trovati';
+    $('#advancedSearchBody').innerHTML = results.slice(0,1000).map(tx => '<tr><td>' + safeText(formatDate(tx.date)) + '</td><td class="name-cell">' + safeText(transactionDescription(tx) || transactionCausale(tx) || 'Movimento') + '</td><td class="' + (Number(tx.amount)>=0?'amount-in':'amount-out') + '">' + euro.format(Number(tx.amount)||0) + '</td><td>' + safeText(accountLabel(tx.bankAccountId)) + '</td><td>' + safeText(accountLabel(tx.counterpartAccountId)) + '</td><td>' + (tx.status === 'confirmed' ? 'Confermato' : 'Da classificare') + '</td></tr>').join('') || '<tr><td colspan="6" class="empty-inline">Nessun movimento corrisponde ai filtri.</td></tr>';
+    if (results.length > 1000) $('#searchResultCount').textContent += ' · mostrati i primi 1.000';
+  }
+  function setupFinanceViews() {
+    const account = $('#searchAccount');
+    if (account) {
+      const old = account.value;
+      account.innerHTML = '<option value="all">Tutti i conti</option>' + state.accounts.filter(a=>a.type!=='ROOT').map(a=>'<option value="' + safeText(a.id) + '">' + safeText(a.path) + '</option>').join('');
+      if ([...account.options].some(o=>o.value===old)) account.value=old;
+    }
+    renderSavedFilters();
+    const budgetMonth = $('#budgetMonth');
+    if (budgetMonth && !budgetMonth.value) budgetMonth.value = localDateKey(new Date()).slice(0,7);
+    const forecast = $('#forecastAccountChoices');
+    if (forecast) {
+      const ids = Array.isArray(state.forecastSettings?.accountIds) ? state.forecastSettings.accountIds : [];
+      const eligible = state.accounts.filter(isLiquidAccount);
+      const all = ids.length === 0 || eligible.every(a=>ids.includes(a.id));
+      $('#forecastAllAccounts').checked = all;
+      forecast.innerHTML = eligible.map(a=>'<label style="display:flex;gap:9px;align-items:center;margin:9px 0"><input type="checkbox" data-forecast-account="' + safeText(a.id) + '" ' + (all || ids.includes(a.id) ? 'checked' : '') + '> ' + safeText(a.path) + '</label>').join('') || '<p class="panel-subtitle">Nessun conto liquido riconosciuto nel piano dei conti.</p>';
+      forecast.querySelectorAll('[data-forecast-account]').forEach(box=>box.addEventListener('change',()=>{
+        const selected=[...forecast.querySelectorAll('[data-forecast-account]:checked')].map(x=>x.dataset.forecastAccount);
+        state.forecastSettings.accountIds=selected.length===eligible.length?[]:selected;
+        $('#forecastAllAccounts').checked=state.forecastSettings.accountIds.length===0;
+        saveState();
+      }));
+    }
+    $('#forecastAllAccounts')?.addEventListener('change',()=>{
+      state.forecastSettings.accountIds=[];
+      setupFinanceViews();
+      saveState();
+    });
+    $('#runAdvancedSearch')?.addEventListener('click',runAdvancedSearch);
+    $('#clearAdvancedSearch')?.addEventListener('click',()=>{
+      ['searchFrom','searchTo','searchText','searchMin','searchMax'].forEach(id=>$('#'+id).value='');
+      $('#searchDirection').value='all';$('#searchStatus').value='all';$('#searchAccount').value='all';runAdvancedSearch();
+    });
+    $('#saveAdvancedFilter')?.addEventListener('click',()=>{
+      const name=window.prompt('Nome da assegnare al filtro:');
+      if(!name?.trim())return;
+      state.savedFilters.push({id:uid('f'),name:name.trim().slice(0,60),criteria:searchControls()});
+      saveState();renderSavedFilters();
+    });
+    $('#savedFilterPicker')?.addEventListener('change',()=>{
+      const f=state.savedFilters.find(x=>x.id===$('#savedFilterPicker').value);if(!f)return;
+      const c=f.criteria||{};
+      $('#searchFrom').value=c.from||'';$('#searchTo').value=c.to||'';$('#searchText').value=c.text||'';
+      $('#searchMin').value=c.min??'';$('#searchMax').value=c.max??'';
+      $('#searchDirection').value=c.direction||'all';$('#searchStatus').value=c.status||'all';$('#searchAccount').value=c.account||'all';runAdvancedSearch();
+    });
+    $('#budgetMonth')?.addEventListener('change',renderBudgetView);
+    renderBudgetView();
+    renderForecastSelection();
+  }
+  function renderBudgetView() {
+    const body=$('#budgetBody');if(!body)return;
+    const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7);
+    const categories=state.accounts.filter(a=>a.type==='EXPENSE').sort((a,b)=>a.path.localeCompare(b.path,'it'));
+    const totals=new Map();
+    for(const tx of state.transactions){
+      if(tx.status!=='confirmed'||String(tx.date||'').slice(0,7)!==month)continue;
+      const splits=Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.length?tx.counterpartSplits:null;
+      if(splits){for(const split of splits){const a=accountById(split.accountId);if(a?.type==='EXPENSE')totals.set(a.id,(totals.get(a.id)||0)+Math.abs(Number(split.value)||0));}}
+      else {const a=accountById(tx.counterpartAccountId);if(a?.type==='EXPENSE')totals.set(a.id,(totals.get(a.id)||0)+Math.abs(Number(tx.amount)||0);}
+    }
+    body.innerHTML=categories.map(a=>{
+      const budget=Number(state.budgets.find(x=>x.accountId===a.id)?.amount)||0,spent=totals.get(a.id)||0,remaining=budget-spent,pct=budget>0?spent/budget*100:0;
+      return '<tr><td class="name-primary">'+safeText(a.path)+'</td><td><input type="number" min="0" step="0.01" data-budget-account="'+safeText(a.id)+'" value="'+(budget||'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px"></td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(budget?euro.format(remaining):'—')+'</td><td>'+(budget?Math.round(pct)+'%':'—')+'</td></tr>';
+    }).join('')||'<tr><td colspan="5" class="empty-inline">Nessuna categoria di spesa nel piano dei conti.</td></tr>';
+    body.querySelectorAll('[data-budget-account]').forEach(input=>input.addEventListener('change',()=>{
+      const id=input.dataset.budgetAccount,amount=Math.max(0,Number(input.value)||0);
+      const existing=state.budgets.find(x=>x.accountId===id);
+      if(existing)existing.amount=amount;else state.budgets.push({accountId:id,amount});
+      saveState();renderBudgetView();
+    }));
+  }
+  function renderForecastSelection() {
+    const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
+    const count=state.accounts.filter(isLiquidAccount).filter(a=>ids.length===0||ids.includes(a.id)).length;
+    const status=$('#forecastStatus');if(status)status.textContent='Conti inclusi: '+count+'. Il calcolo dei flussi previsionali non è ancora attivo: non vengono mostrate stime non verificate.';
+  }
+
   function navigate(view) {
     $$('.content-view').forEach(section => section.classList.toggle('active', section.id === `view-${view}`));
     $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === view));
-    const names = { overview: 'Panoramica', transactions: 'Movimenti', reports: 'Report', accounts: 'Piano dei conti', rules: 'Regole apprese', settings: 'Impostazioni' };
+    const names = { overview: 'Panoramica', transactions: 'Movimenti', search: 'Ricerca avanzata', budget: 'Budget', forecast: 'Previsioni', reports: 'Report', accounts: 'Piano dei conti', rules: 'Regole apprese', settings: 'Impostazioni' };
     $('#currentSection').textContent = names[view] || 'Panoramica';
     renderAll();
     if (view === 'reports') requestAnimationFrame(drawReportChart);
@@ -710,7 +825,7 @@
     if (!state) return;
     try {
       renderAccountFilters();
-      renderOverview(); renderTransactions(); renderReports(); renderAccounts(); renderRules(); renderSettings();
+      renderOverview(); renderTransactions(); renderReports(); setupFinanceViews(); renderAccounts(); renderRules(); renderSettings();
       const pendingCount = pendingTransactions().length;
       $('#pendingNavCount').textContent = String(pendingCount);
       $('#pendingNavCount').classList.toggle('hidden', pendingCount === 0);
