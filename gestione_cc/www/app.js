@@ -765,7 +765,8 @@
   function buildForecast() {
     const accounts=forecastSelectedAccounts(),ids=new Set(accounts.map(a=>a.id)),today=localDateKey(new Date()),currentMonth=today.slice(0,7);
     const txs=state.transactions.filter(t=>t.status==='confirmed'&&t.date<=today&&t.status!=='duplicate'&&ids.has(t.bankAccountId));
-    const opening=Number(state.openingBalance)||0;
+    const primaryAccountId=state.bankAccountId;
+    const opening=ids.has(primaryAccountId)?(Number(state.openingBalance)||0):0;
     const currentBalance=opening+txs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
     const historyKeys=Array.from({length:12},(_,i)=>shiftMonthKey(currentMonth,-12+i));
     const recurringCategoryIds=new Set(state.recurringRules.filter(r=>r.active&&ids.has(r.bankAccountId)&&r.categoryId).map(r=>r.categoryId));
