@@ -1020,12 +1020,17 @@
     const currentBalance=opening+txs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
     const historyKeys=Array.from({length:12},(_,i)=>shiftMonthKey(currentMonth,-12+i));
     const completedCurrentYear=historyKeys.filter(key=>key.slice(0,4)===String(new Date().getFullYear())&&key<currentMonth);
-    const currentYearCoverage=completedCurrentYear.filter(key=>txs.some(tx=>String(tx.date).slice(0,7)===key)).length;
-    const useCurrentYear=currentYearCoverage>=3;
-    const estimateKeys=useCurrentYear?completedCurrentYear:Array.from({length:12},(_,i)=>(new Date().getFullYear()-1)+'-'+String(i+1).padStart(2,'0'));
+    const previousYearKeys=Array.from({length:12},(_,i)=>(new Date().getFullYear()-1)+'-'+String(i+1).padStart(2,'0'));
     const categories=state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)&&a.hierarchyType!=='Mastro');
-    const estimates={income:0,expense:0,source:useCurrentYear?'anno_corrente':'anno_precedente',months:estimateKeys.length};
+    const usedSources=new Set(),usedMonths=new Set();
+    const estimates={income:0,expense:0,source:'',months:0};
     for(const cat of categories){
+      const hasCategoryMovement=key=>txs.some(tx=>String(tx.date).slice(0,7)===key&&
+        (tx.counterpartAccountId===cat.id||(tx.counterpartSplits||[]).some(split=>split.accountId===cat.id)));
+      const categoryCoverage=completedCurrentYear.filter(hasCategoryMovement).length;
+      const estimateKeys=categoryCoverage>=3?completedCurrentYear:previousYearKeys;
+      usedSources.add(categoryCoverage>=3?'anno_corrente':'anno_precedente');
+      estimateKeys.forEach(key=>usedMonths.add(key));
       const monthly=estimateKeys.map(key=>{
         let total=0;
         for(const tx of txs){
@@ -1043,6 +1048,8 @@
     }
     estimates.income=Math.round(estimates.income*100)/100;
     estimates.expense=Math.round(estimates.expense*100)/100;
+    estimates.source=usedSources.size>1?'periodi misti':usedSources.has('anno_corrente')?'anno corrente':'anno precedente';
+    estimates.months=usedMonths.size;
     const forecast=[];
     let balance=currentBalance;
     for(let i=0;i<12;i++){
@@ -1057,7 +1064,7 @@
       forecast.push({key,openingBalance,programmedIncome,programmedExpense,estimateIncome,estimateExpense,programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
     }
     const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:currentBalance,key:currentMonth});
-    return {accounts,currentBalance,forecast,minimum,historyCount:estimateKeys.filter(k=>txs.some(t=>String(t.date).slice(0,7)===k)).length,estimatedNet:estimates.income-estimates.expense,estimates,openingBalanceUnknown};
+    return {accounts,currentBalance,forecast,minimum,historyCount:usedMonths.size,estimatedNet:estimates.income-estimates.expense,estimates,openingBalanceUnknown};
   }
   function renderForecastSelection() {
     const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
