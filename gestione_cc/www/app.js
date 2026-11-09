@@ -934,33 +934,45 @@
     const openingBalanceUnknown=accounts.filter(account=>account.id!==primaryAccountId);
     const currentBalance=opening+txs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
     const historyKeys=Array.from({length:12},(_,i)=>shiftMonthKey(currentMonth,-12+i));
-    const categories=state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type));
-    const estimates=new Map();
+    const completedCurrentYear=historyKeys.filter(key=>key.slice(0,4)===String(new Date().getFullYear())&&key<currentMonth);
+    const currentYearCoverage=completedCurrentYear.filter(key=>txs.some(tx=>String(tx.date).slice(0,7)===key)).length;
+    const useCurrentYear=currentYearCoverage>=3;
+    const estimateKeys=useCurrentYear?completedCurrentYear:Array.from({length:12},(_,i)=>(new Date().getFullYear()-1)+'-'+String(i+1).padStart(2,'0'));
+    const categories=state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)&&a.hierarchyType!=='Mastro');
+    const estimates={income:0,expense:0,source:useCurrentYear?'anno_corrente':'anno_precedente',months:estimateKeys.length};
     for(const cat of categories){
-      const monthly=historyKeys.map(key=>{
+      const monthly=estimateKeys.map(key=>{
         let total=0;
         for(const tx of txs){
           if(String(tx.date).slice(0,7)!==key||transactionIsExplicitlyRecurring(tx,cat.id,key,ids))continue;
           if(tx.counterpartSplits?.length){
-            for(const sp of tx.counterpartSplits)if(sp.accountId===cat.id)total+=Math.abs(Number(sp.value)||0)*(cat.type==='INCOME'?1:-1);
-          }else if(tx.counterpartAccountId===cat.id)total+=Math.abs(Number(tx.amount)||0)*(cat.type==='INCOME'?1:-1);
+            for(const sp of tx.counterpartSplits)if(sp.accountId===cat.id)total+=Math.abs(Number(sp.value)||0);
+          }else if(tx.counterpartAccountId===cat.id)total+=Math.abs(Number(tx.amount)||0);
         }
         return total;
       });
-      estimates.set(cat.id,median(monthly));
+      const nonZero=monthly.filter(value=>value>0);
+      if(nonZero.length<2)continue;
+      const estimate=median(nonZero);
+      if(cat.type==='INCOME')estimates.income+=estimate;else estimates.expense+=estimate;
     }
-    const estimatedNet=[...estimates.values()].reduce((a,b)=>a+b,0);
+    estimates.income=Math.round(estimates.income*100)/100;
+    estimates.expense=Math.round(estimates.expense*100)/100;
     const forecast=[];
     let balance=currentBalance;
     for(let i=0;i<12;i++){
       const key=shiftMonthKey(currentMonth,i),rules=forecastRecurringItems(key,ids);
-      const programmed=rules.reduce((sum,r)=>sum+Number(r.amount||0),0);
-      const estimate=i===0?0:estimatedNet;
-      balance+=programmed+estimate;
-      forecast.push({key,programmed,estimate,balance});
+      const due=rules.filter(rule=>i!==0||monthOccurrence(rule,key)>=today);
+      const programmedIncome=due.filter(rule=>Number(rule.amount)>0).reduce((sum,rule)=>sum+Number(rule.amount),0);
+      const programmedExpense=due.filter(rule=>Number(rule.amount)<0).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)),0);
+      const estimateIncome=i===0?0:estimates.income;
+      const estimateExpense=i===0?0:estimates.expense;
+      const openingBalance=balance;
+      balance=Math.round((balance+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
+      forecast.push({key,openingBalance,programmedIncome,programmedExpense,estimateIncome,estimateExpense,programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
     }
     const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:currentBalance,key:currentMonth});
-    return {accounts,currentBalance,forecast,minimum,historyCount:historyKeys.filter(k=>txs.some(t=>String(t.date).slice(0,7)===k)).length,estimatedNet,openingBalanceUnknown};
+    return {accounts,currentBalance,forecast,minimum,historyCount:estimateKeys.filter(k=>txs.some(t=>String(t.date).slice(0,7)===k)).length,estimatedNet:estimates.income-estimates.expense,estimates,openingBalanceUnknown};
   }
   function renderForecastSelection() {
     const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
@@ -976,9 +988,9 @@
     $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
     $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
     $('#forecastEnding').textContent=euro.format(result.forecast.at(-1)?.balance??result.currentBalance);
-    $('#forecastReliability').textContent='Storico disponibile: '+result.historyCount+' mesi · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
+    $('#forecastReliability').textContent='Storico: '+result.historyCount+' mesi · base '+(result.estimates.source==='anno_corrente'?'anno corrente':'anno precedente')+' · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
     if(status&&result.openingBalanceUnknown.length)status.textContent+=' ATTENZIONE: il saldo iniziale è disponibile solo per '+(accountById(state.bankAccountId)?.path||'il conto principale')+'. Per gli altri conti selezionati il saldo storico potrebbe essere incompleto.';
-    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.programmed)+'</td><td>'+euro.format(row.estimate)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
+    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
   }
 
   function navigate(view) {
