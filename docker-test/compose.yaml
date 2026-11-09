@@ -1,0 +1,19 @@
+services:
+  gestione-cc-test:
+    build:
+      context: ..
+      dockerfile: docker-test/Dockerfile
+    container_name: gestione-cc-test
+    ports:
+      - "127.0.0.1:8444:8443"
+    environment:
+      BOOTSTRAP_PIN: "${BOOTSTRAP_PIN:?Crea il file .env e imposta un PIN di 6 cifre}"
+      TZ: Europe/Rome
+    volumes:
+      - ./data:/data
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
