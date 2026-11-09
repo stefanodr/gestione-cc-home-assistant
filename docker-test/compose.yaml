@@ -10,10 +10,13 @@ services:
       BOOTSTRAP_PIN: "${BOOTSTRAP_PIN:?Crea il file .env e imposta un PIN di 6 cifre}"
       TZ: Europe/Rome
     volumes:
-      - ./data:/data
+      - gestione-cc-test-data:/data
     restart: "no"
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
+
+volumes:
+  gestione-cc-test-data:
