@@ -109,9 +109,9 @@ const accountContext = {
   accountById: id => accountContext.state.accounts.find(a => a.id === id)
 };
 vm.createContext(accountContext);
-vm.runInContext(extract('isLiquidAccount', 'periodTransactions') + '\\n' +
-  extract('budgetSpentByCategory', 'renderBudgetView') + '\\n' +
-  extract('forecastTransactionFlow', 'median') + '\\n' +
+vm.runInContext(extract('isLiquidAccount', 'periodTransactions') + '\n' +
+  extract('budgetSpentByCategory', 'renderBudgetView') + '\n' +
+  extract('forecastTransactionFlow', 'median') + '\n' +
   'this.isLiquidAccount = isLiquidAccount; this.budgetSpentByCategory = budgetSpentByCategory; this.forecastTransactionFlow = forecastTransactionFlow;', accountContext);
 assert.equal(accountContext.isLiquidAccount(accountContext.accountById('bank')), true);
 assert.equal(accountContext.isLiquidAccount(accountContext.accountById('savings')), true);
