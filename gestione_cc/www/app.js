@@ -865,8 +865,12 @@
   function transactionMatchesRecurringRule(tx,rule) {
     const target=normalize(rule.description);
     const tolerance=Math.max(1,Math.abs(Number(rule.amount)||0)*0.05);
+    const splits=Array.isArray(tx.counterpartSplits)?tx.counterpartSplits:[];
+    const relevantAmount=rule.categoryId&&splits.length
+      ? splits.filter(split=>split.accountId===rule.categoryId).reduce((sum,split)=>sum+Math.abs(Number(split.value)||0),0)
+      : Math.abs(Number(tx.amount)||0);
     return tx.status==='confirmed' && tx.bankAccountId===rule.bankAccountId &&
-      Math.abs(Math.abs(Number(tx.amount)||0)-Math.abs(Number(rule.amount)||0))<=tolerance &&
+      Math.abs(relevantAmount-Math.abs(Number(rule.amount)||0))<=tolerance &&
       Boolean(target) && normalize(transactionDescription(tx)||transactionCausale(tx))===target;
   }
   function recurringOccurrenceDates(rule,key) {
