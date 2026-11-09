@@ -778,14 +778,18 @@
     return totals;
   }
 
-  function budgetIncomeForecastForMonth(month) {
+  function budgetIncomeHistory() {
     const now=new Date(),year=now.getFullYear();
     const currentMonths=Array.from({length:now.getMonth()},(_,i)=>year+'-'+String(i+1).padStart(2,'0'));
     const accounts=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro');
     const coverage=currentMonths.filter(key=>accounts.some(account=>budgetActualDirect(key,account.id)>0)).length;
     const months=coverage>=3?currentMonths:Array.from({length:12},(_,i)=>(year-1)+'-'+String(i+1).padStart(2,'0'));
-    const amount=accounts.reduce((sum,account)=>sum+months.reduce((total,key)=>total+budgetActualDirect(key,account.id),0)/Math.max(1,months.length),0);
-    return {amount:Math.round(amount*100)/100,source:coverage>=3?'anno_corrente':'anno_precedente',months:months.length};
+    return {accounts,months,source:coverage>=3?'anno_corrente':'anno_precedente'};
+  }
+  function budgetIncomeForecastForMonth(month) {
+    const history=budgetIncomeHistory();
+    const amount=history.accounts.reduce((sum,account)=>sum+history.months.reduce((total,key)=>total+budgetActualDirect(key,account.id),0)/Math.max(1,history.months.length),0);
+    return {amount:Math.round(amount*100)/100,source:history.source,months:history.months.length};
   }
   function budgetActualDirect(month, accountId) {
     let total = 0;
@@ -826,16 +830,22 @@
         spent, remaining: Math.round((budget-spent)*100)/100,
         utilization: budget > 0 ? Math.round(spent/budget*10000)/100 : null, historySource };
     });
+    const incomeHistory=budgetIncomeHistory();
+    const incomeLines=incomeHistory.accounts.sort((a,b)=>a.path.localeCompare(b.path,'it')).map(account=>{
+      const history=incomeHistory.months.map(key=>budgetActualDirect(key,account.id));
+      const budget=Math.round((history.reduce((sum,value)=>sum+value,0)/Math.max(1,history.length)+Number.EPSILON)*100)/100;
+      const actual=budgetActualDirect(month,account.id);
+      return {accountId:account.id,budget,spent:actual,remaining:Math.round((budget-actual)*100)/100,
+        utilization:budget>0?Math.round(actual/budget*10000)/100:null,historySource:incomeHistory.source};
+    });
     const previous = activeBudgetSnapshot(month);
     const version = (previous?.version || 0) + 1;
     return { month, version, createdAt: new Date().toISOString(), status: 'proposta', historySource, historyMonths: sourceMonths.length,
       lines, totalBudget: lines.reduce((sum,x)=>sum+x.budget,0), totalActual: lines.reduce((sum,x)=>sum+x.spent,0),
       totalRecurringExpenses:lines.reduce((sum,x)=>sum+(x.recurring||0),0), totalVariableExpenses:lines.reduce((sum,x)=>sum+(x.variable||0),0),
-      incomeForecast:state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').reduce((sum,account)=>{
-        const history=sourceMonths.map(key=>budgetActualDirect(key,account.id));
-        return sum+(history.reduce((total,value)=>total+value,0)/Math.max(1,history.length));
-      },0),
-      actualIncome:state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').reduce((sum,account)=>sum+budgetActualDirect(month,account.id),0) };
+      incomeLines, totalIncomeBudget:incomeLines.reduce((sum,x)=>sum+x.budget,0),
+      actualIncome:incomeLines.reduce((sum,x)=>sum+x.spent,0),
+      incomeHistorySource:incomeHistory.source, incomeHistoryMonths:incomeHistory.months.length };
   }
   function renderBudgetView() {
     const body=$('#budgetBody');if(!body)return;
@@ -844,18 +854,26 @@
     const currentMonth=localDateKey(new Date()).slice(0,7);
     if(!snapshot&&month>=currentMonth){snapshot=generateBudgetSnapshot(month);state.budgetSnapshots.push(snapshot);void saveState().then(()=>renderBudgetView());}
     const categories=state.accounts.filter(a=>a.type==='EXPENSE'&&a.hierarchyType!=='Mastro').sort((a,b)=>a.path.localeCompare(b.path,'it'));
+    const incomeCategories=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').sort((a,b)=>a.path.localeCompare(b.path,'it'));
     const actuals=new Map(categories.map(a=>[a.id,budgetActualDirect(month,a.id)]));
     const lines=new Map((snapshot?.lines||[]).map(x=>[x.accountId,x]));
+    const incomeLines=new Map((snapshot?.incomeLines||[]).map(x=>[x.accountId,x]));
     const totalActual=categories.reduce((sum,account)=>sum+(actuals.get(account.id)||0),0);
     const totalBudget=snapshot?.totalBudget||0;
-    const incomeActual=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').reduce((sum,account)=>sum+budgetActualDirect(month,account.id),0);
+    const incomeActual=incomeCategories.reduce((sum,account)=>sum+budgetActualDirect(month,account.id),0);
+    const incomeBudget=snapshot?.totalIncomeBudget??snapshot?.incomeForecast??budgetIncomeForecastForMonth(month).amount;
     const summaryValues={
-      budgetIncome:snapshot?.incomeForecast??budgetIncomeForecastForMonth(month).amount,budgetTotal:totalBudget,budgetRecurring:snapshot?.totalRecurringExpenses||0,
+      budgetIncome:incomeBudget,budgetTotal:totalBudget,budgetRecurring:snapshot?.totalRecurringExpenses||0,
       budgetVariable:snapshot?.totalVariableExpenses||0,budgetActual:totalActual,
-      budgetRemaining:totalBudget-totalActual,budgetNet:(snapshot?.incomeForecast||0)-totalBudget,
+      budgetRemaining:totalBudget-totalActual,budgetNet:incomeBudget-totalBudget,
       budgetIncomeActual:incomeActual
     };
     Object.entries(summaryValues).forEach(([id,value])=>{const el=$('#'+id);if(el)el.textContent=euro.format(value);});
+    const incomeBody=$('#budgetIncomeBody');
+    if(incomeBody) incomeBody.innerHTML=incomeCategories.map(a=>{
+      const line=incomeLines.get(a.id),budget=Number(line?.budget??line?.forecast)||0,spent=budgetActualDirect(month,a.id),remaining=budget-spent,pct=budget>0?spent/budget*100:null;
+      return '<tr><td class="name-primary">'+safeText(a.path)+'</td><td><input type="number" min="0" step="0.01" data-budget-income-account="'+safeText(a.id)+'" value="'+(line?budget:'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px" '+(snapshot?'':'disabled')+'></td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(line?euro.format(remaining):'—')+'</td><td>'+(line&&budget>0?Math.round(pct)+'%':'—')+'</td></tr>';
+    }).join('')||'<tr><td colspan="5" class="empty-inline">Nessuna categoria di entrata disponibile.</td></tr>';
     body.innerHTML=categories.map(a=>{
       const line=lines.get(a.id),budget=Number(line?.budget)||0,spent=actuals.get(a.id)||0,remaining=budget-spent,pct=budget>0?spent/budget*100:null;
       return '<tr><td class="name-primary">'+safeText(a.path)+(a.hierarchyType==='Mastro e conto'?' <small>· conto e mastro</small>':'')+'</td><td><input type="number" min="0" step="0.01" data-budget-account="'+safeText(a.id)+'" value="'+(line?budget:'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px" '+(snapshot?'':'disabled')+'>'+(line?'<small style="display:block;color:#71817d">'+(line.manualOverride?'Modificato manualmente':'Fisse '+euro.format(line.recurring||0)+' · Variabili '+euro.format(line.variable||0))+'</small>':'')+'</td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(line?euro.format(remaining):'—')+'</td><td>'+(line&&budget>0?Math.round(pct)+'%':'—')+'</td></tr>';
@@ -880,6 +898,10 @@
     const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7),snapshot=activeBudgetSnapshot(month);if(!snapshot)return;
     const next=JSON.parse(JSON.stringify(snapshot));next.version=Number(snapshot.version||1)+1;next.createdAt=new Date().toISOString();next.status='proposta';delete next.confirmedAt;
     $('#budgetBody').querySelectorAll('[data-budget-account]').forEach(input=>{const line=next.lines.find(x=>x.accountId===input.dataset.budgetAccount);if(line){line.budget=Math.max(0,Number(input.value)||0);line.manualOverride=true;line.remaining=Math.round((line.budget-line.spent)*100)/100;line.utilization=line.budget>0?Math.round(line.spent/line.budget*10000)/100:null;}});
+    $('#budgetIncomeBody')?.querySelectorAll('[data-budget-income-account]').forEach(input=>{const line=next.incomeLines?.find(x=>x.accountId===input.dataset.budgetIncomeAccount);if(line){line.budget=Math.max(0,Number(input.value)||0);line.manualOverride=true;line.remaining=Math.round((line.budget-line.spent)*100)/100;line.utilization=line.budget>0?Math.round(line.spent/line.budget*10000)/100:null;}});
+    next.totalIncomeBudget=(next.incomeLines||[]).reduce((sum,x)=>sum+(Number(x.budget)||0),0);
+    next.incomeForecast=next.totalIncomeBudget;
+    next.actualIncome=(next.incomeLines||[]).reduce((sum,x)=>sum+(Number(x.spent)||0),0);
     next.totalBudget=next.lines.reduce((sum,x)=>sum+x.budget,0);next.totalRecurringExpenses=next.lines.reduce((sum,x)=>sum+(x.recurring||0),0);next.totalVariableExpenses=next.lines.reduce((sum,x)=>sum+(x.manualOverride?Math.max(0,x.budget-(x.recurring||0)):(x.variable||0)),0);state.budgetSnapshots.push(next);await saveState();renderBudgetView();
   }
 
