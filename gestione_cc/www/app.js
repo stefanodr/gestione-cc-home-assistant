@@ -668,6 +668,8 @@
     });
     $('#budgetMonth')?.addEventListener('change',renderBudgetView);
     renderBudgetView();
+    $('#addRecurringRule')?.addEventListener('click',addRecurringRule);
+    if ($('#recStart') && !$('#recStart').value) $('#recStart').value=localDateKey(new Date());
     renderForecastSelection();
   }
   function renderBudgetView() {
@@ -781,8 +783,7 @@
         }
         return total;
       });
-      const nonzero=monthly.filter(v=>v!==0);
-      estimates.set(cat.id,median(nonzero));
+      estimates.set(cat.id,median(monthly));
     }
     const estimatedNet=[...estimates.values()].reduce((a,b)=>a+b,0);
     const forecast=[];
