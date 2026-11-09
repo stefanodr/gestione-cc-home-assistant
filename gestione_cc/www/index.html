@@ -26,6 +26,9 @@
       <nav class="main-nav" aria-label="Navigazione principale">
         <button class="nav-item active" data-view="overview"><span class="nav-icon">◫</span>Panoramica</button>
         <button class="nav-item" data-view="transactions"><span class="nav-icon">⇄</span>Movimenti <span class="nav-count" id="pendingNavCount">0</span></button>
+        <button class="nav-item" data-view="search"><span class="nav-icon">⌕</span>Ricerca avanzata</button>
+        <button class="nav-item" data-view="budget"><span class="nav-icon">€</span>Budget</button>
+        <button class="nav-item" data-view="forecast"><span class="nav-icon">↗</span>Previsioni</button>
         <button class="nav-item" data-view="reports"><span class="nav-icon">▥</span>Report</button>
         <button class="nav-item" data-view="accounts"><span class="nav-icon">☷</span>Piano dei conti</button>
         <button class="nav-item" data-view="rules"><span class="nav-icon">✦</span>Regole apprese</button>
@@ -93,6 +96,29 @@
         <div class="inline-note"><span>ⓘ</span><p>Confermando un conto, la regola viene salvata solo in questo browser. I movimenti suddivisi o ambigui vanno controllati prima della registrazione.</p></div>
       </section>
 
+      <section class="content-view" id="view-search">
+        <div class="page-heading"><div><p class="eyebrow">REGISTRO COMPLETO</p><h1>Ricerca avanzata</h1><p class="subtitle">Filtra tutti i movimenti dell'archivio, non soltanto quelli della pagina corrente.</p></div></div>
+        <article class="panel" style="padding:18px;margin-bottom:15px">
+          <div class="manual-fields">
+            <label>Dal<input id="searchFrom" type="date"></label><label>Al<input id="searchTo" type="date"></label>
+            <label>Testo libero<input id="searchText" type="search" placeholder="Descrizione, causale, beneficiario…"></label>
+            <label>Importo minimo (€)<input id="searchMin" type="number" step="0.01"></label><label>Importo massimo (€)<input id="searchMax" type="number" step="0.01"></label>
+            <label>Tipo<select id="searchDirection"><option value="all">Entrate e uscite</option><option value="income">Entrate</option><option value="expense">Uscite</option></select></label>
+            <label>Stato<select id="searchStatus"><option value="all">Tutti</option><option value="confirmed">Confermati</option><option value="pending">Da classificare</option></select></label>
+            <label>Conto<select id="searchAccount"><option value="all">Tutti i conti</option></select></label>
+          </div>
+          <div class="heading-actions"><button class="button button-primary" id="runAdvancedSearch">Cerca</button><button class="button button-outline" id="clearAdvancedSearch">Azzera filtri</button><button class="button button-quiet" id="saveAdvancedFilter">Salva filtro</button></div>
+        </article>
+        <article class="panel table-panel"><div class="panel-heading" style="padding:16px 18px"><h2 id="searchResultCount">Imposta i filtri e avvia la ricerca</h2><select id="savedFilterPicker"><option value="">Filtri salvati…</option></select></div><div class="table-scroll"><table class="data-table"><thead><tr><th>Data</th><th>Descrizione</th><th>Importo</th><th>Conto</th><th>Contropartita</th><th>Stato</th></tr></thead><tbody id="advancedSearchBody"></tbody></table></div></article>
+      </section>
+      <section class="content-view" id="view-budget">
+        <div class="page-heading"><div><p class="eyebrow">CONTROLLO SPESE</p><h1>Budget mensile</h1><p class="subtitle">Il budget si rinnova ogni mese: il residuo non viene riportato e gli sforamenti non modificano il mese successivo.</p></div><div class="period-control"><label for="budgetMonth">Mese</label><input id="budgetMonth" type="month"></div></div>
+        <article class="panel table-panel"><div class="table-scroll"><table class="data-table"><thead><tr><th>Categoria di spesa</th><th>Budget mensile (€)</th><th>Speso</th><th>Residuo</th><th>Utilizzo</th></tr></thead><tbody id="budgetBody"></tbody></table></div><div class="panel-footnote" style="padding:14px 18px">Sono conteggiati i movimenti confermati e le quote dei movimenti suddivisi. I trasferimenti e i movimenti da classificare sono esclusi.</div></article>
+      </section>
+      <section class="content-view" id="view-forecast">
+        <div class="page-heading"><div><p class="eyebrow">PIANIFICAZIONE</p><h1>Previsioni liquidità</h1><p class="subtitle">Orizzonte 12 mesi. I dati effettivi, gli impegni e le stime saranno mantenuti distinti.</p></div></div>
+        <article class="panel" style="padding:18px"><h2>Selezione dei conti</h2><p class="panel-subtitle">Seleziona tutti i conti liquidi oppure uno o più conti. La selezione viene salvata nell'archivio.</p><label style="display:flex;gap:9px;align-items:center;margin:14px 0"><input type="checkbox" id="forecastAllAccounts" checked> Tutti i conti liquidi</label><div id="forecastAccountChoices"></div><p id="forecastStatus" class="panel-subtitle" style="margin-top:16px">Motore previsionale in preparazione: nessun saldo stimato viene mostrato finché non sono completate le verifiche sui flussi e sulle ricorrenze.</p></article>
+      </section>
       <section class="content-view" id="view-reports">
         <div class="page-heading"><div><p class="eyebrow">ANALISI</p><h1>Report dei flussi</h1><p class="subtitle">Confronta entrate, uscite e cause del saldo sul periodo scelto.</p><p class="panel-subtitle" id="reportNameCode"></p></div><div class="heading-actions"><div class="period-control"><label for="reportAccountPicker">Conto</label><select id="reportAccountPicker"></select></div><div class="period-control"><label for="reportPeriodMode">Periodo</label><select id="reportPeriodMode"><option value="monthly" selected>Mensile</option><option value="quarterly">Trimestrale</option><option value="halfyearly">Semestrale</option><option value="annual">Annuale</option></select></div><div class="period-navigation"><button class="period-arrow" id="reportPeriodPrev" type="button" aria-label="Periodo precedente" title="Periodo precedente">‹</button><div class="period-control"><label for="reportMonth">Intervallo selezionato</label><select id="reportMonth" aria-label="Seleziona il mese o intervallo del report"></select></div><button class="period-arrow" id="reportPeriodNext" type="button" aria-label="Periodo successivo" title="Periodo successivo">›</button></div><button class="button button-outline" id="exportReportPdf" type="button">PDF report</button><button class="button button-outline" id="exportReportXlsx">XLSX report</button></div></div>
         <div class="metric-grid report-metrics"><article class="metric-card"><div class="metric-head"><span>Flussi in entrata</span><span class="metric-icon green">↗</span></div><strong id="reportIncome">—</strong><small>movimenti sul conto selezionato</small></article><article class="metric-card"><div class="metric-head"><span>Flussi in uscita</span><span class="metric-icon coral">↘</span></div><strong id="reportExpense">—</strong><small>movimenti sul conto selezionato</small></article><article class="metric-card"><div class="metric-head"><span>Saldo netto del periodo</span><span class="metric-icon blue">∑</span></div><strong id="reportNet">—</strong><small>entrate − uscite</small></article><article class="metric-card"><div class="metric-head"><span>Trasferimenti</span><span class="metric-icon amber">⇄</span></div><strong id="reportTransfers">—</strong><small>separati dalle categorie economiche</small></article></div>
