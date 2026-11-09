@@ -1183,7 +1183,11 @@
   function accountPathAt(account, date) {
     if (!account) return 'Da classificare';
     const key = String(date || localDateKey(new Date()));
-    const old = (account.nameHistory || []).find(item => (!item.from || key >= item.from) && (!item.to || key <= item.to));
+    if (account.validFrom && key < account.validFrom) {
+      const old = [...(account.nameHistory || [])].reverse().find(item => !item.from || key >= item.from);
+      if (old) return old.path;
+    }
+    const old = (account.nameHistory || []).find(item => item.from && item.to && key >= item.from && key <= item.to);
     return old?.path || account.path;
   }
   function renameAccount(accountId) {
@@ -1191,7 +1195,7 @@
     const nextPath = window.prompt('Nuova denominazione completa del conto (percorso con : se necessario):', account.path);
     if (!nextPath?.trim() || nextPath.trim() === account.path) return;
     const effectiveDate = window.prompt('Data di decorrenza (AAAA-MM-GG). I report precedenti manterranno il vecchio nome:', localDateKey(new Date()));
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(effectiveDate || '') || Number.isNaN(Date.parse(effectiveDate + 'T12:00:00'))) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate || '') || Number.isNaN(Date.parse(effectiveDate + 'T12:00:00'))) {
       showNotice('Data non valida','Inserisci la data nel formato AAAA-MM-GG.'); return;
     }
     const oldPrefix = account.path, newPrefix = nextPath.trim();
@@ -1221,7 +1225,7 @@
   }
   function renderAccountFilters() {
     const eligible = state.accounts.filter(isLiquidAccount);
-    const options = `<option value="all">Tutti i conti liquidi</option>${eligible.map(a => `<option value="${safeText(a.id)}">${safeText(a.path)}</option>`).join('')}`;
+    const options = `<option value="all">Tutti i conti liquidi</option>${eligible.map(a => `<option value="${safeText(a.id)}">${safeText(accountDisplayLabel(a))}</option>`).join('')}`;
     for (const selector of ['#accountPicker', '#reportAccountPicker']) {
       const control = $(selector); const prior = state.reportAccountId || state.bankAccountId || eligible[0]?.id || 'all';
       control.innerHTML = options;
@@ -1541,7 +1545,7 @@
       const accountCell = isSplit
         ? '<span class="account-type">Ripartito</span>'
         : item.status === 'confirmed'
-          ? `<span class="name-secondary">${safeText(accountLabel(item.counterpartAccountId))}</span>`
+          ? `<span class="name-secondary">${safeText(accountPathAt(accountById(item.counterpartAccountId), item.date))}</span>`
           : `<input class="account-select account-search" type="text" list="accountSearchOptions" data-tx="${safeText(item.id)}" value="${suggested ? safeText(accountLabel(suggested)) : ''}" placeholder="Cerca conto…" autocomplete="off" aria-label="Cerca conto di contropartita">`;
       const conf = item.status === 'confirmed' ? 1 : (item.confidence || 0.1);
       const confidenceClass = conf >= .8 ? 'high' : conf >= .5 ? 'medium' : 'low';
@@ -1551,7 +1555,7 @@
         : item.status === 'confirmed'
           ? `<button class="row-action row-action-review" data-edit-tx="${safeText(item.id)}">Rivedi</button> <button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Ripartisci</button>`
           : `<button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Dividi</button> <button class="row-action row-action-review" data-confirm-tx="${safeText(item.id)}">Conferma</button>`;
-      return `<tr><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountLabel(item.bankAccountId))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td>${actions} <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
+      return `<tr><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountPathAt(accountById(item.bankAccountId), item.date))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td>${actions} <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
     }).join('');
     $$('[data-confirm-tx]', body).forEach(btn => btn.addEventListener('click', () => confirmTransaction(btn.dataset.confirmTx)));
     $$('[data-split-tx]', body).forEach(btn => btn.addEventListener('click', () => openSplitEditor(btn.dataset.splitTx)));
@@ -1573,7 +1577,7 @@
   function refreshAccountSearchOptions() {
     const list = $('#accountSearchOptions'); if (!list || !state) return;
     const accounts = state.accounts.filter(a => !['ROOT', 'TRADING'].includes(a.type)).sort((a, b) => a.path.localeCompare(b.path, 'it', { sensitivity: 'base' }));
-    list.innerHTML = accounts.map(a => `<option value="${safeText(a.path)}"></option>`).join('');
+    list.innerHTML = accounts.map(a => `<option value="${safeText(accountDisplayLabel(a))}"></option>`).join('');
   }
   function openManualTransaction() {
     const banks = state.accounts.filter(isLiquidAccount).sort((a, b) => a.path.localeCompare(b.path, 'it'));
@@ -1728,8 +1732,10 @@
     return { id: top.accountId, label: accountLabel(top.accountId), confidence: ambiguous ? Math.min(.49, top.score) : top.score, reason: ambiguous ? 'Più conti possibili' : `Corrispondenza ${top.field}` };
   }
   function findAccountByLabel(label) {
-    const n = normalize(label);
-    return state.accounts.find(a => normalize(a.path) === n || normalize(a.name) === n || normalize(a.path.replace(/:/g, ' ')) === n);
+    const clean = String(label || '').split(' · [')[0].trim();
+    const n = normalize(clean);
+    return state.accounts.find(a => normalize(a.path) === n || normalize(a.name) === n || normalize(a.path.replace(/:/g, ' ')) === n ||
+      (a.nameHistory || []).some(item => normalize(item.path) === n || normalize(item.path.replace(/:/g, ' ')) === n));
   }
 
   function renderReports() {
@@ -2367,7 +2373,8 @@
       const actual = actualMap.get(id) || 0, expected = baseline.get(id) || 0;
       const delta = actual - expected;
       const previousYear = previousMap.get(id) || 0, yearDelta = actual - previousYear;
-      return { id, name: accountLabel(id).replace(/^.*:/, ''), actual, previousYear, yearDelta, yearPercent: previousYear > 0.005 ? yearDelta / previousYear * 100 : null, expected, delta, percent: expected > 0.005 ? delta / expected * 100 : null };
+      const periodDate = comparisons[0].tx.map(tx=>tx.date).filter(Boolean).sort()[0] || monthSelection() + '-01';
+      return { id, name: accountPathAt(accountById(id), periodDate).replace(/^.*:/, ''), actual, previousYear, yearDelta, yearPercent: previousYear > 0.005 ? yearDelta / previousYear * 100 : null, expected, delta, percent: expected > 0.005 ? delta / expected * 100 : null };
     }).filter(row => baselinePeriods > 0 && Math.abs(row.delta) >= 0.01)
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   }
