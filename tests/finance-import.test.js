@@ -135,4 +135,53 @@ const budgetTotals = accountContext.budgetSpentByCategory([
 assert.equal(budgetTotals.get('food'), 170);
 assert.equal(budgetTotals.get('home'), 50);
 
-console.log('OK: OFX, ricorrenze, conti liquidi, trasferimenti selezionati e budget con movimenti suddivisi.');
+
+const forecastBuildContext = {
+  state: {
+    accounts: accountContext.state.accounts,
+    bankAccountId: 'bank',
+    openingBalance: 1000,
+    forecastSettings: { accountIds: [] },
+    transactions: [
+      { id: 'income', status: 'confirmed', date: '2026-11-01', bankAccountId: 'bank', counterpartAccountId: 'salary', amount: 200 },
+      { id: 'transfer', status: 'confirmed', date: '2026-11-02', bankAccountId: 'bank', counterpartAccountId: 'savings', amount: -100, counterpartSplits: [{ accountId: 'savings', value: 100 }] },
+      { id: 'savings-expense', status: 'confirmed', date: '2026-11-03', bankAccountId: 'savings', counterpartAccountId: 'food', amount: -50 },
+      { id: 'pending', status: 'pending', date: '2026-11-04', bankAccountId: 'bank', counterpartAccountId: 'food', amount: -999 },
+      { id: 'future', status: 'confirmed', date: '2026-12-01', bankAccountId: 'bank', counterpartAccountId: 'salary', amount: 400 }
+    ],
+    recurringRules: []
+  },
+  normalize: value => String(value || '').toLowerCase().trim(),
+  transactionDescription: tx => tx.description || '',
+  localDateKey: () => '2026-11-09',
+  accountById: id => forecastBuildContext.state.accounts.find(a => a.id === id)
+};
+vm.createContext(forecastBuildContext);
+const buildHelpers = [
+  extract('isLiquidAccount', 'periodTransactions'),
+  extract('forecastSelectedAccounts', 'monthKeyFromDate'),
+  extract('monthKeyFromDate', 'monthOccurrence'),
+  extract('monthOccurrence', 'recurringOccursInMonth'),
+  extract('recurringOccursInMonth', 'transactionMatchesRecurringRule'),
+  extract('transactionMatchesRecurringRule', 'recurringAlreadyRealized'),
+  extract('recurringAlreadyRealized', 'forecastRecurringItems'),
+  extract('forecastRecurringItems', 'transactionIsExplicitlyRecurring'),
+  extract('transactionIsExplicitlyRecurring', 'forecastTransactionFlow'),
+  extract('forecastTransactionFlow', 'median'),
+  extract('median', 'renderRecurringRules'),
+  extract('buildForecast', 'renderForecastSelection')
+].join('\\n');
+vm.runInContext(buildHelpers + '\\nthis.buildForecast = buildForecast;', forecastBuildContext);
+const allForecast = forecastBuildContext.buildForecast();
+assert.equal(allForecast.currentBalance, 1150);
+assert.equal(allForecast.openingBalanceUnknown.length, 1);
+forecastBuildContext.state.forecastSettings.accountIds = ['bank'];
+const bankForecast = forecastBuildContext.buildForecast();
+assert.equal(bankForecast.currentBalance, 1100);
+assert.equal(bankForecast.openingBalanceUnknown.length, 0);
+forecastBuildContext.state.forecastSettings.accountIds = ['savings'];
+const savingsForecast = forecastBuildContext.buildForecast();
+assert.equal(savingsForecast.currentBalance, 50);
+assert.equal(savingsForecast.openingBalanceUnknown.length, 1);
+
+console.log('OK: OFX, ricorrenze, trasferimenti, budget e saldi previsionali su più conti.');
