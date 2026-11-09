@@ -672,17 +672,30 @@
     if ($('#recStart') && !$('#recStart').value) $('#recStart').value=localDateKey(new Date());
     renderForecastSelection();
   }
+  function budgetSpentByCategory(transactions,month) {
+    const totals=new Map();
+    for(const tx of transactions||[]){
+      if(tx.status!=='confirmed'||String(tx.date||'').slice(0,7)!==month)continue;
+      const splits=Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.length?tx.counterpartSplits:null;
+      if(splits){
+        for(const split of splits){
+          const account=accountById(split.accountId);
+          if(account?.type==='EXPENSE')totals.set(account.id,(totals.get(account.id)||0)+Math.abs(Number(split.value)||0));
+        }
+      } else {
+        const account=accountById(tx.counterpartAccountId);
+        if(account?.type==='EXPENSE')totals.set(account.id,(totals.get(account.id)||0)+Math.abs(Number(tx.amount)||0));
+      }
+    }
+    return totals;
+  }
+
   function renderBudgetView() {
     const body=$('#budgetBody');if(!body)return;
     const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7);
     const categories=state.accounts.filter(a=>a.type==='EXPENSE').sort((a,b)=>a.path.localeCompare(b.path,'it'));
-    const totals=new Map();
-    for(const tx of state.transactions){
-      if(tx.status!=='confirmed'||String(tx.date||'').slice(0,7)!==month)continue;
-      const splits=Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.length?tx.counterpartSplits:null;
-      if(splits){for(const split of splits){const a=accountById(split.accountId);if(a?.type==='EXPENSE')totals.set(a.id,(totals.get(a.id)||0)+Math.abs(Number(split.value)||0));}}
-      else {const a=accountById(tx.counterpartAccountId);if(a?.type==='EXPENSE')totals.set(a.id,(totals.get(a.id)||0)+Math.abs(Number(tx.amount)||0));}
-    }
+    const totals=budgetSpentByCategory(state.transactions,month);
+
     body.innerHTML=categories.map(a=>{
       const budget=Number(state.budgets.find(x=>x.accountId===a.id)?.amount)||0,spent=totals.get(a.id)||0,remaining=budget-spent,pct=budget>0?spent/budget*100:0;
       return '<tr><td class="name-primary">'+safeText(a.path)+'</td><td><input type="number" min="0" step="0.01" data-budget-account="'+safeText(a.id)+'" value="'+(budget||'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px"></td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(budget?euro.format(remaining):'—')+'</td><td>'+(budget?Math.round(pct)+'%':'—')+'</td></tr>';
@@ -752,18 +765,21 @@
       recurringOccursInMonth(rule,key)&&transactionMatchesRecurringRule(tx,rule));
   }
   function forecastTransactionFlow(tx,selectedIds) {
-    if(tx.status!=='confirmed'||tx.status==='duplicate'||!selectedIds.has(tx.bankAccountId))return 0;
-    let flow=Number(tx.amount)||0;
-    // A split assigned to another selected liquid account is an internal transfer:
-    // remove that portion from the external cash flow.
-    if(Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.length){
-      for(const split of tx.counterpartSplits){
-        if(selectedIds.has(split.accountId) && isLiquidAccount(accountById(split.accountId)))flow+=Number(split.value)||0;
-      }
-    } else if(selectedIds.has(tx.counterpartAccountId) && isLiquidAccount(accountById(tx.counterpartAccountId))) {
-      flow=0;
+    if(tx.status!=='confirmed'||tx.status==='duplicate')return 0;
+    const bankSelected=selectedIds.has(tx.bankAccountId);
+    const splits=Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.length?tx.counterpartSplits:null;
+    if(splits){
+      const selectedCounterparts=splits.filter(split=>selectedIds.has(split.accountId)&&isLiquidAccount(accountById(split.accountId)));
+      if(bankSelected)return (Number(tx.amount)||0)+selectedCounterparts.reduce((sum,split)=>sum+(Number(split.value)||0),0);
+      return selectedCounterparts.reduce((sum,split)=>sum+(Number(split.value)||0),0);
     }
-    return flow;
+    if(bankSelected){
+      if(selectedIds.has(tx.counterpartAccountId)&&isLiquidAccount(accountById(tx.counterpartAccountId)))return 0;
+      return Number(tx.amount)||0;
+    }
+    // The selected account is the counterpart of a transaction booked on an excluded account.
+    if(selectedIds.has(tx.counterpartAccountId)&&isLiquidAccount(accountById(tx.counterpartAccountId)))return -(Number(tx.amount)||0);
+    return 0;
   }
   function median(values) {
     if(!values.length)return 0;
@@ -787,7 +803,8 @@
   }
   function buildForecast() {
     const accounts=forecastSelectedAccounts(),ids=new Set(accounts.map(a=>a.id)),today=localDateKey(new Date()),currentMonth=today.slice(0,7);
-    const txs=state.transactions.filter(t=>t.status==='confirmed'&&t.date<=today&&t.status!=='duplicate'&&ids.has(t.bankAccountId));
+    const txs=state.transactions.filter(t=>t.status==='confirmed'&&t.date<=today&&t.status!=='duplicate'&&
+      (ids.has(t.bankAccountId)||ids.has(t.counterpartAccountId)||(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.some(sp=>ids.has(sp.accountId)))));
     const primaryAccountId=state.bankAccountId;
     const opening=ids.has(primaryAccountId)?(Number(state.openingBalance)||0):0;
     const currentBalance=opening+txs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
@@ -867,7 +884,8 @@
   }
   function isLiquidAccount(account) {
     if (!account) return false;
-    if (['BANK', 'CASH', 'CREDIT'].includes(String(account.type || '').toUpperCase())) return true;
+    // CREDIT represents a liability (credit card), not immediately available liquidity.
+    if (['BANK', 'CASH'].includes(String(account.type || '').toUpperCase())) return true;
     // Some GnuCash books classify named current-account subaccounts as ASSET.
     // Recognize this common hierarchy so they are not silently omitted.
     return String(account.type || '').toUpperCase() === 'ASSET' && normalize(account.path || '').includes('attivita correnti');
