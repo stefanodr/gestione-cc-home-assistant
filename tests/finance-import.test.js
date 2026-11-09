@@ -11,7 +11,7 @@ function extract(name, nextName) {
   assert.notEqual(end, -1, 'Delimitatore non trovato: ' + nextName);
   return source.slice(start, end);
 }
-const parseAmount = extract('parseAmount', 'parseQifDate');
+const parseAmount = extract('parseAmount', 'normalize');
 const ofxParser = extract('parseOfxDate', 'parseQif');
 const context = { uid: prefix => prefix + '-test', parseAmount: null };
 vm.createContext(context);
