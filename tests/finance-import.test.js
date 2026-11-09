@@ -94,4 +94,45 @@ assert.equal(forecastContext.recurringAlreadyRealized(futureRule, '2026-11'), tr
 forecastContext.state.transactions = [{ ...matchingTx, amount: -900 }];
 assert.equal(forecastContext.recurringAlreadyRealized(futureRule, '2026-11'), false);
 
-console.log('OK: importi, OFX XML/SGML, ricorrenze già contabilizzate e scadenze del mese corrente.');
+
+const accountContext = {
+  state: {
+    accounts: [
+      { id: 'bank', name: 'Conto', path: 'Attività:Conto', type: 'BANK' },
+      { id: 'savings', name: 'Risparmi', path: 'Attività:Risparmi', type: 'BANK' },
+      { id: 'card', name: 'Carta', path: 'Passività:Carta', type: 'CREDIT' },
+      { id: 'food', name: 'Alimentari', path: 'Uscite:Alimentari', type: 'EXPENSE' },
+      { id: 'home', name: 'Casa', path: 'Uscite:Casa', type: 'EXPENSE' }
+    ]
+  },
+  normalize: value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
+  accountById: id => accountContext.state.accounts.find(a => a.id === id)
+};
+vm.createContext(accountContext);
+vm.runInContext(extract('isLiquidAccount', 'periodTransactions') + '\\n' +
+  extract('budgetSpentByCategory', 'renderBudgetView') + '\\n' +
+  extract('forecastTransactionFlow', 'median') + '\\n' +
+  'this.isLiquidAccount = isLiquidAccount; this.budgetSpentByCategory = budgetSpentByCategory; this.forecastTransactionFlow = forecastTransactionFlow;', accountContext);
+assert.equal(accountContext.isLiquidAccount(accountContext.accountById('bank')), true);
+assert.equal(accountContext.isLiquidAccount(accountContext.accountById('savings')), true);
+assert.equal(accountContext.isLiquidAccount(accountContext.accountById('card')), false);
+const both = new Set(['bank', 'savings']);
+const onlyBank = new Set(['bank']);
+const onlySavings = new Set(['savings']);
+const transfer = { status: 'confirmed', bankAccountId: 'bank', counterpartAccountId: 'savings', amount: -100, counterpartSplits: [{ accountId: 'savings', value: 100 }] };
+assert.equal(accountContext.forecastTransactionFlow(transfer, both), 0);
+assert.equal(accountContext.forecastTransactionFlow(transfer, onlyBank), -100);
+assert.equal(accountContext.forecastTransactionFlow(transfer, onlySavings), 100);
+const unsplitTransfer = { status: 'confirmed', bankAccountId: 'bank', counterpartAccountId: 'savings', amount: -75 };
+assert.equal(accountContext.forecastTransactionFlow(unsplitTransfer, both), 0);
+assert.equal(accountContext.forecastTransactionFlow(unsplitTransfer, onlySavings), 75);
+const budgetTotals = accountContext.budgetSpentByCategory([
+  { status: 'confirmed', date: '2026-11-02', amount: -100, counterpartAccountId: 'food' },
+  { status: 'confirmed', date: '2026-11-03', amount: -120, counterpartSplits: [{ accountId: 'food', value: -70 }, { accountId: 'home', value: -50 }] },
+  { status: 'pending', date: '2026-11-04', amount: -999, counterpartAccountId: 'food' },
+  { status: 'confirmed', date: '2026-10-31', amount: -888, counterpartAccountId: 'food' }
+], '2026-11');
+assert.equal(budgetTotals.get('food'), 170);
+assert.equal(budgetTotals.get('home'), 50);
+
+console.log('OK: OFX, ricorrenze, conti liquidi, trasferimenti selezionati e budget con movimenti suddivisi.');
