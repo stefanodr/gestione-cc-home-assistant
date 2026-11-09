@@ -1064,7 +1064,7 @@
       forecast.push({key,openingBalance,programmedIncome,programmedExpense,estimateIncome,estimateExpense,programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
     }
     const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:currentBalance,key:currentMonth});
-    return {accounts,currentBalance,forecast,minimum,historyCount:usedMonths.size,estimatedNet:estimates.income-estimates.expense,estimates,openingBalanceUnknown};
+    return {accounts,currentBalance,forecast,minimum,historyCount:[...usedMonths].filter(key=>txs.some(tx=>String(tx.date).slice(0,7)===key)).length,estimatedNet:estimates.income-estimates.expense,estimates,openingBalanceUnknown};
   }
   function renderForecastSelection() {
     const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
