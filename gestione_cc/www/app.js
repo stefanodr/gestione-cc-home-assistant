@@ -1715,7 +1715,9 @@
       const visited = new Set();
       while (account && !visited.has(String(account.id))) {
         visited.add(String(account.id));
-        if (account.type === 'EXPENSE') totals.set(account.id, (totals.get(account.id) || 0) + amount);
+        if (account.type === 'EXPENSE' || (account.classification === 'Patrimoniale' && account.includeInBudget === true)) {
+          totals.set(account.id, (totals.get(account.id) || 0) + amount);
+        }
         account = account.parentId ? accountById(account.parentId) : null;
       }
     };
