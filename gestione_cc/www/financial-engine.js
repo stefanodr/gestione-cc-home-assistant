@@ -22,6 +22,7 @@
     const direct = new Set();
     for (const tx of transactions || []) {
       if (tx.status !== 'confirmed') continue;
+      if (tx.bankAccountId != null) direct.add(String(tx.bankAccountId));
       if (tx.counterpartAccountId != null) direct.add(String(tx.counterpartAccountId));
       for (const split of tx.counterpartSplits || []) if (split.accountId != null) direct.add(String(split.accountId));
     }
