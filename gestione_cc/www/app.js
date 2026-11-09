@@ -674,18 +674,20 @@
   }
   function budgetSpentByCategory(transactions,month) {
     const totals=new Map();
+    const addExpense=(accountId,amount)=>{
+      let account=accountById(accountId),guard=new Set();
+      while(account&&account.type==='EXPENSE'&&!guard.has(account.id)){
+        guard.add(account.id);
+        totals.set(account.id,(totals.get(account.id)||0)+amount);
+        account=account.parentId?accountById(account.parentId):null;
+      }
+    };
     for(const tx of transactions||[]){
       if(tx.status!=='confirmed'||String(tx.date||'').slice(0,7)!==month)continue;
       const splits=Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.length?tx.counterpartSplits:null;
       if(splits){
-        for(const split of splits){
-          const account=accountById(split.accountId);
-          if(account?.type==='EXPENSE')totals.set(account.id,(totals.get(account.id)||0)+Math.abs(Number(split.value)||0));
-        }
-      } else {
-        const account=accountById(tx.counterpartAccountId);
-        if(account?.type==='EXPENSE')totals.set(account.id,(totals.get(account.id)||0)+Math.abs(Number(tx.amount)||0));
-      }
+        for(const split of splits)addExpense(split.accountId,Math.abs(Number(split.value)||0));
+      } else addExpense(tx.counterpartAccountId,Math.abs(Number(tx.amount)||0));
     }
     return totals;
   }
