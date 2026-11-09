@@ -125,7 +125,9 @@
   }
 
   function isDuplicateOccurrence(occurrence, transactions, tolerance = 0.02, windowDays = 5) {
-    const occurrenceDate = occurrence.date || occurrence.nextDate;\n    if (!occurrenceDate) return false;\n    const target = Date.parse(occurrenceDate + 'T12:00:00Z');
+    const occurrenceDate = occurrence.date || occurrence.nextDate;
+    if (!occurrenceDate) return false;
+    const target = Date.parse(occurrenceDate + 'T12:00:00Z');
     return (transactions || []).some(tx => {
       if (tx.status !== 'confirmed' || !tx.date) return false;
       const splits = tx.counterpartSplits?.length ? tx.counterpartSplits : [{ accountId: tx.counterpartAccountId, value: tx.amount }];
