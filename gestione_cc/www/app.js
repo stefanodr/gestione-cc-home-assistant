@@ -826,12 +826,6 @@
     $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.programmed)+'</td><td>'+euro.format(row.estimate)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
   }
 
-  function renderForecastSelection() {
-    const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
-    const count=state.accounts.filter(isLiquidAccount).filter(a=>ids.length===0||ids.includes(a.id)).length;
-    const status=$('#forecastStatus');if(status)status.textContent='Conti inclusi: '+count+'. Il calcolo dei flussi previsionali non è ancora attivo: non vengono mostrate stime non verificate.';
-  }
-
   function navigate(view) {
     $$('.content-view').forEach(section => section.classList.toggle('active', section.id === `view-${view}`));
     $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === view));
