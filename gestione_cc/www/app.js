@@ -776,7 +776,7 @@
     const lines=new Map((snapshot?.lines||[]).map(x=>[x.accountId,x]));
     body.innerHTML=categories.map(a=>{
       const line=lines.get(a.id),budget=Number(line?.budget)||0,spent=actuals.get(a.id)||0,remaining=budget-spent,pct=budget>0?spent/budget*100:null;
-      return '<tr><td class="name-primary">'+safeText(a.path)+(a.hierarchyType==='Mastro e conto'?' <small>· conto e mastro</small>':'')+'</td><td><input type="number" min="0" step="0.01" data-budget-account="'+safeText(a.id)+'" value="'+(line?budget:'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px" '+(snapshot?'':'disabled')+'>'+(line?'<small style="display:block;color:#71817d">Fisse '+euro.format(line.recurring||0)+' · Variabili '+euro.format(line.variable||0)+'</small>':'')+'</td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(line?euro.format(remaining):'—')+'</td><td>'+(line&&budget>0?Math.round(pct)+'%':'—')+'</td></tr>';
+      return '<tr><td class="name-primary">'+safeText(a.path)+(a.hierarchyType==='Mastro e conto'?' <small>· conto e mastro</small>':'')+'</td><td><input type="number" min="0" step="0.01" data-budget-account="'+safeText(a.id)+'" value="'+(line?budget:'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px" '+(snapshot?'':'disabled')+'>'+(line?'<small style="display:block;color:#71817d">'+(line.manualOverride?'Modificato manualmente':'Fisse '+euro.format(line.recurring||0)+' · Variabili '+euro.format(line.variable||0))+'</small>':'')+'</td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(line?euro.format(remaining):'—')+'</td><td>'+(line&&budget>0?Math.round(pct)+'%':'—')+'</td></tr>';
     }).join('')||'<tr><td colspan="5" class="empty-inline">Nessuna categoria di spesa utilizzabile nel budget.</td></tr>';
     const status=$('#budgetSnapshotStatus');
     if(status)status.textContent=snapshot?'Versione '+snapshot.version+' · '+(snapshot.status==='confermato'?'Confermato':'Proposta')+' · base: '+(snapshot.historySource==='anno_corrente'?'anno corrente':'anno precedente')+' · '+snapshot.historyMonths+' mesi':'Nessun budget salvato per questo mese. Genera una proposta per iniziare.';
@@ -797,7 +797,7 @@
   async function saveBudgetEdits() {
     const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7),snapshot=activeBudgetSnapshot(month);if(!snapshot)return;
     const next=JSON.parse(JSON.stringify(snapshot));next.version=Number(snapshot.version||1)+1;next.createdAt=new Date().toISOString();next.status='proposta';delete next.confirmedAt;
-    $('#budgetBody').querySelectorAll('[data-budget-account]').forEach(input=>{const line=next.lines.find(x=>x.accountId===input.dataset.budgetAccount);if(line){line.budget=Math.max(0,Number(input.value)||0);line.remaining=Math.round((line.budget-line.spent)*100)/100;line.utilization=line.budget>0?Math.round(line.spent/line.budget*10000)/100:null;}});
+    $('#budgetBody').querySelectorAll('[data-budget-account]').forEach(input=>{const line=next.lines.find(x=>x.accountId===input.dataset.budgetAccount);if(line){line.budget=Math.max(0,Number(input.value)||0);line.manualOverride=true;line.remaining=Math.round((line.budget-line.spent)*100)/100;line.utilization=line.budget>0?Math.round(line.spent/line.budget*10000)/100:null;}});
     next.totalBudget=next.lines.reduce((sum,x)=>sum+x.budget,0);state.budgetSnapshots.push(next);await saveState();renderBudgetView();
   }
 
