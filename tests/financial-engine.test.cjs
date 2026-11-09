@@ -10,6 +10,12 @@ test('classifies parent with direct postings as Mastro e conto and leaf as Conto
   assert.equal(result.find(a=>a.id==='fuel').hierarchyType,'Conto');
 });
 
+test('recognizes direct postings on the bank side of a transaction', () => {
+  const result=engine.classifyHierarchy([{id:'bank-parent'},{id:'bank',parentId:'bank-parent'}],
+    [{status:'confirmed',bankAccountId:'bank-parent'}]);
+  assert.equal(result.find(a=>a.id==='bank-parent').hierarchyType,'Mastro e conto');
+});
+
 test('manual hierarchy override wins over automatic proposal', () => {
   const result=engine.classifyHierarchy([{id:'p',hierarchyTypeOverride:'Mastro e conto'},{id:'c',parentId:'p'}],[]);
   assert.equal(result[0].hierarchyType,'Mastro e conto');
@@ -32,6 +38,18 @@ test('rejects cyclic account trees', () => {
 test('recognizes monthly recurring transactions', () => {
   const inferred=engine.inferFrequency(['2026-01-10','2026-02-09','2026-03-11','2026-04-10']);
   assert.equal(inferred.frequency,'mensile');
+});
+
+test('detects recurring payments despite small amount variations', () => {
+  const proposals=engine.detectRecurrences([
+    {status:'confirmed',date:'2026-01-10',description:'Bolletta luce',counterpartAccountId:'energy',amount:-80},
+    {status:'confirmed',date:'2026-02-09',description:'Bolletta luce',counterpartAccountId:'energy',amount:-82},
+    {status:'confirmed',date:'2026-03-11',description:'Bolletta luce',counterpartAccountId:'energy',amount:-79},
+    {status:'confirmed',date:'2026-04-10',description:'Bolletta luce',counterpartAccountId:'energy',amount:-81}
+  ]);
+  assert.equal(proposals.length,1);
+  assert.equal(proposals[0].frequency,'mensile');
+  assert.equal(proposals[0].amount,80.5);
 });
 
 test('budget snapshots preserve negative remaining and do not balance deficit away', () => {
