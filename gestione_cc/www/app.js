@@ -1177,7 +1177,7 @@
   function accountDisplayLabel(account) {
     if (!account) return 'Da classificare';
     const tags = Array.isArray(account.tags) ? account.tags : [];
-    return account.path + (tags.length ? ' · [' + tags.join(', ') + ']' : '');
+    return accountPathAt(account, localDateKey(new Date())) + (tags.length ? ' · [' + tags.join(', ') + ']' : '');
   }
   function accountLabel(id) { return accountDisplayLabel(accountById(id)); }
   function accountPathAt(account, date) {
