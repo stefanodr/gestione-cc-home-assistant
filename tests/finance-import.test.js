@@ -101,8 +101,9 @@ const accountContext = {
       { id: 'bank', name: 'Conto', path: 'Attività:Conto', type: 'BANK' },
       { id: 'savings', name: 'Risparmi', path: 'Attività:Risparmi', type: 'BANK' },
       { id: 'card', name: 'Carta', path: 'Passività:Carta', type: 'CREDIT' },
-      { id: 'food', name: 'Alimentari', path: 'Uscite:Alimentari', type: 'EXPENSE' },
-      { id: 'home', name: 'Casa', path: 'Uscite:Casa', type: 'EXPENSE' }
+      { id: 'expense', name: 'Uscite', path: 'Uscite', type: 'EXPENSE' },
+      { id: 'food', name: 'Alimentari', path: 'Uscite:Alimentari', type: 'EXPENSE', parentId: 'expense' },
+      { id: 'home', name: 'Casa', path: 'Uscite:Casa', type: 'EXPENSE', parentId: 'expense' }
     ]
   },
   normalize: value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
@@ -134,6 +135,7 @@ const budgetTotals = accountContext.budgetSpentByCategory([
 ], '2026-11');
 assert.equal(budgetTotals.get('food'), 170);
 assert.equal(budgetTotals.get('home'), 50);
+assert.equal(budgetTotals.get('expense'), 220);
 
 
 const forecastBuildContext = {
