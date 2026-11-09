@@ -1505,7 +1505,7 @@
     const file=event.target.files?.[0]; if(!file)return;
     try {
       let imported; const ext=file.name.toLowerCase().split('.').pop();
-      if(ext==='qif'||ext==='txt') imported=parseQif(await file.text()); else if(ext==='csv') imported=parseCsv(await file.text()); else if(ext==='xlsx') imported=await parseXlsx(file); else throw new Error('Formato non supportato.');
+      if(ext==='qif'||ext==='txt') imported=parseQif(await file.text()); else if(ext==='ofx') imported=parseOfx(await file.text()); else if(ext==='csv') imported=parseCsv(await file.text()); else if(ext==='xlsx') imported=await parseXlsx(file); else throw new Error('Formato non supportato.');
       if(!imported.length) throw new Error('Non ho trovato movimenti con data e importo.');
       const start=replaceDemo=>{
         if(replaceDemo) state={...createDemoState(),accounts:defaultAccounts(),transactions:[],rules:[],demo:false,openingBalance:0};
@@ -1529,13 +1529,35 @@
     const key = transactionFingerprint(candidate);
     return state.transactions.some(tx => tx.status !== 'duplicate' && transactionFingerprint(tx) === key);
   }
-  function transactionFingerprint(tx) { return [parseDate(tx.date), Number(tx.amount).toFixed(2), normalize(transactionDescription(tx)), normalize(transactionCausale(tx))].join('|'); }
+  function transactionFingerprint(tx) { if(tx.fitid)return 'OFX|'+String(tx.fitid).trim(); return [parseDate(tx.date), Number(tx.amount).toFixed(2), normalize(transactionDescription(tx)), normalize(transactionCausale(tx))].join('|'); }
   function findImportDuplicates(rows) {
     const seen = new Set(state.transactions.filter(tx => tx.status !== 'duplicate').map(transactionFingerprint));
     const duplicates = [];
     rows.forEach(tx => { const key = transactionFingerprint(tx); if (seen.has(key)) duplicates.push(tx); seen.add(key); });
     return duplicates;
   }
+
+  function parseOfxDate(value) {
+    const m=String(value||'').match(/^(\d{4})(\d{2})(\d{2})/);
+    return m?m[1]+'-'+m[2]+'-'+m[3]:'';
+  }
+  function parseOfx(content) {
+    const source=String(content||'').replace(/^\uFEFF/,'');
+    const blocks=source.match(/<STMTTRN\b[^>]*>[\s\S]*?(?:<\/STMTTRN>|(?=<STMTTRN\b)|$)/gi)||[];
+    const read=(block,tag)=>{
+      const match=block.match(new RegExp('<'+tag+'\\s*>([^<\\r\\n]*)','i'));
+      return match?String(match[1]).trim():'';
+    };
+    return blocks.map(block=>{
+      const date=parseOfxDate(read(block,'DTPOSTED'));
+      const amount=parseAmount(read(block,'TRNAMT'));
+      const fitid=read(block,'FITID');
+      const name=read(block,'NAME')||read(block,'PAYEE')||'';
+      const memo=read(block,'MEMO')||'';
+      return {id:uid('o'),date,amount,fitid,description:name,payee:name,memo,causale:memo};
+    }).filter(tx=>tx.date&&Number.isFinite(tx.amount));
+  }
+
   function parseQif(content) {
     const records = []; let record = {};
     const append = (field, value) => { if (!value) return; record[field] = record[field] ? `${record[field]} ${value}` : value; };
