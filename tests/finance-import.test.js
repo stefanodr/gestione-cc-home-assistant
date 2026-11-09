@@ -65,4 +65,33 @@ assert.equal(parsedSgml[0].amount, -9.99);
 assert.equal(parsedSgml[0].memo, 'Caffe');
 assert.equal(parsedSgml[1].date, '2026-11-02');
 assert.equal(context.parseOfx('<OFX></OFX>').length, 0);
-console.log('OK: importi, date, OFX XML, OFX SGML e file senza movimenti.');
+
+const forecastHelpers = [
+  extract('monthOccurrence', 'recurringOccursInMonth'),
+  extract('recurringOccursInMonth', 'transactionMatchesRecurringRule'),
+  extract('transactionMatchesRecurringRule', 'recurringAlreadyRealized'),
+  extract('recurringAlreadyRealized', 'forecastRecurringItems'),
+  extract('forecastRecurringItems', 'transactionIsExplicitlyRecurring'),
+  extract('transactionIsExplicitlyRecurring', 'forecastTransactionFlow')
+].join('\\n');
+const forecastContext = {
+  state: { transactions: [], recurringRules: [] },
+  normalize: value => String(value || '').toLowerCase().trim(),
+  transactionDescription: tx => tx.description || '',
+  localDateKey: () => '2026-11-09'
+};
+vm.createContext(forecastContext);
+vm.runInContext(forecastHelpers, forecastContext);
+const pastRule = { id: 'past', active: true, bankAccountId: 'bank', categoryId: 'rent', description: 'Affitto', amount: -700, frequency: 'monthly', day: 5, startDate: '2026-01-05' };
+const futureRule = { id: 'future', active: true, bankAccountId: 'bank', categoryId: 'rent', description: 'Affitto', amount: -700, frequency: 'monthly', day: 15, startDate: '2026-01-15' };
+forecastContext.state.recurringRules = [pastRule, futureRule];
+const selected = new Set(['bank']);
+assert.deepEqual(Array.from(forecastContext.forecastRecurringItems('2026-11', selected), r => r.id), ['future']);
+const matchingTx = { status: 'confirmed', bankAccountId: 'bank', amount: -700, description: 'Affitto' };
+forecastContext.state.transactions = [matchingTx];
+assert.equal(forecastContext.transactionIsExplicitlyRecurring(matchingTx, 'rent', '2026-11', selected), true);
+assert.equal(forecastContext.recurringAlreadyRealized(futureRule, '2026-11'), true);
+forecastContext.state.transactions = [{ ...matchingTx, amount: -900 }];
+assert.equal(forecastContext.recurringAlreadyRealized(futureRule, '2026-11'), false);
+
+console.log('OK: importi, OFX XML/SGML, ricorrenze già contabilizzate e scadenze del mese corrente.');
