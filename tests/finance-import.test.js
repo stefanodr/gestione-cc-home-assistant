@@ -73,7 +73,7 @@ const forecastHelpers = [
   extract('recurringAlreadyRealized', 'forecastRecurringItems'),
   extract('forecastRecurringItems', 'transactionIsExplicitlyRecurring'),
   extract('transactionIsExplicitlyRecurring', 'forecastTransactionFlow')
-].join('\\n');
+].join('\n');
 const forecastContext = {
   state: { transactions: [], recurringRules: [] },
   normalize: value => String(value || '').toLowerCase().trim(),
