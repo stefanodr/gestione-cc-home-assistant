@@ -640,7 +640,7 @@
         const selected=[...forecast.querySelectorAll('[data-forecast-account]:checked')].map(x=>x.dataset.forecastAccount);
         state.forecastSettings.accountIds=selected.length===eligible.length?[]:selected;
         $('#forecastAllAccounts').checked=state.forecastSettings.accountIds.length===0;
-        saveState();
+        saveState();renderForecastSelection();
       }));
     }
     $('#forecastAllAccounts')?.addEventListener('change',()=>{
@@ -729,16 +729,25 @@
     }
     return false;
   }
+  function recurringAlreadyRealized(rule,key) {
+    const target=normalize(rule.description);
+    const tolerance=Math.max(1,Math.abs(Number(rule.amount)||0)*0.05);
+    return state.transactions.some(tx=>tx.status==='confirmed'&&String(tx.date||'').slice(0,7)===key&&tx.bankAccountId===rule.bankAccountId&&Math.abs(Math.abs(Number(tx.amount)||0)-Math.abs(Number(rule.amount)||0))<=tolerance&&target&&normalize(transactionDescription(tx))===target);
+  }
   function forecastRecurringItems(key,selectedIds) {
-    return state.recurringRules.filter(r=>r.active && selectedIds.has(r.bankAccountId) && recurringOccursInMonth(r,key));
+    return state.recurringRules.filter(r=>r.active && selectedIds.has(r.bankAccountId) && recurringOccursInMonth(r,key) && !recurringAlreadyRealized(r,key));
   }
   function forecastTransactionFlow(tx,selectedIds) {
     if(tx.status!=='confirmed'||tx.status==='duplicate'||!selectedIds.has(tx.bankAccountId))return 0;
     let flow=Number(tx.amount)||0;
     // A split assigned to another selected liquid account is an internal transfer:
     // remove that portion from the external cash flow.
-    for(const split of (Array.isArray(tx.counterpartSplits)?tx.counterpartSplits:[])){
-      if(selectedIds.has(split.accountId) && isLiquidAccount(accountById(split.accountId)))flow+=Number(split.value)||0;
+    if(Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.length){
+      for(const split of tx.counterpartSplits){
+        if(selectedIds.has(split.accountId) && isLiquidAccount(accountById(split.accountId)))flow+=Number(split.value)||0;
+      }
+    } else if(selectedIds.has(tx.counterpartAccountId) && isLiquidAccount(accountById(tx.counterpartAccountId))) {
+      flow=0;
     }
     return flow;
   }
