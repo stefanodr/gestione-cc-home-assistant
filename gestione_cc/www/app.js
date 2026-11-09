@@ -729,13 +729,27 @@
     }
     return false;
   }
-  function recurringAlreadyRealized(rule,key) {
+  function transactionMatchesRecurringRule(tx,rule) {
     const target=normalize(rule.description);
     const tolerance=Math.max(1,Math.abs(Number(rule.amount)||0)*0.05);
-    return state.transactions.some(tx=>tx.status==='confirmed'&&String(tx.date||'').slice(0,7)===key&&tx.bankAccountId===rule.bankAccountId&&Math.abs(Math.abs(Number(tx.amount)||0)-Math.abs(Number(rule.amount)||0))<=tolerance&&target&&normalize(transactionDescription(tx))===target);
+    return tx.status==='confirmed' && tx.bankAccountId===rule.bankAccountId &&
+      Math.abs(Math.abs(Number(tx.amount)||0)-Math.abs(Number(rule.amount)||0))<=tolerance &&
+      Boolean(target) && normalize(transactionDescription(tx))===target;
+  }
+  function recurringAlreadyRealized(rule,key) {
+    return state.transactions.some(tx=>String(tx.date||'').slice(0,7)===key&&transactionMatchesRecurringRule(tx,rule));
   }
   function forecastRecurringItems(key,selectedIds) {
-    return state.recurringRules.filter(r=>r.active && selectedIds.has(r.bankAccountId) && recurringOccursInMonth(r,key) && !recurringAlreadyRealized(r,key));
+    const today=localDateKey(new Date());
+    return state.recurringRules.filter(r=>{
+      if(!r.active||!selectedIds.has(r.bankAccountId)||!recurringOccursInMonth(r,key)||recurringAlreadyRealized(r,key))return false;
+      // In the current month, never project an occurrence whose due date has already passed.
+      return key!==today.slice(0,7)||monthOccurrence(r,key)>=today;
+    });
+  }
+  function transactionIsExplicitlyRecurring(tx,categoryId,key,selectedIds) {
+    return state.recurringRules.some(rule=>rule.active&&rule.categoryId===categoryId&&selectedIds.has(rule.bankAccountId)&&
+      recurringOccursInMonth(rule,key)&&transactionMatchesRecurringRule(tx,rule));
   }
   function forecastTransactionFlow(tx,selectedIds) {
     if(tx.status!=='confirmed'||tx.status==='duplicate'||!selectedIds.has(tx.bankAccountId))return 0;
@@ -778,15 +792,13 @@
     const opening=ids.has(primaryAccountId)?(Number(state.openingBalance)||0):0;
     const currentBalance=opening+txs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
     const historyKeys=Array.from({length:12},(_,i)=>shiftMonthKey(currentMonth,-12+i));
-    const recurringCategoryIds=new Set(state.recurringRules.filter(r=>r.active&&ids.has(r.bankAccountId)&&r.categoryId).map(r=>r.categoryId));
     const categories=state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type));
     const estimates=new Map();
     for(const cat of categories){
-      if(recurringCategoryIds.has(cat.id))continue;
       const monthly=historyKeys.map(key=>{
         let total=0;
         for(const tx of txs){
-          if(String(tx.date).slice(0,7)!==key)continue;
+          if(String(tx.date).slice(0,7)!==key||transactionIsExplicitlyRecurring(tx,cat.id,key,ids))continue;
           if(tx.counterpartSplits?.length){
             for(const sp of tx.counterpartSplits)if(sp.accountId===cat.id)total+=Math.abs(Number(sp.value)||0)*(cat.type==='INCOME'?1:-1);
           }else if(tx.counterpartAccountId===cat.id)total+=Math.abs(Number(tx.amount)||0)*(cat.type==='INCOME'?1:-1);
