@@ -2183,7 +2183,7 @@
       const parsed=parseGnuCashXml(xml);if(!parsed.accounts.length)throw new Error('Nel file non ho trovato un piano dei conti leggibile.');
       const duplicateCount=findImportDuplicates(parsed.transactions).length;
       const merge=async include=>{
-        const byPath=new Map(state.accounts.map(ac=>[ac.path,ac]));const idMap=new Map();
+        const byPath=new Map();state.accounts.forEach(ac=>{byPath.set(ac.path,ac);(ac.nameHistory||[]).forEach(item=>{if(item.path)byPath.set(item.path,ac);});});const idMap=new Map();
         parsed.accounts.forEach(ac=>{if(ac.type==='ROOT'){idMap.set(ac.id,state.accounts.find(x=>x.type==='ROOT')?.id||'root');return;}const old=byPath.get(ac.path);idMap.set(ac.id,old?old.id:uid('a'));});
         const additions=parsed.accounts.filter(ac=>ac.type!=='ROOT'&&!byPath.has(ac.path)).map(ac=>({...ac,id:idMap.get(ac.id),parentId:idMap.get(ac.parentId)||'root'}));state.accounts.push(...additions);
         const keys=new Set(state.transactions.filter(tx=>tx.status!=='duplicate').map(transactionFingerprint));const seen=new Set();
