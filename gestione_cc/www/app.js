@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7-test';
+  const APP_VERSION = '1.7.1-test';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -1172,8 +1172,53 @@
     renderAll();
     if (view === 'reports') requestAnimationFrame(drawReportChart);
   }
+  const ACCOUNT_TAGS = ['CONTO CHIUSO','INATTIVO','DA VERIFICARE','SOLO STORICO','NON UTILIZZARE','PRINCIPALE','SECONDARIO','RISPARMIO','EMERGENZA'];
   function accountById(id) { return state.accounts.find(a => a.id === id); }
-  function accountLabel(id) { return accountById(id)?.path || 'Da classificare'; }
+  function accountDisplayLabel(account) {
+    if (!account) return 'Da classificare';
+    const tags = Array.isArray(account.tags) ? account.tags : [];
+    return account.path + (tags.length ? ' · [' + tags.join(', ') + ']' : '');
+  }
+  function accountLabel(id) { return accountDisplayLabel(accountById(id)); }
+  function accountPathAt(account, date) {
+    if (!account) return 'Da classificare';
+    const key = String(date || localDateKey(new Date()));
+    const old = (account.nameHistory || []).find(item => (!item.from || key >= item.from) && (!item.to || key <= item.to));
+    return old?.path || account.path;
+  }
+  function renameAccount(accountId) {
+    const account = accountById(accountId); if (!account) return;
+    const nextPath = window.prompt('Nuova denominazione completa del conto (percorso con : se necessario):', account.path);
+    if (!nextPath?.trim() || nextPath.trim() === account.path) return;
+    const effectiveDate = window.prompt('Data di decorrenza (AAAA-MM-GG). I report precedenti manterranno il vecchio nome:', localDateKey(new Date()));
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(effectiveDate || '') || Number.isNaN(Date.parse(effectiveDate + 'T12:00:00'))) {
+      showNotice('Data non valida','Inserisci la data nel formato AAAA-MM-GG.'); return;
+    }
+    const oldPrefix = account.path, newPrefix = nextPath.trim();
+    const affected = state.accounts.filter(item => item.id === account.id || String(item.path || '').startsWith(oldPrefix + ':'));
+    const previousDay = new Date(effectiveDate + 'T12:00:00'); previousDay.setDate(previousDay.getDate() - 1);
+    const historyEnd = localDateKey(previousDay);
+    for (const item of affected) {
+      const oldPath = item.path;
+      item.nameHistory = Array.isArray(item.nameHistory) ? item.nameHistory : [];
+      item.nameHistory.push({ path: oldPath, from: item.validFrom || '', to: historyEnd });
+      item.path = newPrefix + oldPath.slice(oldPrefix.length);
+      item.name = item.path.split(':').at(-1);
+      item.validFrom = effectiveDate;
+    }
+    saveState().then(()=>{renderAll();showNotice('Conto rinominato','ID e movimenti sono rimasti invariati. I nomi precedenti sono conservati per la consultazione storica.');});
+  }
+  async function editAccountTags(accountId) {
+    const account = accountById(accountId); if (!account) return;
+    const current = Array.isArray(account.tags) ? account.tags : [];
+    const answer = window.prompt('Tag ammessi (separati da virgola):\\n' + ACCOUNT_TAGS.join(' · ') + '\\n\\nLascia vuoto per rimuovere tutti i tag.', current.join(', '));
+    if (answer === null) return;
+    const requested = answer.split(',').map(value=>value.trim().toUpperCase()).filter(Boolean);
+    const invalid = requested.filter(tag=>!ACCOUNT_TAGS.includes(tag));
+    if (invalid.length) { showNotice('Tag non riconosciuto','Valori ammessi: '+ACCOUNT_TAGS.join(', ')); return; }
+    account.tags = [...new Set(requested)];
+    await saveState(); renderAll();
+  }
   function renderAccountFilters() {
     const eligible = state.accounts.filter(isLiquidAccount);
     const options = `<option value="all">Tutti i conti liquidi</option>${eligible.map(a => `<option value="${safeText(a.id)}">${safeText(a.path)}</option>`).join('')}`;
@@ -1795,8 +1840,12 @@
       const cls = a.classification === 'Economica' ? 'class-economic' : a.classification === 'Patrimoniale' ? 'class-balance' : a.classification === 'Tecnica' ? 'class-technical' : 'class-structural';
       const options = ['automatico','Mastro','Mastro e conto','Conto'].map(v => `<option value="${v}" ${(v === 'automatico' ? !a.hierarchyTypeOverride : a.hierarchyType === v && a.hierarchyTypeSource === 'manuale') ? 'selected' : ''}>${v === 'automatico' ? 'Automatico · ' + safeText(a.hierarchyTypeProposal || a.hierarchyType) : v}</option>`).join('');
       const budgetEligible=a.classification==='Patrimoniale'&&!isLiquidAccount(a)&&a.hierarchyType!=='Mastro';
-      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}</td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+'> Includi</label>' : '—'}</td></tr>`;
+      const tags=Array.isArray(a.tags)?a.tags:[];
+      const tagMarkup=tags.length?'<small class="account-tags">'+tags.map(tag=>'<span>'+safeText(tag)+'</span>').join(' ')+'</small>':'';
+      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+'> Includi</label>' : '—'}</td></tr>`;
     }).join('');
+    $('#accountsBody').querySelectorAll('[data-rename-account]').forEach(button=>button.addEventListener('click',()=>renameAccount(button.dataset.renameAccount)));
+    $('#accountsBody').querySelectorAll('[data-tags-account]').forEach(button=>button.addEventListener('click',()=>editAccountTags(button.dataset.tagsAccount)));
     $('#accountsBody').querySelectorAll('[data-hierarchy-account]').forEach(select => select.addEventListener('change', async () => {
       const account = accountById(select.dataset.hierarchyAccount); if (!account) return;
       if (select.value === 'automatico') delete account.hierarchyTypeOverride;
