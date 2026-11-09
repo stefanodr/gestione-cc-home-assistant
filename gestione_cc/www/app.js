@@ -427,6 +427,20 @@
     // Additive finance-feature state: preserve existing archives and unknown fields.
     if (!Array.isArray(state.budgets)) { state.budgets = []; changed = true; }
     if (!Array.isArray(state.budgetSnapshots)) { state.budgetSnapshots = []; changed = true; }
+    if (state.budgets.length) {
+      const month = localDateKey(new Date()).slice(0,7);
+      if (!state.budgetSnapshots.some(snapshot => snapshot.month === month)) {
+        const lines = state.budgets.filter(item => item && item.accountId).map(item => {
+          const spent = budgetActualDirect(month, item.accountId), budget = Math.max(0, Number(item.amount) || 0);
+          return { accountId: item.accountId, budget, spent, remaining: Math.round((budget-spent)*100)/100,
+            utilization: budget > 0 ? Math.round(spent/budget*10000)/100 : null, historySource: 'budget_precedente', manualOverride: true };
+        });
+        state.budgetSnapshots.push({ month, version: 1, createdAt: new Date().toISOString(), status: 'confermato',
+          historySource: 'budget_precedente', historyMonths: 0, lines, totalBudget: lines.reduce((sum,line)=>sum+line.budget,0),
+          totalActual: lines.reduce((sum,line)=>sum+line.spent,0), migrated: true });
+        changed = true;
+      }
+    }
     if (!Array.isArray(state.recurringRules)) { state.recurringRules = []; changed = true; }
     if (!Array.isArray(state.recurringProposals)) { state.recurringProposals = []; changed = true; }
     if (!Array.isArray(state.savedFilters)) { state.savedFilters = []; changed = true; }
@@ -449,6 +463,14 @@
       if (tx.counterpartAccountId) directPostings.add(String(tx.counterpartAccountId));
       (tx.counterpartSplits || []).forEach(split => { if (split.accountId) directPostings.add(String(split.accountId)); });
     });
+    if (window.GestioneFinancialEngine?.classifyHierarchy) {
+      const calculated = window.GestioneFinancialEngine.classifyHierarchy(state.accounts, state.transactions);
+      calculated.forEach(item => {
+        const account = state.accounts.find(a => String(a.id) === String(item.id));
+        if (account) Object.assign(account, { hierarchyType: item.hierarchyType, hierarchyTypeProposal: item.hierarchyTypeProposal,
+          hierarchyTypeSource: item.hierarchyTypeSource, hasChildren: item.hasChildren, hasDirectMovements: item.hasDirectMovements });
+      });
+    }
     state.accounts.forEach(account => {
       const hasChildren = (childCounts.get(String(account.id)) || 0) > 0;
       const proposal = hasChildren ? (directPostings.has(String(account.id)) ? 'Mastro e conto' : 'Mastro') : 'Conto';
