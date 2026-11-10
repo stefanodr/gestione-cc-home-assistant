@@ -141,3 +141,6 @@ body.app-ready .app-shell{visibility:visible}
 @media(max-width:900px){.drive-backup-card{grid-column:auto}}
 
 .account-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;color:#52645f;font-size:10px;font-weight:600}.account-tags span{display:inline-block;padding:2px 6px;border:1px solid #d7e2de;border-radius:999px;background:#f4f7f5}.account-row-actions{display:flex;gap:6px;margin-top:5px}.account-row-actions .row-action{font-size:11px;padding:3px 7px}
+
+/* Ricerca avanzata: i due estremi del periodo restano affiancati anche con la regola generale del secondo campo a larghezza intera. */
+.manual-fields label.search-date-field:nth-child(1),.manual-fields label.search-date-field:nth-child(2){grid-column:auto;min-width:0}
