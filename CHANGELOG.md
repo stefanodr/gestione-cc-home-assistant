@@ -1,3 +1,10 @@
+## [1.0.13] - 2026-11-10
+
+- Added multiple custom tags per account, with no predefined list: any text is accepted, including an IBAN, with one tag per line.
+- Tags belonging to the selected account are displayed in the report heading immediately after the account path.
+- Added account tags to PDF and Excel report headings and to PDF/XLSX transaction statements.
+- Preserved the SQLite archive, PIN authentication, HTTPS configuration, LAN access and backup behavior; no migration or deletion of existing data is required.
+
 ## [1.0.12] - 2026-11-10
 
 - Fixed the add-on version displayed in the application footer; it now matches the released 1.0.12 version.
