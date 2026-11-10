@@ -1,3 +1,8 @@
+## [1.0.12] - 2026-11-10
+
+- Fixed the add-on version displayed in the application footer; it now matches the released 1.0.12 version.
+- Preserved the SQLite archive, PIN authentication, HTTPS configuration, LAN access and backup behavior.
+
 ## [1.0.11] - 2026-11-10
 
 - Updated the bundled Gestione C/C application to version 1.7.6.
