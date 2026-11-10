@@ -399,7 +399,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.8</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.11</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
