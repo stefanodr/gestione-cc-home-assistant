@@ -1,5 +1,9 @@
 # Gestione C/C Home Assistant App — Changelog
 
+## 1.0.8 — 10 novembre 2026
+
+- Corretta la versione dell'add-on mostrata nel piè di pagina dell'interfaccia: ora corrisponde alla versione 1.0.8 distribuita.
+
 ## 1.0.7 — 10 novembre 2026
 
 - Aggiornata l'applicazione inclusa alla versione 1.7.3, mantenendo gli adattamenti specifici per Home Assistant.
