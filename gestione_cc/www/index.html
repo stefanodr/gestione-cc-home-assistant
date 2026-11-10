@@ -106,7 +106,7 @@
             <label>Importo minimo (€)<input id="searchMin" type="number" step="0.01"></label><label>Importo massimo (€)<input id="searchMax" type="number" step="0.01"></label>
             <label>Tipo<select id="searchDirection"><option value="all">Entrate e uscite</option><option value="income">Entrate</option><option value="expense">Uscite</option></select></label>
             <label>Stato<select id="searchStatus"><option value="all">Tutti</option><option value="confirmed">Confermati</option><option value="pending">Da classificare</option></select></label>
-            <label>Conto<select id="searchAccount"><option value="all">Tutti i conti</option></select></label>
+            <label>Conto<input id="searchAccount" type="search" list="searchAdvancedAccountOptions" placeholder="Tutti i conti · digita per cercare" autocomplete="off"><datalist id="searchAdvancedAccountOptions"></datalist></label>
           </div>
           <div class="heading-actions"><button class="button button-primary" id="runAdvancedSearch">Cerca</button><button class="button button-outline" id="clearAdvancedSearch">Azzera filtri</button><button class="button button-quiet" id="saveAdvancedFilter">Salva filtro</button></div>
         </article>
