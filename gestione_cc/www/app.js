@@ -1235,9 +1235,9 @@
   async function editAccountTags(accountId) {
     const account = accountById(accountId); if (!account) return;
     const current = Array.isArray(account.tags) ? account.tags : [];
-    const answer = window.prompt('Inserisci uno o più tag personalizzati, uno per riga. È ammesso qualsiasi testo, ad esempio IBAN: IT60S0103070230000000622264. Lascia vuoto per rimuovere tutti i tag.', current.join('\\n'));
+    const answer = window.prompt('Inserisci uno o più tag personalizzati, uno per riga. È ammesso qualsiasi testo, ad esempio IBAN: IT60S0103070230000000622264. Lascia vuoto per rimuovere tutti i tag.', current.join('\n'));
     if (answer === null) return;
-    const requested = answer.split(/\\r?\\n/).map(value => value.trim()).filter(Boolean);
+    const requested = answer.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
     const unique = [];
     const seen = new Set();
     for (const tag of requested) {
