@@ -108,6 +108,8 @@ def maybe_auto_backup():
 # Google Drive backup configuration is stored only in the persistent /data volume.
 DRIVE_CONFIG = DATA / "google_drive.json"
 DRIVE_LOCK = __import__("threading").RLock()
+SESSION_BACKUP_JOBS = {}
+SESSION_BACKUP_JOBS_LOCK = __import__("threading").Lock()
 DRIVE_API = "https://www.googleapis.com/drive/v3"
 DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -303,6 +305,20 @@ def drive_session_backup(force=False):
             try: local.unlink()
             except OSError: pass
 
+def run_session_backup_job(job_id):
+    try:
+        with SESSION_BACKUP_JOBS_LOCK:
+            SESSION_BACKUP_JOBS[job_id] = {"status": "running"}
+        result = drive_session_backup()
+        with SESSION_BACKUP_JOBS_LOCK:
+            SESSION_BACKUP_JOBS[job_id] = {"status": "done", "result": result}
+    except Exception as error:
+        message = str(error)[:500]
+        print("GestioneCC: backup di chiusura non riuscito: " + message)
+        with SESSION_BACKUP_JOBS_LOCK:
+            SESSION_BACKUP_JOBS[job_id] = {"status": "failed", "error": message}
+
+
 def drive_nightly_backup():
     with DRIVE_LOCK:
         cfg = drive_read_config()
@@ -425,6 +441,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/api/drive/session-backup/status":
+            item = self.require_auth()
+            if not item: return
+            from urllib.parse import parse_qs
+            job_id = parse_qs(urlparse(self.path).query).get("id", [""])[0]
+            with SESSION_BACKUP_JOBS_LOCK:
+                job = SESSION_BACKUP_JOBS.get(job_id)
+            if not job:
+                self.send_json(404, {"error": "Operazione di backup non trovata"})
+                return
+            self.send_json(200, job)
+            return
         if path == "/api/drive/status":
             item = self.require_auth()
             if not item: return
@@ -602,6 +630,23 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, result)
             except Exception as error:
                 self.send_json(502, {"error": "Backup su Google Drive non riuscito: " + str(error)})
+            return
+        if path == "/api/drive/session-backup/start":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            job_id = secrets.token_urlsafe(18)
+            with SESSION_BACKUP_JOBS_LOCK:
+                SESSION_BACKUP_JOBS[job_id] = {"status": "queued"}
+                if len(SESSION_BACKUP_JOBS) > 100:
+                    for old_id in list(SESSION_BACKUP_JOBS)[:-50]:
+                        SESSION_BACKUP_JOBS.pop(old_id, None)
+            __import__("threading").Thread(
+                target=run_session_backup_job,
+                args=(job_id,),
+                daemon=True,
+                name="drive-session-backup"
+            ).start()
+            self.send_json(202, {"ok": True, "job_id": job_id})
             return
         if path == "/api/drive/session-backup":
             item = self.require_auth(csrf=True)
