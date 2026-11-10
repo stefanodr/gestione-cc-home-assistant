@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.5';
+  const APP_VERSION = '1.7.6';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -1856,13 +1856,79 @@
   function reportExpenseAmount(tx) { return economicExpenseAmount(tx) || (reportExpenseIsUnclassified(tx) ? Math.abs(tx.amount) : 0); }
 
   function aggregateDeviationRows(rows) {
-    const total = rows.reduce((sum, row) => {
+    // economicExpenseTotals stores each movement on its account and every
+    // eligible ancestor. Aggregate only the highest eligible account in each
+    // branch, otherwise parent totals and their children are counted twice.
+    const rowIds = new Set(rows.map(row => String(row.id)));
+    const roots = rows.filter(row => {
+      let parent = accountById(accountById(row.id)?.parentId);
+      const visited = new Set();
+      while (parent && !visited.has(String(parent.id))) {
+        visited.add(String(parent.id));
+        const eligible = parent.type === 'EXPENSE' ||
+          (parent.classification === 'Patrimoniale' && parent.includeInBudget === true);
+        if (eligible && rowIds.has(String(parent.id))) return false;
+        parent = parent.parentId ? accountById(parent.parentId) : null;
+      }
+      return true;
+    });
+    const total = roots.reduce((sum, row) => {
       sum.actual += row.actual; sum.previousYear += row.previousYear; sum.yearDelta += row.yearDelta;
       sum.expected += row.expected; sum.delta += row.delta; return sum;
     }, { actual: 0, previousYear: 0, yearDelta: 0, expected: 0, delta: 0 });
     total.yearPercent = total.previousYear > 0.005 ? total.yearDelta / total.previousYear * 100 : null;
     total.percent = total.expected > 0.005 ? total.delta / total.expected * 100 : null;
     return total;
+  }
+  function reportCashFlowDeviationTotal(comparisons) {
+    // "Uscite" must reconcile to the cash-outflow total in the period summary.
+    // Its expected value uses the same elapsed-period monthly reference logic,
+    // but on cash movements rather than only classified expense accounts.
+    const actual = comparisons[0]?.data?.expense || 0;
+    const previousYear = comparisons[1]?.data?.expense || 0;
+    const [year, selectedMonth] = monthSelection().split('-').map(Number);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const span = reportMode === 'monthly' ? 1 : reportMode === 'quarterly' ? 3 : reportMode === 'halfyearly' ? 6 : 12;
+    const start = reportMode === 'monthly' ? selectedMonth - 1 : reportMode === 'annual' ? 0 : Math.floor((selectedMonth - 1) / span) * span;
+    const periodEnd = reportMode === 'annual' ? 11 : reportMode === 'monthly' ? start : start + span - 1;
+    const lastCompleteMonth = year === currentYear ? now.getMonth() - 1 : 11;
+    let expected = 0;
+    if (reportMode === 'monthly' && selectedMonth <= 2) {
+      expected = previousYear;
+    } else {
+      const referenceMonths = [];
+      if (reportMode === 'annual') {
+        for (let m = 0; m <= Math.min(lastCompleteMonth, 10); m++) referenceMonths.push(m);
+      } else {
+        for (let m = 0; m <= Math.min(lastCompleteMonth, 11); m++) {
+          if (m < start) referenceMonths.push(m);
+        }
+      }
+      if (!referenceMonths.length) {
+        expected = previousYear;
+      } else {
+        const monthlyAverage = referenceMonths.reduce((sum, month) => {
+          const dayEnd = new Date(year, month + 1, 0).getDate();
+          return sum + cashFlowTotals(periodTransactions(year, month, month, dayEnd)).expense;
+        }, 0) / referenceMonths.length;
+        const currentPeriodPartial = year === currentYear && now.getMonth() >= start && now.getMonth() <= periodEnd;
+        const exposure = reportMode === 'annual'
+          ? Math.max(1, now.getMonth() + now.getDate() / new Date(year, now.getMonth() + 1, 0).getDate())
+          : reportMode === 'monthly' ? 1
+            : currentPeriodPartial
+              ? Math.max(0.01, now.getMonth() - start + now.getDate() / new Date(year, now.getMonth() + 1, 0).getDate())
+              : span;
+        expected = monthlyAverage * exposure;
+      }
+    }
+    const delta = actual - expected;
+    const yearDelta = actual - previousYear;
+    return {
+      actual, previousYear, yearDelta,
+      yearPercent: previousYear > 0.005 ? yearDelta / previousYear * 100 : null,
+      expected, delta, percent: expected > 0.005 ? delta / expected * 100 : null
+    };
   }
   function reportExpenseCategory(account) {
     let current = account, parent = accountById(current?.parentId);
@@ -1899,9 +1965,10 @@
       }
     }
     const total = aggregateDeviationRows(flatRows);
+    const cashFlowTotal = reportCashFlowDeviationTotal(comparisons);
     return [{ kind: 'summary', name: 'Spese', ...total }, ...categoryRows,
       ...ungrouped.filter(row => Math.abs(row.delta) >= 0.01).map(row => ({ ...row, kind: 'detail', depth: 1 })),
-      { kind: 'total', name: 'Uscite', ...total }];
+      { kind: 'total', name: 'Uscite', ...cashFlowTotal }];
   }
   function deviationYearLabel(row) {
     const amount = `${row.yearDelta >= 0 ? '+' : '−'}${euro.format(Math.abs(row.yearDelta))}`;
