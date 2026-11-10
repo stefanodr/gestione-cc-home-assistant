@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.3';
+  const APP_VERSION = '1.7.4';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -1563,7 +1563,8 @@
       const causale = transactionCausale(item);
       const primaryText = description || causale || 'Movimento importato';
       const primaryLabel = description ? 'Descrizione: ' : causale ? 'Causale: ' : '';
-      const causaleRow = description && causale ? `<span class="name-secondary transaction-causale"><strong>Causale:</strong> ${safeText(causale)}</span>` : '';
+      const secondaryLabel = item.source === 'qif' ? 'Dettagli:' : 'Causale:';
+      const causaleRow = description && causale ? `<span class="name-secondary transaction-causale"><strong>${secondaryLabel}</strong> ${safeText(causale)}</span>` : '';
       const isSplit = Array.isArray(item.counterpartSplits) && item.counterpartSplits.length > 1;
       const accountCell = isSplit
         ? '<span class="account-type">Ripartito</span>'
@@ -2129,6 +2130,19 @@
     let n = 0; for (const c of letters) n = n * 26 + c.charCodeAt(0) - 64; return n - 1;
   }
   function detectHeaderRow(rows) {
+    // Bank statements often contain a title, account balances and filters
+    // before the actual transaction table. Identify the header by its labels,
+    // not by assuming that the very next row contains numeric Excel cells.
+    const limit = Math.min(rows.length, 120);
+    for (let i = 0; i < limit; i++) {
+      const headers = (rows[i] || []).map(value => normalize(value));
+      const hasDate = headers.some(value => /^(data|data cont|data contabil|data valuta|date|booking date|value date)$/.test(value));
+      const hasAmount = headers.some(value => /importo|amount|totale|dare|avere|addebito|accredito|uscita|entrata/.test(value));
+      const hasDescription = headers.some(value => /descrizion|description|beneficiario|beneficiary|payee|esercente|merchant|causale|causal|memo|dettaglio|note/.test(value));
+      if (hasDate && hasAmount && hasDescription) return i;
+    }
+    // Keep compatibility with simpler CSV/XLSX exports whose column names
+    // are less descriptive than those used by Italian bank statements.
     for (let i = 0; i < Math.min(rows.length - 1, 60); i++) {
       const textCount = rows[i].filter(v => typeof v === 'string' && v.trim()).length;
       const next = rows[i + 1] || [];
