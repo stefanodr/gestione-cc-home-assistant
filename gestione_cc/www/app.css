@@ -151,3 +151,17 @@ body.app-ready .app-shell{visibility:visible}
 .transaction-date-filter input{height:36px;min-width:145px;border:1px solid #dce5e2;border-radius:7px;background:#fff;padding:9px 11px;color:#324541;outline:none;font-size:12px}
 .transaction-date-filter input:focus{border-color:#69a79d;box-shadow:0 0 0 3px #e6f3f0}
 @media(max-width:760px){.transaction-date-filter{flex:1 1 145px;min-width:0}.transaction-date-filter input{width:100%;min-width:0}}
+
+
+/* Versione 1.7.3: maggiore leggibilità dei nomi nel piano dei conti. */
+.account-path-cell{font-size:13px!important;font-weight:650;color:#344a46!important;line-height:1.5}
+
+/* Registro movimenti: campi data uniformi agli altri controlli di periodo. */
+#view-transactions .transaction-heading-actions{flex-wrap:wrap;justify-content:flex-end;align-items:flex-end}
+#view-transactions .transaction-date-control{min-width:132px;gap:5px}
+#view-transactions .transaction-date-control label{font-size:10px;color:#80908d;font-weight:600}
+#view-transactions .transaction-date-control input{height:40px;min-width:132px;padding:8px 9px;font-size:12px}
+#view-transactions .transaction-heading-actions select,
+#view-transactions .transaction-heading-actions input{height:40px}
+#view-transactions .transaction-heading-actions .button{min-height:40px}
+@media(max-width:760px){#view-transactions .transaction-heading-actions{justify-content:flex-start}#view-transactions .transaction-date-control{min-width:calc(50% - 6px)}#view-transactions .transaction-date-control input{width:100%;min-width:0}}

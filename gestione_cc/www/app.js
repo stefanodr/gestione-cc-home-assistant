@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.2';
+  const APP_VERSION = '1.7.3';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -2682,10 +2682,66 @@
     ]);
   }
   async function exitApp() {
-    await saveState();
-    try { await fetch('/__stop', { method: 'POST' }); } catch {}
-    document.body.innerHTML = '<main style="font:16px Segoe UI,Arial;padding:48px;color:#1b2a2a"><h1>Gestione C/C è stata chiusa</h1><p>Il servizio locale è fermato. Puoi chiudere questa scheda del browser.</p></main>';
-    window.close();
+    let saveFailed = false;
+    try {
+      // Flush any queued write. Do not write the state a second time on exit:
+      // the server revision is used to detect whether a Drive backup is needed.
+      await saveQueue;
+    } catch (error) {
+      saveFailed = true;
+      console.error('Salvataggio finale non riuscito', error);
+    }
+
+    let backupJobId = null;
+    let backupStartFailed = false;
+    if (!saveFailed) {
+      try {
+        const started = await apiRequest('/api/drive/session-backup/start', { method: 'POST', body: '{}' });
+        backupJobId = started.job_id || null;
+      } catch (error) {
+        backupStartFailed = true;
+        console.error('Impossibile avviare il backup di chiusura', error);
+      }
+    }
+
+    document.body.innerHTML = '<main style="font:16px Segoe UI,Arial;padding:48px;color:#1b2a2a;max-width:720px"><h1>Gestione C/C è stata chiusa</h1><p>Puoi chiudere questa scheda del browser. Il servizio Home Assistant resta attivo e disponibile agli altri dispositivi autorizzati della rete locale.</p><p id="exitBackupStatus" role="status">Verifica del backup in corso…</p></main>';
+    const status = document.getElementById('exitBackupStatus');
+
+    if (saveFailed) {
+      status.textContent = 'Attenzione: il salvataggio finale non è riuscito. Il backup non è stato avviato; verifica l’archivio prima di continuare.';
+      window.alert('Gestione C/C è uscita, ma il salvataggio finale non è riuscito. Verifica l’archivio prima di continuare.');
+      return;
+    }
+    if (backupStartFailed || !backupJobId) {
+      status.textContent = 'Attenzione: non è stato possibile avviare la verifica del backup. Controlla lo stato di Google Drive nelle impostazioni.';
+      if (backupStartFailed) window.alert('Gestione C/C è uscita, ma non è stato possibile avviare il backup di chiusura. Verifica Google Drive nelle impostazioni.');
+      return;
+    }
+
+    const checkBackup = async () => {
+      try {
+        const result = await apiRequest('/api/drive/session-backup/status?id=' + encodeURIComponent(backupJobId));
+        if (result.status === 'queued' || result.status === 'running') {
+          status.textContent = 'Uscita completata. Il backup, se necessario, sta proseguendo in background…';
+          window.setTimeout(checkBackup, 1000);
+          return;
+        }
+        if (result.status === 'failed') {
+          status.textContent = 'Attenzione: il backup Google Drive non è riuscito. ' + (result.error || 'Verifica la connessione e riprova.');
+          window.alert('Gestione C/C è uscita, ma il backup Google Drive non è riuscito. ' + (result.error || 'Verifica la connessione e riprova.'));
+          return;
+        }
+        if (result.result?.skipped) {
+          status.textContent = 'Uscita completata. Nessun backup necessario: non ci sono modifiche dall’ultimo backup oppure Google Drive non è collegato.';
+        } else {
+          status.textContent = 'Uscita completata. Backup Google Drive completato correttamente.';
+        }
+      } catch (error) {
+        status.textContent = 'Uscita completata, ma non è stato possibile verificare l’esito del backup. Controlla lo stato di Google Drive nelle impostazioni.';
+        window.alert('Gestione C/C è uscita, ma non è stato possibile verificare l’esito del backup. Controlla Google Drive nelle impostazioni.');
+      }
+    };
+    void checkBackup();
   }
   function deletePersonalData() {
     showConfirm('Eliminare movimenti e regole?', 'Saranno cancellati tutti i movimenti e le regole apprese dal browser. I conti resteranno. Se il backup Drive è attivo, verrà aggiornato senza la cronologia.', async () => {
