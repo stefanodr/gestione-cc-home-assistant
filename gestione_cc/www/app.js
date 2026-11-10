@@ -1263,7 +1263,13 @@
     // Recognize this common hierarchy so they are not silently omitted.
     const normalizedPath = normalize(account.path || '');
     return String(account.type || '').toUpperCase() === 'ASSET' &&
-      (normalizedPath.includes('attivita correnti') || normalizedPath.startsWith('attivita conto corrente'));
+      (normalizedPath.includes('attivita correnti') ||
+       normalizedPath.includes('conto corrente') ||
+       normalizedPath.includes('conto deposito') ||
+       normalizedPath.includes('banca') ||
+       normalizedPath.includes('cassa') ||
+       normalizedPath.includes('liquidita') ||
+       normalizedPath.includes('disponibilita liquide'));
   }
   function periodTransactions(year, startMonth, endMonth, endDay = 31) {
     const start = `${year}-${String(startMonth + 1).padStart(2, '0')}-01`;
