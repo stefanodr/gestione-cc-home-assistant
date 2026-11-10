@@ -1,5 +1,14 @@
 # Gestione C/C Home Assistant App — Changelog
 
+## 1.0.7 — 10 novembre 2026
+
+- Aggiornata l'applicazione inclusa alla versione 1.7.3, mantenendo gli adattamenti specifici per Home Assistant.
+- Uniformati altezza e allineamento dei campi data «Dal» e «Al» nella sezione Movimenti.
+- Aumentata la dimensione dei nomi dei conti nel Piano dei conti.
+- Ottimizzata la chiusura: il salvataggio in coda viene completato senza riscrivere inutilmente l'archivio.
+- Il backup Google Drive di sessione viene avviato in background solo se la revisione dell'archivio è cambiata dall'ultimo backup; l'uscita dall'interfaccia non arresta il servizio dell'add-on.
+- In caso di errore del backup, l'interfaccia mostra un avviso senza impedire l'uscita.
+
 ## 1.0.6 — 10 novembre 2026
 
 - Aggiornata l'applicazione Gestione C/C inclusa alla versione 1.7.2.
