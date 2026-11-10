@@ -1,3 +1,10 @@
+## 1.0.13 — 10 novembre 2026
+
+- Introdotti tag personalizzati multipli per ciascun conto, senza un elenco predefinito: è possibile inserire qualsiasi testo, incluso un IBAN, con un tag per riga.
+- I tag del conto selezionato sono riportati nell'intestazione del report, subito dopo il percorso del conto.
+- Aggiunti i tag alle intestazioni dei report PDF ed Excel e dei prospetti PDF/XLSX dei movimenti.
+- Mantenuti invariati archivio SQLite, autenticazione PIN, configurazione HTTPS, accesso LAN e backup; nessuna migrazione o cancellazione dei dati esistenti.
+
 ## 1.0.12 — 10 novembre 2026
 
 - Corretta la versione dell'add-on mostrata nel piè di pagina dell'interfaccia: ora è allineata alla versione distribuita 1.0.12.
