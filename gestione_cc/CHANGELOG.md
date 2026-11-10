@@ -1,3 +1,8 @@
+## 1.0.12 — 10 novembre 2026
+
+- Corretta la versione dell'add-on mostrata nel piè di pagina dell'interfaccia: ora è allineata alla versione distribuita 1.0.12.
+- Mantenuti invariati archivio SQLite, autenticazione PIN, configurazione HTTPS, accesso LAN e backup.
+
 ## 1.0.11 — 10 novembre 2026
 
 - Aggiornata l'applicazione inclusa alla versione Gestione C/C 1.7.6.
