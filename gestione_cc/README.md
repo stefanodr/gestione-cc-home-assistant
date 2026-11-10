@@ -20,4 +20,4 @@ Please use the [GitHub issue tracker](https://github.com/stefanodr/gestione-cc-h
 
 ## Version
 
-1.0.0
+1.0.10
