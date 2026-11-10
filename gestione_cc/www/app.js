@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.6';
+  const APP_VERSION = '1.7.2';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -13,6 +13,7 @@
   let transactionPage = 0;
   let confirmCallback = null;
   let resizeTimer;
+  let editingRecurringId = null;
 
   const $ = (selector, parent = document) => parent.querySelector(selector);
   const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
@@ -398,7 +399,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.textContent = 'Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.5';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.5</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -406,7 +407,7 @@
     $('#monthPicker').value = selectedMonth;
     syncReportPeriodPicker(selectedMonth);
     if (needsSave) await saveState();
-    $('#statementMonth').value = selectedMonth;
+    
     $('#welcomeDate').textContent = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()).toUpperCase();
     document.body.classList.add('app-ready');
     $('#appLoading')?.classList.add('hidden');
@@ -423,6 +424,65 @@
     if (!state.accounts) { state.accounts = defaultAccounts(); changed = true; }
     if (!state.transactions) { state.transactions = []; changed = true; }
     if (!state.rules) { state.rules = []; changed = true; }
+    // Additive finance-feature state: preserve existing archives and unknown fields.
+    if (!Array.isArray(state.budgets)) { state.budgets = []; changed = true; }
+    if (!Array.isArray(state.budgetSnapshots)) { state.budgetSnapshots = []; changed = true; }
+    if (state.budgets.length) {
+      const month = localDateKey(new Date()).slice(0,7);
+      if (!state.budgetSnapshots.some(snapshot => snapshot.month === month)) {
+        const lines = state.budgets.filter(item => item && item.accountId).map(item => {
+          const spent = budgetActualDirect(month, item.accountId), budget = Math.max(0, Number(item.amount) || 0);
+          return { accountId: item.accountId, budget, spent, remaining: Math.round((budget-spent)*100)/100,
+            utilization: budget > 0 ? Math.round(spent/budget*10000)/100 : null, historySource: 'budget_precedente', manualOverride: true };
+        });
+        state.budgetSnapshots.push({ month, version: 1, createdAt: new Date().toISOString(), status: 'confermato',
+          historySource: 'budget_precedente', historyMonths: 0, lines, totalBudget: lines.reduce((sum,line)=>sum+line.budget,0),
+          totalActual: lines.reduce((sum,line)=>sum+line.spent,0), incomeForecast:budgetIncomeForecastForMonth(month).amount, actualIncome:state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').reduce((sum,account)=>sum+budgetActualDirect(month,account.id),0), migrated: true });
+        changed = true;
+      }
+    }
+    if (!Array.isArray(state.recurringRules)) { state.recurringRules = []; changed = true; }
+    if (!Array.isArray(state.recurringProposals)) { state.recurringProposals = []; changed = true; }
+    if (!Array.isArray(state.savedFilters)) { state.savedFilters = []; changed = true; }
+    if (!Array.isArray(state.importProfiles)) { state.importProfiles = []; changed = true; }
+    if (!state.forecastSettings || typeof state.forecastSettings !== 'object' || Array.isArray(state.forecastSettings)) {
+      state.forecastSettings = { horizonMonths: 12, accountIds: [] };
+      changed = true;
+    } else {
+      if (state.forecastSettings.horizonMonths !== 12) { state.forecastSettings.horizonMonths = 12; changed = true; }
+      if (!Array.isArray(state.forecastSettings.accountIds)) { state.forecastSettings.accountIds = []; changed = true; }
+    }
+    // Classificazione gerarchica: ricalcola solo la proposta automatica e conserva gli override manuali.
+    const validHierarchy = ['Mastro', 'Mastro e conto', 'Conto'];
+    const childCounts = new Map(state.accounts.map(a => [String(a.id), 0]));
+    state.accounts.forEach(a => { if (a.parentId != null && childCounts.has(String(a.parentId))) childCounts.set(String(a.parentId), childCounts.get(String(a.parentId)) + 1); });
+    const directPostings = new Set();
+    state.transactions.forEach(tx => {
+      if (tx.status !== 'confirmed') return;
+      if (tx.bankAccountId) directPostings.add(String(tx.bankAccountId));
+      if (tx.counterpartAccountId) directPostings.add(String(tx.counterpartAccountId));
+      (tx.counterpartSplits || []).forEach(split => { if (split.accountId) directPostings.add(String(split.accountId)); });
+    });
+    if (window.GestioneFinancialEngine?.classifyHierarchy) {
+      const calculated = window.GestioneFinancialEngine.classifyHierarchy(state.accounts, state.transactions);
+      calculated.forEach(item => {
+        const account = state.accounts.find(a => String(a.id) === String(item.id));
+        if (account) Object.assign(account, { hierarchyType: item.hierarchyType, hierarchyTypeProposal: item.hierarchyTypeProposal,
+          hierarchyTypeSource: item.hierarchyTypeSource, hasChildren: item.hasChildren, hasDirectMovements: item.hasDirectMovements });
+      });
+    }
+    state.accounts.forEach(account => {
+      const hasChildren = (childCounts.get(String(account.id)) || 0) > 0;
+      const proposal = hasChildren ? (directPostings.has(String(account.id)) ? 'Mastro e conto' : 'Mastro') : 'Conto';
+      const override = validHierarchy.includes(account.hierarchyTypeOverride) ? account.hierarchyTypeOverride : null;
+      const nextType = override || proposal;
+      if (account.hierarchyTypeProposal !== proposal || account.hierarchyType !== nextType || account.hierarchyTypeSource !== (override ? 'manuale' : 'automatico')) changed = true;
+      account.hierarchyTypeProposal = proposal;
+      account.hierarchyType = nextType;
+      account.hierarchyTypeSource = override ? 'manuale' : 'automatico';
+      account.hasChildren = hasChildren;
+      account.hasDirectMovements = directPostings.has(String(account.id));
+    });
     if (state.openingBalance == null) { state.openingBalance = 0; changed = true; }
     if (!state.bankAccountId) {
       state.bankAccountId = state.accounts.find(a => a.type === 'BANK')?.id || state.accounts[0]?.id;
@@ -453,8 +513,8 @@
     $('#confirmExclude')?.addEventListener('click', async () => { const fn=confirmCallback; closeModals(); if(!fn)return; showNotice('Operazione in corso','Attendi il completamento.'); try{await fn(false);}catch(error){showNotice('Operazione non completata',error.message||String(error));} });
     $$('.nav-item').forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
     $$('[data-goto]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.goto)));
-    $('#monthPicker').addEventListener('change', () => { state.selectedMonth = $('#monthPicker').value; syncReportPeriodPicker(state.selectedMonth); $('#statementMonth').value = state.selectedMonth; saveState(); renderAll(); });
-    $('#reportMonth').addEventListener('change', () => { state.selectedMonth = overviewMonthForReportPeriod($('#reportMonth').value, reportMode); $('#monthPicker').value = state.selectedMonth; $('#statementMonth').value = state.selectedMonth; saveState(); renderAll(); });
+    $('#monthPicker').addEventListener('change', () => { state.selectedMonth = $('#monthPicker').value; syncReportPeriodPicker(state.selectedMonth);  saveState(); renderAll(); });
+    $('#reportMonth').addEventListener('change', () => { state.selectedMonth = overviewMonthForReportPeriod($('#reportMonth').value, reportMode); $('#monthPicker').value = state.selectedMonth;  saveState(); renderAll(); });
     $('#monthPrev')?.addEventListener('click', () => moveSelectedPeriod(-1, 'overview'));
     $('#monthNext')?.addEventListener('click', () => moveSelectedPeriod(1, 'overview'));
     $('#reportPeriodPrev')?.addEventListener('click', () => moveSelectedPeriod(-1, 'report'));
@@ -462,6 +522,14 @@
     $('#accountPicker').addEventListener('change', () => { state.reportAccountId = $('#accountPicker').value; $('#reportAccountPicker').value = state.reportAccountId; saveState(); renderAll(); });
     $('#reportAccountPicker').addEventListener('change', () => { state.reportAccountId = $('#reportAccountPicker').value; $('#accountPicker').value = state.reportAccountId; saveState(); renderAll(); });
     $('#transactionFilter').addEventListener('change', () => { transactionPage = 0; renderTransactions(); });
+    $('#transactionDateFrom')?.addEventListener('change', () => { transactionPage = 0; renderTransactions(); });
+    $('#transactionDateTo')?.addEventListener('change', () => { transactionPage = 0; renderTransactions(); });
+    $('#clearTransactionDates')?.addEventListener('click', () => {
+      $('#transactionDateFrom').value = '';
+      $('#transactionDateTo').value = '';
+      transactionPage = 0;
+      renderTransactions();
+    });
     $('#transactionPrev').addEventListener('click', () => { transactionPage = Math.max(0, transactionPage - 1); renderTransactions(); });
     $('#transactionNext').addEventListener('click', () => { transactionPage++; renderTransactions(); });
     $('#addManualTransaction')?.addEventListener('click', openManualTransaction);
@@ -469,7 +537,7 @@
     $('#cancelManualTransaction')?.addEventListener('click', closeManualTransaction);
     $('#manualBankAccount')?.addEventListener('change', populateManualCounterAccounts);
     $('#saveManualTransaction')?.addEventListener('click', saveManualTransaction);
-    $('#reportPeriodMode')?.addEventListener('change', event => { reportMode = event.target.value || 'monthly'; const next = syncReportPeriodPicker(state.selectedMonth); state.selectedMonth = overviewMonthForReportPeriod(next); $('#monthPicker').value = state.selectedMonth; $('#statementMonth').value = state.selectedMonth; state.reportMode = reportMode; saveState(); renderAll(); });
+    $('#reportPeriodMode')?.addEventListener('change', event => { reportMode = event.target.value || 'monthly'; const next = syncReportPeriodPicker(state.selectedMonth); state.selectedMonth = overviewMonthForReportPeriod(next); $('#monthPicker').value = state.selectedMonth;  state.reportMode = reportMode; saveState(); renderAll(); });
     $('#importBank').addEventListener('click', () => $('#bankFile').click());
     $('#importBankSecondary').addEventListener('click', () => $('#bankFile').click());
     $('#emptyImport').addEventListener('click', () => $('#bankFile').click());
@@ -554,7 +622,7 @@
       syncReportPeriodPicker(nextMonth, reportMode);
     }
     $('#monthPicker').value = state.selectedMonth;
-    $('#statementMonth').value = state.selectedMonth;
+    
     saveState();
     renderAll();
   }
@@ -569,19 +637,610 @@
     const reportDate = new Date(ry, rm - 1, 1);
     if ($('#reportPeriodNext')) $('#reportPeriodNext').disabled = reportDate >= currentMonth;
   }
+
+  function searchControls() {
+    const get = id => document.getElementById(id);
+    const text = get('searchText')?.value.trim().toLocaleLowerCase('it') || '';
+    const from = get('searchFrom')?.value || '', to = get('searchTo')?.value || '';
+    const min = get('searchMin')?.value === '' ? null : Number(get('searchMin').value);
+    const max = get('searchMax')?.value === '' ? null : Number(get('searchMax').value);
+    const direction = get('searchDirection')?.value || 'all', status = get('searchStatus')?.value || 'all';
+    const accountText = get('searchAccount')?.value.trim() || '';
+    const matchedAccount = accountText ? state.accounts.find(a => accountDisplayLabel(a) === accountText || a.path === accountText) : null;
+    const account = !accountText ? 'all' : (matchedAccount?.id || '__no_matching_account__');
+    return { text, from, to, min, max, direction, status, account };
+  }
+  function renderSavedFilters() {
+    const picker = $('#savedFilterPicker'); if (!picker) return;
+    const current = picker.value;
+    picker.innerHTML = '<option value="">Filtri salvati…</option>' + state.savedFilters.map(f => '<option value="' + safeText(f.id) + '">' + safeText(f.name) + '</option>').join('');
+    if (state.savedFilters.some(f => f.id === current)) picker.value = current;
+  }
+  function searchAccountAllocation(tx, accountId) {
+    if (accountId === 'all') return { matches: true, amount: Number(tx.amount) || 0, labels: [] };
+    if (tx.bankAccountId === accountId) return { matches: true, amount: Number(tx.amount) || 0, labels: [] };
+    const splits = Array.isArray(tx.counterpartSplits) ? tx.counterpartSplits : [];
+    if (splits.length) {
+      const isWithinSelectedAccount = splitAccountId => {
+        let account = accountById(splitAccountId), guard = new Set();
+        while (account && !guard.has(String(account.id))) {
+          if (String(account.id) === String(accountId)) return true;
+          guard.add(String(account.id));
+          account = account.parentId ? accountById(account.parentId) : null;
+        }
+        return false;
+      };
+      const matched = splits.filter(split => isWithinSelectedAccount(split.accountId));
+      if (!matched.length) return { matches: false, amount: 0, labels: [] };
+      // Nel riparto il valore è opposto al movimento bancario: lo invertiamo
+      // per mostrare l'importo e il segno dal punto di vista dell'entrata/uscita.
+      return { matches: true, amount: -matched.reduce((sum, split) => sum + (Number(split.value) || 0), 0),
+        labels: matched.map(split => accountLabel(split.accountId)) };
+    }
+    if (tx.counterpartAccountId === accountId) return { matches: true, amount: Number(tx.amount) || 0, labels: [] };
+    return { matches: false, amount: 0, labels: [] };
+  }
+  function runAdvancedSearch() {
+    const f = searchControls();
+    const results = state.transactions.map(tx => ({ tx, allocation: searchAccountAllocation(tx, f.account) })).filter(({tx, allocation}) => {
+      const date = String(tx.date || '');
+      const amount = Math.abs(allocation.amount);
+      const haystack = [transactionDescription(tx), transactionCausale(tx), tx.payee, tx.memo].join(' ').toLocaleLowerCase('it');
+      if (f.from && date < f.from || f.to && date > f.to) return false;
+      if (f.text && !haystack.includes(f.text)) return false;
+      if (!allocation.matches) return false;
+      if (f.min !== null && Number.isFinite(f.min) && amount < f.min) return false;
+      if (f.max !== null && Number.isFinite(f.max) && amount > f.max) return false;
+      if (f.direction === 'income' && allocation.amount <= 0 || f.direction === 'expense' && allocation.amount >= 0) return false;
+      if (f.status !== 'all' && tx.status !== f.status) return false;
+      return true;
+    }).sort((a,b) => String(b.tx.date).localeCompare(String(a.tx.date)));
+    $('#searchResultCount').textContent = results.length + ' movimenti trovati';
+    $('#advancedSearchBody').innerHTML = results.slice(0,1000).map(({tx,allocation}) => '<tr><td>' + safeText(formatDate(tx.date)) + '</td><td class="name-cell">' + safeText(transactionDescription(tx) || transactionCausale(tx) || 'Movimento') + (allocation.labels.length ? '<small class="name-secondary">Riparto: ' + safeText(allocation.labels.join(' · ')) + '</small>' : '') + '</td><td class="' + (allocation.amount>=0?'amount-in':'amount-out') + '">' + euro.format(allocation.amount) + '</td><td>' + safeText(accountLabel(tx.bankAccountId)) + '</td><td>' + safeText(allocation.labels.length ? allocation.labels.join(' · ') : accountLabel(tx.counterpartAccountId)) + '</td><td>' + (tx.status === 'confirmed' ? 'Confermato' : 'Da classificare') + '</td></tr>').join('') || '<tr><td colspan="6" class="empty-inline">Nessun movimento corrisponde ai filtri.</td></tr>';
+    if (results.length > 1000) $('#searchResultCount').textContent += ' · mostrati i primi 1.000';
+  }
+  function setupFinanceViews() {
+    if (setupFinanceViews.listenersBound) { if(state.transactions.length&&state.recurringDetectionLastTransactionCount!==state.transactions.length)detectRecurringProposals(); renderBudgetView(); renderForecastSelection(); return; }
+    setupFinanceViews.listenersBound = true;
+    const account = $('#searchAccount');
+    if (account) {
+      const old = account.value;
+      const categoryOrder = path => {
+        const root = normalize(String(path || '').split(':')[0]);
+        if (root === 'attivita') return 0;
+        if (root === 'passivita') return 1;
+        if (root === 'uscite') return 2;
+        if (root === 'entrate') return 3;
+        if (root === 'patrimonio netto') return 4;
+        return 5;
+      };
+      const orderedAccounts = state.accounts.filter(a=>a.type!=='ROOT')
+        .sort((a,b)=>categoryOrder(a.path)-categoryOrder(b.path) || a.path.localeCompare(b.path,'it',{sensitivity:'base'}));
+      const searchList = $('#searchAdvancedAccountOptions');
+      if (searchList) searchList.innerHTML = orderedAccounts.map(a=>'<option value="' + safeText(accountDisplayLabel(a)) + '"></option>').join('');
+      if (old && orderedAccounts.some(a=>a.id===old)) account.value=accountDisplayLabel(accountById(old));
+      else if (!old || old === 'all') account.value='';
+    }
+    renderSavedFilters();
+    const budgetMonth = $('#budgetMonth');
+    if (budgetMonth && !budgetMonth.value) budgetMonth.value = localDateKey(new Date()).slice(0,7);
+    const forecast = $('#forecastAccountChoices');
+    if (forecast) {
+      const ids = Array.isArray(state.forecastSettings?.accountIds) ? state.forecastSettings.accountIds : [];
+      const eligible = state.accounts.filter(isLiquidAccount);
+      const all = ids.length === 0 || eligible.every(a=>ids.includes(a.id));
+      $('#forecastAllAccounts').checked = all;
+      forecast.innerHTML = eligible.map(a=>'<label style="display:flex;gap:9px;align-items:center;margin:9px 0"><input type="checkbox" data-forecast-account="' + safeText(a.id) + '" ' + (all || ids.includes(a.id) ? 'checked' : '') + '> ' + safeText(accountDisplayLabel(a)) + '</label>').join('') || '<p class="panel-subtitle">Nessun conto liquido riconosciuto nel piano dei conti.</p>';
+      forecast.querySelectorAll('[data-forecast-account]').forEach(box=>box.addEventListener('change',()=>{
+        const selected=[...forecast.querySelectorAll('[data-forecast-account]:checked')].map(x=>x.dataset.forecastAccount);
+        state.forecastSettings.accountIds=selected.length===eligible.length?[]:selected;
+        $('#forecastAllAccounts').checked=state.forecastSettings.accountIds.length===0;
+        saveState();renderForecastSelection();
+      }));
+    }
+    $('#forecastAllAccounts')?.addEventListener('change',()=>{
+      state.forecastSettings.accountIds=[];
+      setupFinanceViews();
+      saveState();
+    });
+    $('#runAdvancedSearch')?.addEventListener('click',runAdvancedSearch);
+    $('#clearAdvancedSearch')?.addEventListener('click',()=>{
+      ['searchFrom','searchTo','searchText','searchMin','searchMax'].forEach(id=>$('#'+id).value='');
+      $('#searchDirection').value='all';$('#searchStatus').value='all';$('#searchAccount').value='';runAdvancedSearch();
+    });
+    $('#saveAdvancedFilter')?.addEventListener('click',()=>{
+      const name=window.prompt('Nome da assegnare al filtro:');
+      if(!name?.trim())return;
+      state.savedFilters.push({id:uid('f'),name:name.trim().slice(0,60),criteria:searchControls()});
+      saveState();renderSavedFilters();
+    });
+    $('#savedFilterPicker')?.addEventListener('change',()=>{
+      const f=state.savedFilters.find(x=>x.id===$('#savedFilterPicker').value);if(!f)return;
+      const c=f.criteria||{};
+      $('#searchFrom').value=c.from||'';$('#searchTo').value=c.to||'';$('#searchText').value=c.text||'';
+      $('#searchMin').value=c.min??'';$('#searchMax').value=c.max??'';
+      $('#searchDirection').value=c.direction||'all';$('#searchStatus').value=c.status||'all';$('#searchAccount').value=c.account==='all'?'':(accountById(c.account)?accountDisplayLabel(accountById(c.account)):c.account||'');runAdvancedSearch();
+    });
+    $('#budgetMonth')?.addEventListener('change',renderBudgetView);
+    $('#generateBudgetProposal')?.addEventListener('click',generateBudgetForSelectedMonth);
+    $('#generateHistoricalBudgets')?.addEventListener('click',generateHistoricalBudgets);
+    $('#confirmBudgetSnapshot')?.addEventListener('click',confirmBudgetForSelectedMonth);
+    $('#saveBudgetEdits')?.addEventListener('click',saveBudgetEdits);
+    renderBudgetView();
+    $('#addRecurringRule')?.addEventListener('click',addRecurringRule);
+    $('#detectRecurringRules')?.addEventListener('click',detectRecurringProposals);
+    renderRecurringProposals();
+    if(state.transactions.length&&state.recurringDetectionLastTransactionCount!==state.transactions.length)detectRecurringProposals();
+    if ($('#recStart') && !$('#recStart').value) $('#recStart').value=localDateKey(new Date());
+    renderForecastSelection();
+  }
+  function budgetSpentByCategory(transactions,month) {
+    const totals=new Map();
+    const addExpense=(accountId,amount)=>{
+      let account=accountById(accountId),guard=new Set();
+      while(account&&account.type==='EXPENSE'&&!guard.has(account.id)){
+        guard.add(account.id);
+        totals.set(account.id,(totals.get(account.id)||0)+amount);
+        account=account.parentId?accountById(account.parentId):null;
+      }
+    };
+    for(const tx of transactions||[]){
+      if(tx.status!=='confirmed'||String(tx.date||'').slice(0,7)!==month)continue;
+      const splits=Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.length?tx.counterpartSplits:null;
+      if(splits){
+        for(const split of splits)addExpense(split.accountId,Math.abs(Number(split.value)||0));
+      } else addExpense(tx.counterpartAccountId,Math.abs(Number(tx.amount)||0));
+    }
+    return totals;
+  }
+
+  function budgetIncomeHistory(targetMonth) {
+    const now=new Date(),[targetYear,targetMonthNumber]=String(targetMonth||localDateKey(now).slice(0,7)).split('-').map(Number);
+    const currentYear=now.getFullYear();
+    const cutoff=targetYear<currentYear?targetMonthNumber-1:Math.min(targetMonthNumber-1,now.getMonth());
+    const currentMonths=Array.from({length:Math.max(0,cutoff)},(_,i)=>targetYear+'-'+String(i+1).padStart(2,'0'));
+    const accounts=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro');
+    const coverage=currentMonths.filter(key=>accounts.some(account=>budgetActualDirect(key,account.id)>0)).length;
+    const months=coverage>=3?currentMonths:Array.from({length:12},(_,i)=>(targetYear-1)+'-'+String(i+1).padStart(2,'0'));
+    return {accounts,months,source:coverage>=3?'anno_corrente':'anno_precedente'};
+  }
+  function budgetIncomeForecastForMonth(month) {
+    const history=budgetIncomeHistory(month);
+    const amount=history.accounts.reduce((sum,account)=>sum+history.months.reduce((total,key)=>total+budgetActualDirect(key,account.id),0)/Math.max(1,history.months.length),0);
+    return {amount:Math.round(amount*100)/100,source:history.source,months:history.months.length};
+  }
+  function budgetActualDirect(month, accountId) {
+    let total = 0;
+    for (const tx of state.transactions) {
+      if (tx.status !== 'confirmed' || String(tx.date || '').slice(0, 7) !== month) continue;
+      const splits = Array.isArray(tx.counterpartSplits) && tx.counterpartSplits.length ? tx.counterpartSplits : null;
+      if (splits) for (const split of splits) { if (split.accountId === accountId) total += Math.abs(Number(split.value) || 0); }
+      else if (tx.counterpartAccountId === accountId) total += Math.abs(Number(tx.amount) || 0);
+    }
+    return Math.round((total + Number.EPSILON) * 100) / 100;
+  }
+  function activeBudgetSnapshot(month) {
+    return state.budgetSnapshots.filter(x => x.month === month).sort((a,b) => Number(b.version || 0) - Number(a.version || 0))[0] || null;
+  }
+  function budgetEligibleAccounts() {
+    return state.accounts.filter(a => a.hierarchyType !== 'Mastro' &&
+      (a.type === 'EXPENSE' || (a.classification === 'Patrimoniale' && a.includeInBudget === true && !isLiquidAccount(a))));
+  }
+  function budgetExpenseHistory(month, accounts) {
+    const now=new Date(),[year,targetMonth]=month.split('-').map(Number),currentYear=now.getFullYear();
+    const cutoff=year<currentYear?targetMonth-1:Math.min(targetMonth-1,now.getMonth());
+    const currentMonths=Array.from({length:Math.max(0,cutoff)},(_,i)=>year+'-'+String(i+1).padStart(2,'0'));
+    const coverage=currentMonths.filter(key=>accounts.some(account=>budgetActualDirect(key,account.id)>0)).length;
+    const months=coverage>=3?currentMonths:Array.from({length:12},(_,i)=>(year-1)+'-'+String(i+1).padStart(2,'0'));
+    return {months,source:coverage>=3?'anno_corrente':'anno_precedente'};
+  }
+  function generateBudgetSnapshot(month) {
+    const categories = budgetEligibleAccounts().sort((a,b)=>a.path.localeCompare(b.path,'it'));
+    const expenseHistory=budgetExpenseHistory(month,categories);
+    const sourceMonths=expenseHistory.months;
+    const historySource=expenseHistory.source;
+    const lines = categories.map(account => {
+      const fixedForMonth = key => state.recurringRules.filter(rule=>rule.active&&rule.categoryId===account.id&&Number(rule.amount)<0)
+        .flatMap(rule=>recurringOccurrenceDates(rule,key).map(date=>({rule,date})))
+        .reduce((sum,item)=>sum+Math.abs(Number(item.rule.amount)||0),0);
+      const variableHistory = sourceMonths.map(key => {
+        const actual=budgetActualDirect(key,account.id);
+        const realizedFixed=state.recurringRules.filter(rule=>rule.active&&rule.categoryId===account.id&&Number(rule.amount)<0)
+          .reduce((sum,rule)=>sum+state.transactions.filter(tx=>tx.status==='confirmed'&&String(tx.date||'').slice(0,7)===key&&String(tx.date||'')>=String(rule.historyStartDate||rule.startDate||'')&&transactionMatchesRecurringRule(tx,rule)).reduce((subtotal,tx)=>subtotal+Math.abs(Number(tx.amount)||0),0),0);
+        return Math.max(0,actual-realizedFixed);
+      });
+      const variable = variableHistory.reduce((sum,value)=>sum+value,0)/Math.max(1,variableHistory.length);
+      const recurring = fixedForMonth(month);
+      const budget = Math.round((variable+recurring+Number.EPSILON)*100)/100;
+      const spent = budgetActualDirect(month, account.id);
+      return { accountId: account.id, budget, recurring:Math.round(recurring*100)/100, variable:Math.round(variable*100)/100,
+        spent, remaining: Math.round((budget-spent)*100)/100,
+        utilization: budget > 0 ? Math.round(spent/budget*10000)/100 : null, historySource };
+    });
+    const incomeHistory=budgetIncomeHistory(month);
+    const incomeLines=incomeHistory.accounts.sort((a,b)=>a.path.localeCompare(b.path,'it')).map(account=>{
+      const history=incomeHistory.months.map(key=>budgetActualDirect(key,account.id));
+      const budget=Math.round((history.reduce((sum,value)=>sum+value,0)/Math.max(1,history.length)+Number.EPSILON)*100)/100;
+      const actual=budgetActualDirect(month,account.id);
+      return {accountId:account.id,budget,spent:actual,remaining:Math.round((budget-actual)*100)/100,
+        utilization:budget>0?Math.round(actual/budget*10000)/100:null,historySource:incomeHistory.source};
+    });
+    const previous = activeBudgetSnapshot(month);
+    const version = (previous?.version || 0) + 1;
+    return { month, version, createdAt: new Date().toISOString(), status: 'proposta', historySource, historyMonths: sourceMonths.length,
+      lines, totalBudget: lines.reduce((sum,x)=>sum+x.budget,0), totalActual: lines.reduce((sum,x)=>sum+x.spent,0),
+      totalRecurringExpenses:lines.reduce((sum,x)=>sum+(x.recurring||0),0), totalVariableExpenses:lines.reduce((sum,x)=>sum+(x.variable||0),0),
+      incomeLines, totalIncomeBudget:incomeLines.reduce((sum,x)=>sum+x.budget,0),
+      actualIncome:incomeLines.reduce((sum,x)=>sum+x.spent,0),
+      incomeHistorySource:incomeHistory.source, incomeHistoryMonths:incomeHistory.months.length };
+  }
+  function renderBudgetView() {
+    const body=$('#budgetBody');if(!body)return;
+    const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7);
+    let snapshot=activeBudgetSnapshot(month);
+    const currentMonth=localDateKey(new Date()).slice(0,7);
+    if(!snapshot&&month>=currentMonth){snapshot=generateBudgetSnapshot(month);state.budgetSnapshots.push(snapshot);void saveState().then(()=>renderBudgetView());}
+    const categories=budgetEligibleAccounts().sort((a,b)=>a.path.localeCompare(b.path,'it'));
+    const incomeCategories=state.accounts.filter(a=>a.type==='INCOME'&&a.hierarchyType!=='Mastro').sort((a,b)=>a.path.localeCompare(b.path,'it'));
+    const actuals=new Map(categories.map(a=>[a.id,budgetActualDirect(month,a.id)]));
+    const lines=new Map((snapshot?.lines||[]).map(x=>[x.accountId,x]));
+    const incomeLines=new Map((snapshot?.incomeLines||[]).map(x=>[x.accountId,x]));
+    const totalActual=categories.reduce((sum,account)=>sum+(actuals.get(account.id)||0),0);
+    const totalBudget=snapshot?.totalBudget||0;
+    const incomeActual=incomeCategories.reduce((sum,account)=>sum+budgetActualDirect(month,account.id),0);
+    const incomeBudget=snapshot?.totalIncomeBudget??snapshot?.incomeForecast??budgetIncomeForecastForMonth(month).amount;
+    const summaryValues={
+      budgetIncome:incomeBudget,budgetTotal:totalBudget,budgetRecurring:snapshot?.totalRecurringExpenses||0,
+      budgetVariable:snapshot?.totalVariableExpenses||0,budgetActual:totalActual,
+      budgetRemaining:totalBudget-totalActual,budgetNet:incomeBudget-totalBudget,
+      budgetIncomeActual:incomeActual
+    };
+    Object.entries(summaryValues).forEach(([id,value])=>{const el=$('#'+id);if(el)el.textContent=euro.format(value);});
+    const incomeBody=$('#budgetIncomeBody');
+    if(incomeBody) incomeBody.innerHTML=incomeCategories.map(a=>{
+      const line=incomeLines.get(a.id),budget=Number(line?.budget??line?.forecast)||0,spent=budgetActualDirect(month,a.id),remaining=budget-spent,pct=budget>0?spent/budget*100:null;
+      return '<tr><td class="name-primary">'+safeText(a.path)+'</td><td><input type="number" min="0" step="0.01" data-budget-income-account="'+safeText(a.id)+'" value="'+(line?budget:'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px" '+(snapshot?'':'disabled')+'></td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(line?euro.format(remaining):'—')+'</td><td>'+(line&&budget>0?Math.round(pct)+'%':'—')+'</td></tr>';
+    }).join('')||'<tr><td colspan="5" class="empty-inline">Nessuna categoria di entrata disponibile.</td></tr>';
+    body.innerHTML=categories.map(a=>{
+      const line=lines.get(a.id),budget=Number(line?.budget)||0,spent=actuals.get(a.id)||0,remaining=budget-spent,pct=budget>0?spent/budget*100:null;
+      return '<tr><td class="name-primary">'+safeText(a.path)+(a.hierarchyType==='Mastro e conto'?' <small>· conto e mastro</small>':'')+'</td><td><input type="number" min="0" step="0.01" data-budget-account="'+safeText(a.id)+'" value="'+(line?budget:'')+'" placeholder="Non impostato" style="width:130px;padding:7px;border:1px solid #dce5e2;border-radius:6px" '+(snapshot?'':'disabled')+'>'+(line?'<small style="display:block;color:#71817d">'+(line.manualOverride?'Modificato manualmente':'Fisse '+euro.format(line.recurring||0)+' · Variabili '+euro.format(line.variable||0))+'</small>':'')+'</td><td>'+euro.format(spent)+'</td><td class="'+(remaining<0?'amount-out':'amount-in')+'">'+(line?euro.format(remaining):'—')+'</td><td>'+(line&&budget>0?Math.round(pct)+'%':'—')+'</td></tr>';
+    }).join('')||'<tr><td colspan="5" class="empty-inline">Nessuna categoria di spesa utilizzabile nel budget.</td></tr>';
+    const status=$('#budgetSnapshotStatus');
+    if(status)status.textContent=snapshot?'Versione '+snapshot.version+' · '+(snapshot.status==='confermato'?'Confermato':'Proposta')+' · base: '+(snapshot.historySource==='anno_corrente'?'anno corrente':'anno precedente')+' · '+snapshot.historyMonths+' mesi':'Nessun budget salvato per questo mese. Genera una proposta per iniziare.';
+    const generate=$('#generateBudgetProposal'),confirm=$('#confirmBudgetSnapshot'),save=$('#saveBudgetEdits');
+    if(generate)generate.textContent=snapshot?'Genera nuova versione':'Genera proposta automatica';
+    if(confirm)confirm.disabled=!snapshot||snapshot.status==='confermato';
+    if(save)save.disabled=!snapshot;
+  }
+  async function generateBudgetForSelectedMonth() {
+    const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7),previous=activeBudgetSnapshot(month);
+    if(previous){showConfirm('Generare una nuova versione del budget?', 'La versione esistente resterà conservata nello storico. Verrà creata una nuova proposta per '+monthName(month)+'.', async()=>{state.budgetSnapshots.push(generateBudgetSnapshot(month));await saveState();renderBudgetView();});return;}
+    state.budgetSnapshots.push(generateBudgetSnapshot(month));await saveState();renderBudgetView();
+  }
+  async function generateHistoricalBudgets() {
+    const now=new Date(),year=now.getFullYear(),lastCompletedMonth=now.getMonth();
+    if(lastCompletedMonth<1){showNotice('Nessun mese storico disponibile','La funzione sarà disponibile dal mese successivo.');return;}
+    const months=Array.from({length:lastCompletedMonth},(_,i)=>year+'-'+String(i+1).padStart(2,'0'));
+    showConfirm('Ricalcolare i budget storici?', 'Saranno create nuove proposte da gennaio a '+monthName(months[months.length-1])+' '+year+'. Le versioni già presenti non verranno cancellate: resteranno nello storico.', async()=>{
+      months.forEach(month=>state.budgetSnapshots.push(generateBudgetSnapshot(month)));
+      await saveState();renderBudgetView();
+      showNotice('Budget storici generati',months.length+' nuove versioni create. Seleziona i mesi precedenti per confrontare previsto ed effettivo.');
+    });
+  }
+  async function confirmBudgetForSelectedMonth() {
+    const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7),snapshot=activeBudgetSnapshot(month);if(!snapshot)return;
+    snapshot.status='confermato';snapshot.confirmedAt=new Date().toISOString();await saveState();renderBudgetView();
+  }
+  async function saveBudgetEdits() {
+    const month=$('#budgetMonth')?.value||localDateKey(new Date()).slice(0,7),snapshot=activeBudgetSnapshot(month);if(!snapshot)return;
+    const next=JSON.parse(JSON.stringify(snapshot));next.version=Number(snapshot.version||1)+1;next.createdAt=new Date().toISOString();next.status='proposta';delete next.confirmedAt;
+    $('#budgetBody').querySelectorAll('[data-budget-account]').forEach(input=>{const line=next.lines.find(x=>x.accountId===input.dataset.budgetAccount);if(line){line.budget=Math.max(0,Number(input.value)||0);line.manualOverride=true;line.remaining=Math.round((line.budget-line.spent)*100)/100;line.utilization=line.budget>0?Math.round(line.spent/line.budget*10000)/100:null;}});
+    $('#budgetIncomeBody')?.querySelectorAll('[data-budget-income-account]').forEach(input=>{const line=next.incomeLines?.find(x=>x.accountId===input.dataset.budgetIncomeAccount);if(line){line.budget=Math.max(0,Number(input.value)||0);line.manualOverride=true;line.remaining=Math.round((line.budget-line.spent)*100)/100;line.utilization=line.budget>0?Math.round(line.spent/line.budget*10000)/100:null;}});
+    next.totalIncomeBudget=(next.incomeLines||[]).reduce((sum,x)=>sum+(Number(x.budget)||0),0);
+    next.incomeForecast=next.totalIncomeBudget;
+    next.actualIncome=(next.incomeLines||[]).reduce((sum,x)=>sum+(Number(x.spent)||0),0);
+    next.totalBudget=next.lines.reduce((sum,x)=>sum+x.budget,0);next.totalRecurringExpenses=next.lines.reduce((sum,x)=>sum+(x.recurring||0),0);next.totalVariableExpenses=next.lines.reduce((sum,x)=>sum+(x.manualOverride?Math.max(0,x.budget-(x.recurring||0)):(x.variable||0)),0);state.budgetSnapshots.push(next);await saveState();renderBudgetView();
+  }
+
+  function forecastSelectedAccounts() {
+    const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
+    return state.accounts.filter(isLiquidAccount).filter(a=>ids.length===0||ids.includes(a.id));
+  }
+  function monthKeyFromDate(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+  function shiftMonthKey(key,offset) {
+    const [y,m]=key.split('-').map(Number);const d=new Date(y,m-1+offset,1);
+    return monthKeyFromDate(d);
+  }
+  function monthLabel(key) {
+    const [y,m]=key.split('-').map(Number);
+    return new Intl.DateTimeFormat('it-IT',{month:'long',year:'numeric'}).format(new Date(y,m-1,1));
+  }
+  function monthOccurrence(rule,key) {
+    const [y,m]=key.split('-').map(Number),last=new Date(y,m,0).getDate();
+    const day=Math.min(Math.max(1,Number(rule.day)||1),last);
+    return key+'-'+String(day).padStart(2,'0');
+  }
+  function recurringOccursInMonth(rule,key) {
+    if(!rule.active)return false;
+    const start=String(rule.startDate||''),end=String(rule.endDate||'');
+    const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number);
+    if(!sy||!sm||!sd)return false;
+    const monthDiff=(y-sy)*12+(m-sm);
+    if(rule.frequency==='once')return monthDiff===0;
+    const periods={monthly:1,bimonthly:2,quarterly:3,fourmonthly:4,halfyearly:6,yearly:12};
+    if(rule.frequency==='weekly'||rule.frequency==='biweekly'){
+      const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd);
+      const step=rule.frequency==='weekly'?7:14;
+      let due=new Date(origin);while(due<first)due.setDate(due.getDate()+step);
+      while(due<=last){const keyDate=localDateKey(due);if(keyDate>=start&&(!end||keyDate<=end))return true;due.setDate(due.getDate()+step);}
+      return false;
+    }
+    const period=periods[rule.frequency];
+    if(!period||monthDiff<0||monthDiff%period!==0)return false;
+    const date=monthOccurrence(rule,key);
+    return date>=start&&(!end||date<=end);
+  }
+  function transactionMatchesRecurringRule(tx,rule) {
+    const target=normalize(rule.description);
+    const tolerance=Math.max(1,Math.abs(Number(rule.amount)||0)*0.05);
+    const splits=Array.isArray(tx.counterpartSplits)?tx.counterpartSplits:[];
+    const relevantAmount=rule.categoryId&&splits.length
+      ? splits.filter(split=>split.accountId===rule.categoryId).reduce((sum,split)=>sum+Math.abs(Number(split.value)||0),0)
+      : Math.abs(Number(tx.amount)||0);
+    return tx.status==='confirmed' && tx.bankAccountId===rule.bankAccountId &&
+      Math.abs(relevantAmount-Math.abs(Number(rule.amount)||0))<=tolerance &&
+      Boolean(target) && normalize(transactionDescription(tx)||transactionCausale(tx))===target;
+  }
+  function recurringOccurrenceDates(rule,key) {
+    if(!recurringOccursInMonth(rule,key))return [];
+    const start=String(rule.startDate||''),end=String(rule.endDate||'');
+    const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number);
+    if(rule.frequency==='weekly'||rule.frequency==='biweekly'){
+      const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd),step=rule.frequency==='weekly'?7:14,dates=[];
+      let due=new Date(origin);while(due<first)due.setDate(due.getDate()+step);
+      while(due<=last){const date=localDateKey(due);if(date>=start&&(!end||date<=end))dates.push(date);due.setDate(due.getDate()+step);}
+      return dates;
+    }
+    const date=monthOccurrence(rule,key);
+    return date>=start&&(!end||date<=end)?[date]:[];
+  }
+  function recurringAlreadyRealized(rule,date) {
+    return state.transactions.some(tx=>{
+      if(tx.status!=='confirmed'||!tx.date||!transactionMatchesRecurringRule(tx,rule))return false;
+      const days=Math.abs((Date.parse(tx.date+'T12:00:00Z')-Date.parse(date+'T12:00:00Z'))/86400000);
+      return days<=5;
+    });
+  }
+  function forecastRecurringItems(key,selectedIds) {
+    const today=localDateKey(new Date());
+    return state.recurringRules.filter(r=>r.active&&selectedIds.has(r.bankAccountId))
+      .flatMap(rule=>recurringOccurrenceDates(rule,key).filter(date=>(key!==today.slice(0,7)||date>=today)&&!recurringAlreadyRealized(rule,date))
+        .map(date=>({...rule,occurrenceDate:date})));
+  }
+  function transactionIsExplicitlyRecurring(tx,categoryId,key,selectedIds) {
+    return state.recurringRules.some(rule=>rule.active&&rule.categoryId===categoryId&&selectedIds.has(rule.bankAccountId)&&
+      String(tx.date||'')>=String(rule.historyStartDate||rule.startDate||'')&&transactionMatchesRecurringRule(tx,rule));
+  }
+  function forecastTransactionFlow(tx,selectedIds) {
+    if(tx.status!=='confirmed'||tx.status==='duplicate')return 0;
+    const bankSelected=selectedIds.has(tx.bankAccountId);
+    const splits=Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.length?tx.counterpartSplits:null;
+    if(splits){
+      const selectedCounterparts=splits.filter(split=>selectedIds.has(split.accountId)&&isLiquidAccount(accountById(split.accountId)));
+      if(bankSelected)return (Number(tx.amount)||0)+selectedCounterparts.reduce((sum,split)=>sum+(Number(split.value)||0),0);
+      return selectedCounterparts.reduce((sum,split)=>sum+(Number(split.value)||0),0);
+    }
+    if(bankSelected){
+      if(selectedIds.has(tx.counterpartAccountId)&&isLiquidAccount(accountById(tx.counterpartAccountId)))return 0;
+      return Number(tx.amount)||0;
+    }
+    // The selected account is the counterpart of a transaction booked on an excluded account.
+    if(selectedIds.has(tx.counterpartAccountId)&&isLiquidAccount(accountById(tx.counterpartAccountId)))return -(Number(tx.amount)||0);
+    return 0;
+  }
+  function median(values) {
+    if(!values.length)return 0;
+    const sorted=[...values].sort((a,b)=>a-b),mid=Math.floor(sorted.length/2);
+    return sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2;
+  }
+  function renderRecurringRules() {
+    const body=$('#recurringBody');if(!body)return;
+    const labels={once:'Una tantum',weekly:'Settimanale',biweekly:'Quindicinale',monthly:'Mensile',bimonthly:'Bimestrale',quarterly:'Trimestrale',fourmonthly:'Quadrimestrale',halfyearly:'Semestrale',yearly:'Annuale'};
+    body.innerHTML=state.recurringRules.map(r=>'<tr><td>'+safeText(r.description)+'</td><td>'+euro.format(r.amount)+'</td><td>'+labels[r.frequency]+'</td><td>'+safeText(r.startDate)+'</td><td>'+(r.active?'Attiva':'Sospesa')+'</td><td><button class="row-action" data-edit-rec="'+safeText(r.id)+'">Modifica</button> <button class="row-action" data-toggle-rec="'+safeText(r.id)+'">'+(r.active?'Sospendi':'Attiva')+'</button> <button class="row-action row-action-danger" data-delete-rec="'+safeText(r.id)+'">Elimina</button></td></tr>').join('')||'<tr><td colspan="6" class="empty-inline">Nessuna ricorrenza configurata.</td></tr>';
+    body.querySelectorAll('[data-edit-rec]').forEach(b=>b.addEventListener('click',()=>{const r=state.recurringRules.find(x=>x.id===b.dataset.editRec);if(!r)return;editingRecurringId=r.id;$('#recDescription').value=r.description;$('#recAmount').value=r.amount;$('#recBankAccount').value=r.bankAccountId;$('#recCategory').value=r.categoryId||'';$('#recFrequency').value=r.frequency;$('#recDay').value=r.day||1;$('#recStart').value=r.startDate;$('#recEnd').value=r.endDate||'';$('#addRecurringRule').textContent='Salva modifica';$('#recDescription').focus();}));
+    body.querySelectorAll('[data-toggle-rec]').forEach(b=>b.addEventListener('click',()=>{const r=state.recurringRules.find(x=>x.id===b.dataset.toggleRec);if(r)r.active=!r.active;saveState();renderForecastSelection();}));
+    body.querySelectorAll('[data-delete-rec]').forEach(b=>b.addEventListener('click',()=>{state.recurringRules=state.recurringRules.filter(x=>x.id!==b.dataset.deleteRec);saveState();renderForecastSelection();}));
+  }
+  function detectRecurringProposals() {
+    const groups=new Map();
+    for(const tx of state.transactions){
+      if(tx.status!=='confirmed'||!tx.date||tx.status==='duplicate')continue;
+      const description=transactionDescription(tx)||transactionCausale(tx);if(!description)continue;
+      const counterpart=tx.counterpartSplits?.length===1?tx.counterpartSplits[0].accountId:tx.counterpartAccountId;
+      if(!counterpart)continue;
+      const key=[normalize(description),tx.bankAccountId||'',counterpart,Math.sign(Number(tx.amount)||0)].join('|');
+      if(!groups.has(key))groups.set(key,[]);
+      groups.get(key).push(tx);
+    }
+    const labels=[['weekly',7],['biweekly',14],['monthly',30.44],['bimonthly',60.88],['quarterly',91.31],['fourmonthly',121.75],['halfyearly',182.63],['yearly',365.25]];
+    const proposals=[];
+    for(const items of groups.values()){
+      const sorted=items.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+      if(sorted.length<3)continue;
+      const gaps=[];for(let i=1;i<sorted.length;i++){const days=(Date.parse(sorted[i].date+'T12:00:00Z')-Date.parse(sorted[i-1].date+'T12:00:00Z'))/86400000;if(days>0)gaps.push(days);}
+      if(gaps.length<2)continue;
+      const ordered=[...gaps].sort((a,b)=>a-b),mid=Math.floor(ordered.length/2),typical=ordered.length%2?ordered[mid]:(ordered[mid-1]+ordered[mid])/2;
+      const candidate=labels.map(([frequency,days])=>({frequency,days,error:Math.abs(typical-days)/days})).sort((a,b)=>a.error-b.error)[0];
+      if(candidate.error>.22)continue;
+      const amounts=sorted.map(tx=>Math.abs(Number(tx.amount)||0)).sort((a,b)=>a-b),am= Math.floor(amounts.length/2);
+      const amountMagnitude=amounts.length%2?amounts[am]:(amounts[am-1]+amounts[am])/2;
+      if(!amountMagnitude)continue;
+      const amountDeviation=amounts.reduce((sum,value)=>sum+Math.abs(value-amountMagnitude),0)/amounts.length/amountMagnitude;
+      if(amountDeviation>0.35)continue;
+      const amount=Math.sign(Number(sorted[sorted.length-1].amount)||1)*amountMagnitude;
+      const last=sorted[sorted.length-1].date,next=new Date(last+'T12:00:00');
+      next.setDate(next.getDate()+Math.round(candidate.days));
+      const description=transactionDescription(sorted[0])||transactionCausale(sorted[0]);
+      proposals.push({id:uid('rp'),description,amount,bankAccountId:sorted[0].bankAccountId,categoryId:sorted[0].counterpartSplits?.length===1?sorted[0].counterpartSplits[0].accountId:sorted[0].counterpartAccountId,
+        frequency:candidate.frequency,day:Number(last.slice(8,10)),startDate:sorted[0].date,historyStartDate:sorted[0].date,nextDate:localDateKey(next),endDate:null,occurrences:sorted.length,confidence:Math.round((1-candidate.error)*(1-amountDeviation)*100),status:'proposta'});
+    }
+    state.recurringProposals=proposals.filter(p=>!state.recurringRules.some(rule=>rule.active&&rule.bankAccountId===p.bankAccountId&&rule.categoryId===p.categoryId&&normalize(rule.description)===normalize(p.description))).sort((a,b)=>b.confidence-a.confidence);
+    state.recurringDetectionLastTransactionCount=state.transactions.length;
+    renderRecurringProposals();saveState();
+  }
+  function renderRecurringProposals() {
+    const body=$('#recurringProposalsBody');if(!body)return;
+    const labels={weekly:'Settimanale',biweekly:'Quindicinale',monthly:'Mensile',bimonthly:'Bimestrale',quarterly:'Trimestrale',fourmonthly:'Quadrimestrale',halfyearly:'Semestrale',yearly:'Annuale'};
+    body.innerHTML=state.recurringProposals.map(p=>'<tr><td>'+safeText(p.description)+'</td><td>'+euro.format(p.amount)+'</td><td>'+labels[p.frequency]+'</td><td>'+safeText(formatDate(p.nextDate))+'</td><td>'+p.occurrences+'</td><td>'+p.confidence+'%</td><td><button class="row-action" data-accept-proposal="'+safeText(p.id)+'">Conferma</button> <button class="row-action row-action-danger" data-dismiss-proposal="'+safeText(p.id)+'">Ignora</button></td></tr>').join('')||'<tr><td colspan="7" class="empty-inline">Nessuna proposta. Analizza i movimenti confermati per cercare ricorrenze.</td></tr>';
+    body.querySelectorAll('[data-accept-proposal]').forEach(button=>button.addEventListener('click',async()=>{const p=state.recurringProposals.find(x=>x.id===button.dataset.acceptProposal);if(!p)return;state.recurringRules.push({id:uid('r'),description:p.description,amount:p.amount,bankAccountId:p.bankAccountId,categoryId:p.categoryId,frequency:p.frequency,day:p.day,startDate:p.nextDate,historyStartDate:p.startDate,endDate:p.endDate,active:true,createdAt:new Date().toISOString(),source:'rilevata'});state.recurringProposals=state.recurringProposals.filter(x=>x.id!==p.id);await saveState();renderForecastSelection();}));
+    body.querySelectorAll('[data-dismiss-proposal]').forEach(button=>button.addEventListener('click',async()=>{state.recurringProposals=state.recurringProposals.filter(x=>x.id!==button.dataset.dismissProposal);await saveState();renderRecurringProposals();}));
+  }
+  function addRecurringRule() {
+    const description=$('#recDescription').value.trim(),amount=Number($('#recAmount').value),bankAccountId=$('#recBankAccount').value,categoryId=$('#recCategory').value;
+    const frequency=$('#recFrequency').value,startDate=$('#recStart').value,endDate=$('#recEnd').value,day=frequency==='once'?Number(startDate.slice(8,10)):Math.min(31,Math.max(1,Number($('#recDay').value)||1));
+    if(!description||!Number.isFinite(amount)||amount===0||!bankAccountId||!startDate){showNotice('Dati incompleti','Inserisci descrizione, importo diverso da zero, conto e prima occorrenza.');return;}
+    if(endDate&&endDate<startDate){showNotice('Date non valide','L’ultima occorrenza non può precedere la prima.');return;}
+    if(editingRecurringId){const existing=state.recurringRules.find(rule=>rule.id===editingRecurringId);if(existing)Object.assign(existing,{description,amount,bankAccountId,categoryId:categoryId||null,frequency,day,startDate,endDate:endDate||null});editingRecurringId=null;}else state.recurringRules.push({id:uid('r'),description,amount,bankAccountId,categoryId:categoryId||null,frequency,day,startDate,endDate:endDate||null,active:true,createdAt:new Date().toISOString(),source:'manuale'});
+    saveState();['recDescription','recAmount','recEnd'].forEach(id=>$('#'+id).value='');$('#addRecurringRule').textContent='Aggiungi impegno manuale';renderForecastSelection();
+  }
+  function buildForecast() {
+    const accounts=forecastSelectedAccounts(),ids=new Set(accounts.map(a=>a.id)),today=localDateKey(new Date()),currentMonth=today.slice(0,7);
+    const txs=state.transactions.filter(t=>t.status==='confirmed'&&t.date<=today&&t.status!=='duplicate'&&
+      (ids.has(t.bankAccountId)||ids.has(t.counterpartAccountId)||(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.some(sp=>ids.has(sp.accountId)))));
+    const primaryAccountId=state.bankAccountId;
+    const opening=ids.has(primaryAccountId)?(Number(state.openingBalance)||0):0;
+    const openingBalanceUnknown=accounts.filter(account=>account.id!==primaryAccountId);
+    const currentBalance=opening+txs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
+    const historyKeys=Array.from({length:12},(_,i)=>shiftMonthKey(currentMonth,-12+i));
+    const completedCurrentYear=historyKeys.filter(key=>key.slice(0,4)===String(new Date().getFullYear())&&key<currentMonth);
+    const previousYearKeys=Array.from({length:12},(_,i)=>(new Date().getFullYear()-1)+'-'+String(i+1).padStart(2,'0'));
+    const categories=state.accounts.filter(a=>a.hierarchyType!=='Mastro'&&
+      (['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))));
+    const usedSources=new Set(),usedMonths=new Set();
+    const estimates={income:0,expense:0,source:'',months:0};
+    for(const cat of categories){
+      const hasCategoryMovement=key=>txs.some(tx=>String(tx.date).slice(0,7)===key&&
+        (tx.counterpartAccountId===cat.id||(tx.counterpartSplits||[]).some(split=>split.accountId===cat.id)));
+      const categoryCoverage=completedCurrentYear.filter(hasCategoryMovement).length;
+      const estimateKeys=categoryCoverage>=3?completedCurrentYear:previousYearKeys;
+      usedSources.add(categoryCoverage>=3?'anno_corrente':'anno_precedente');
+      estimateKeys.forEach(key=>usedMonths.add(key));
+      const monthly=estimateKeys.map(key=>{
+        let total=0;
+        for(const tx of txs){
+          if(String(tx.date).slice(0,7)!==key||transactionIsExplicitlyRecurring(tx,cat.id,key,ids))continue;
+          if(tx.counterpartSplits?.length){
+            for(const sp of tx.counterpartSplits)if(sp.accountId===cat.id)total+=Math.abs(Number(sp.value)||0);
+          }else if(tx.counterpartAccountId===cat.id)total+=Math.abs(Number(tx.amount)||0);
+        }
+        return total;
+      });
+      const nonZero=monthly.filter(value=>value>0);
+      if(nonZero.length<2)continue;
+      const estimate=median(nonZero);
+      if(cat.type==='INCOME')estimates.income+=estimate;else estimates.expense+=estimate;
+    }
+    estimates.income=Math.round(estimates.income*100)/100;
+    estimates.expense=Math.round(estimates.expense*100)/100;
+    estimates.source=usedSources.size>1?'periodi misti':usedSources.has('anno_corrente')?'anno corrente':'anno precedente';
+    estimates.months=usedMonths.size;
+    const forecast=[];
+    let balance=currentBalance;
+    for(let i=0;i<12;i++){
+      const key=shiftMonthKey(currentMonth,i),rules=forecastRecurringItems(key,ids);
+      const due=rules.filter(rule=>i!==0||rule.occurrenceDate>=today);
+      const programmedIncome=due.filter(rule=>Number(rule.amount)>0).reduce((sum,rule)=>sum+Number(rule.amount),0);
+      const programmedExpense=due.filter(rule=>Number(rule.amount)<0).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)),0);
+      const estimateIncome=i===0?0:estimates.income;
+      const estimateExpense=i===0?0:estimates.expense;
+      const openingBalance=balance;
+      balance=Math.round((balance+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
+      forecast.push({key,openingBalance,programmedIncome,programmedExpense,estimateIncome,estimateExpense,programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
+    }
+    const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:currentBalance,key:currentMonth});
+    return {accounts,currentBalance,forecast,minimum,historyCount:[...usedMonths].filter(key=>txs.some(tx=>String(tx.date).slice(0,7)===key)).length,estimatedNet:estimates.income-estimates.expense,estimates,openingBalanceUnknown};
+  }
+  function renderForecastSelection() {
+    const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
+    const count=forecastSelectedAccounts().length;
+    const status=$('#forecastStatus');if(status)status.textContent='Conti inclusi: '+count+'. Selezione vuota = tutti i conti liquidi.';
+    const liquid=state.accounts.filter(isLiquidAccount);
+    const bank=$('#recBankAccount'),category=$('#recCategory');
+    if(bank){const prior=bank.value;bank.innerHTML=liquid.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if(liquid.some(a=>a.id===prior))bank.value=prior;}
+    if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
+    renderRecurringRules();
+    const result=buildForecast();
+    $('#forecastOpening').textContent=euro.format(result.currentBalance);
+    $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
+    $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
+    $('#forecastEnding').textContent=euro.format(result.forecast.at(-1)?.balance??result.currentBalance);
+    $('#forecastReliability').textContent='Storico: '+result.historyCount+' mesi · base '+(result.estimates.source==='anno_corrente'?'anno corrente':'anno precedente')+' · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
+    if(status&&result.openingBalanceUnknown.length)status.textContent+=' ATTENZIONE: il saldo iniziale è disponibile solo per '+(accountById(state.bankAccountId)?.path||'il conto principale')+'. Per gli altri conti selezionati il saldo storico potrebbe essere incompleto.';
+    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
+  }
+
   function navigate(view) {
     $$('.content-view').forEach(section => section.classList.toggle('active', section.id === `view-${view}`));
     $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === view));
-    const names = { overview: 'Panoramica', transactions: 'Movimenti', reports: 'Report', accounts: 'Piano dei conti', rules: 'Regole apprese', settings: 'Impostazioni' };
+    const names = { overview: 'Panoramica', transactions: 'Movimenti', search: 'Ricerca avanzata', budget: 'Budget', forecast: 'Previsioni', reports: 'Report', accounts: 'Piano dei conti', rules: 'Regole apprese', settings: 'Impostazioni' };
     $('#currentSection').textContent = names[view] || 'Panoramica';
     renderAll();
     if (view === 'reports') requestAnimationFrame(drawReportChart);
   }
+  const ACCOUNT_TAGS = ['CONTO CHIUSO','INATTIVO','DA VERIFICARE','SOLO STORICO','NON UTILIZZARE','PRINCIPALE','SECONDARIO','RISPARMIO','EMERGENZA'];
   function accountById(id) { return state.accounts.find(a => a.id === id); }
-  function accountLabel(id) { return accountById(id)?.path || 'Da classificare'; }
+  function accountDisplayLabel(account) {
+    if (!account) return 'Da classificare';
+    const tags = Array.isArray(account.tags) ? account.tags : [];
+    return accountPathAt(account, localDateKey(new Date())) + (tags.length ? ' · [' + tags.join(', ') + ']' : '');
+  }
+  function accountLabel(id) { return accountDisplayLabel(accountById(id)); }
+  function accountPathAt(account, date) {
+    if (!account) return 'Da classificare';
+    const key = String(date || localDateKey(new Date()));
+    if (account.validFrom && key < account.validFrom) {
+      const old = [...(account.nameHistory || [])].reverse().find(item => !item.from || key >= item.from);
+      if (old) return old.path;
+    }
+    const old = (account.nameHistory || []).find(item => item.from && item.to && key >= item.from && key <= item.to);
+    return old?.path || account.path;
+  }
+  function renameAccount(accountId) {
+    const account = accountById(accountId); if (!account) return;
+    const nextPath = window.prompt('Nuova denominazione completa del conto (percorso con : se necessario):', account.path);
+    if (!nextPath?.trim() || nextPath.trim() === account.path) return;
+    const effectiveDate = window.prompt('Data di decorrenza (AAAA-MM-GG). I report precedenti manterranno il vecchio nome:', localDateKey(new Date()));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate || '') || Number.isNaN(Date.parse(effectiveDate + 'T12:00:00'))) {
+      showNotice('Data non valida','Inserisci la data nel formato AAAA-MM-GG.'); return;
+    }
+    const oldPrefix = account.path, newPrefix = nextPath.trim();
+    const affected = state.accounts.filter(item => item.id === account.id || String(item.path || '').startsWith(oldPrefix + ':'));
+    const previousDay = new Date(effectiveDate + 'T12:00:00'); previousDay.setDate(previousDay.getDate() - 1);
+    const historyEnd = localDateKey(previousDay);
+    for (const item of affected) {
+      const oldPath = item.path;
+      item.nameHistory = Array.isArray(item.nameHistory) ? item.nameHistory : [];
+      item.nameHistory.push({ path: oldPath, from: item.validFrom || '', to: historyEnd });
+      item.path = newPrefix + oldPath.slice(oldPrefix.length);
+      item.name = item.path.split(':').at(-1);
+      item.validFrom = effectiveDate;
+    }
+    saveState().then(()=>{renderAll();showNotice('Conto rinominato','ID e movimenti sono rimasti invariati. I nomi precedenti sono conservati per la consultazione storica.');});
+  }
+  async function editAccountTags(accountId) {
+    const account = accountById(accountId); if (!account) return;
+    const current = Array.isArray(account.tags) ? account.tags : [];
+    const answer = window.prompt('Tag ammessi (separati da virgola):\\n' + ACCOUNT_TAGS.join(' · ') + '\\n\\nLascia vuoto per rimuovere tutti i tag.', current.join(', '));
+    if (answer === null) return;
+    const requested = answer.split(',').map(value=>value.trim().toUpperCase()).filter(Boolean);
+    const invalid = requested.filter(tag=>!ACCOUNT_TAGS.includes(tag));
+    if (invalid.length) { showNotice('Tag non riconosciuto','Valori ammessi: '+ACCOUNT_TAGS.join(', ')); return; }
+    account.tags = [...new Set(requested)];
+    await saveState(); renderAll();
+  }
   function renderAccountFilters() {
     const eligible = state.accounts.filter(isLiquidAccount);
-    const options = `<option value="all">Tutti i conti liquidi</option>${eligible.map(a => `<option value="${safeText(a.id)}">${safeText(a.path)}</option>`).join('')}`;
+    const options = `<option value="all">Tutti i conti liquidi</option>${eligible.map(a => `<option value="${safeText(a.id)}">${safeText(accountDisplayLabel(a))}</option>`).join('')}`;
     for (const selector of ['#accountPicker', '#reportAccountPicker']) {
       const control = $(selector); const prior = state.reportAccountId || state.bankAccountId || eligible[0]?.id || 'all';
       control.innerHTML = options;
@@ -598,10 +1257,19 @@
   }
   function isLiquidAccount(account) {
     if (!account) return false;
-    if (['BANK', 'CASH', 'CREDIT'].includes(String(account.type || '').toUpperCase())) return true;
+    // CREDIT represents a liability (credit card), not immediately available liquidity.
+    if (['BANK', 'CASH'].includes(String(account.type || '').toUpperCase())) return true;
     // Some GnuCash books classify named current-account subaccounts as ASSET.
     // Recognize this common hierarchy so they are not silently omitted.
-    return String(account.type || '').toUpperCase() === 'ASSET' && normalize(account.path || '').includes('attivita correnti');
+    const normalizedPath = normalize(account.path || '');
+    return String(account.type || '').toUpperCase() === 'ASSET' &&
+      (normalizedPath.includes('attivita correnti') ||
+       normalizedPath.includes('conto corrente') ||
+       normalizedPath.includes('conto deposito') ||
+       normalizedPath.includes('banca') ||
+       normalizedPath.includes('cassa') ||
+       normalizedPath.includes('liquidita') ||
+       normalizedPath.includes('disponibilita liquide'));
   }
   function periodTransactions(year, startMonth, endMonth, endDay = 31) {
     const start = `${year}-${String(startMonth + 1).padStart(2, '0')}-01`;
@@ -698,7 +1366,7 @@
     if (!state) return;
     try {
       renderAccountFilters();
-      renderOverview(); renderTransactions(); renderReports(); renderAccounts(); renderRules(); renderSettings();
+      renderOverview(); renderTransactions(); renderReports(); setupFinanceViews(); renderAccounts(); renderRules(); renderSettings();
       const pendingCount = pendingTransactions().length;
       $('#pendingNavCount').textContent = String(pendingCount);
       $('#pendingNavCount').classList.toggle('hidden', pendingCount === 0);
@@ -872,9 +1540,13 @@
   function renderTransactions() {
     refreshAccountSearchOptions();
     const filter = $('#transactionFilter')?.value || 'all';
+    const dateFrom = $('#transactionDateFrom')?.value || '';
+    const dateTo = $('#transactionDateTo')?.value || '';
     let tx = [...state.transactions].sort((a, b) => parseDate(b.date).localeCompare(parseDate(a.date)));
     if (filter === 'pending') tx = tx.filter(t => t.status === 'pending');
     if (filter === 'confirmed') tx = tx.filter(t => t.status === 'confirmed');
+    if (dateFrom) tx = tx.filter(t => parseDate(t.date) >= dateFrom);
+    if (dateTo) tx = tx.filter(t => parseDate(t.date) <= dateTo);
     const body = $('#transactionsBody'); if (!body) return;
     $('#emptyTransactions').classList.toggle('hidden', tx.length > 0);
     const pageSize = 100;
@@ -896,7 +1568,7 @@
       const accountCell = isSplit
         ? '<span class="account-type">Ripartito</span>'
         : item.status === 'confirmed'
-          ? `<span class="name-secondary">${safeText(accountLabel(item.counterpartAccountId))}</span>`
+          ? `<span class="name-secondary">${safeText(accountPathAt(accountById(item.counterpartAccountId), item.date))}</span>`
           : `<input class="account-select account-search" type="text" list="accountSearchOptions" data-tx="${safeText(item.id)}" value="${suggested ? safeText(accountLabel(suggested)) : ''}" placeholder="Cerca conto…" autocomplete="off" aria-label="Cerca conto di contropartita">`;
       const conf = item.status === 'confirmed' ? 1 : (item.confidence || 0.1);
       const confidenceClass = conf >= .8 ? 'high' : conf >= .5 ? 'medium' : 'low';
@@ -906,7 +1578,7 @@
         : item.status === 'confirmed'
           ? `<button class="row-action row-action-review" data-edit-tx="${safeText(item.id)}">Rivedi</button> <button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Ripartisci</button>`
           : `<button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Dividi</button> <button class="row-action row-action-review" data-confirm-tx="${safeText(item.id)}">Conferma</button>`;
-      return `<tr><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountLabel(item.bankAccountId))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td>${actions} <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
+      return `<tr><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountPathAt(accountById(item.bankAccountId), item.date))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td>${actions} <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
     }).join('');
     $$('[data-confirm-tx]', body).forEach(btn => btn.addEventListener('click', () => confirmTransaction(btn.dataset.confirmTx)));
     $$('[data-split-tx]', body).forEach(btn => btn.addEventListener('click', () => openSplitEditor(btn.dataset.splitTx)));
@@ -928,11 +1600,11 @@
   function refreshAccountSearchOptions() {
     const list = $('#accountSearchOptions'); if (!list || !state) return;
     const accounts = state.accounts.filter(a => !['ROOT', 'TRADING'].includes(a.type)).sort((a, b) => a.path.localeCompare(b.path, 'it', { sensitivity: 'base' }));
-    list.innerHTML = accounts.map(a => `<option value="${safeText(a.path)}"></option>`).join('');
+    list.innerHTML = accounts.map(a => `<option value="${safeText(accountDisplayLabel(a))}"></option>`).join('');
   }
   function openManualTransaction() {
     const banks = state.accounts.filter(isLiquidAccount).sort((a, b) => a.path.localeCompare(b.path, 'it'));
-    $('#manualBankAccount').innerHTML = banks.map(a => `<option value="${safeText(a.id)}">${safeText(a.path)}</option>`).join('');
+    $('#manualBankAccount').innerHTML = banks.map(a => `<option value="${safeText(a.id)}">${safeText(accountDisplayLabel(a))}</option>`).join('');
     const selected = state.reportAccountId && banks.some(a => a.id === state.reportAccountId) ? state.reportAccountId : state.bankAccountId;
     if (selected && banks.some(a => a.id === selected)) $('#manualBankAccount').value = selected;
     $('#manualDate').value = localDateKey(new Date());
@@ -1083,8 +1755,10 @@
     return { id: top.accountId, label: accountLabel(top.accountId), confidence: ambiguous ? Math.min(.49, top.score) : top.score, reason: ambiguous ? 'Più conti possibili' : `Corrispondenza ${top.field}` };
   }
   function findAccountByLabel(label) {
-    const n = normalize(label);
-    return state.accounts.find(a => normalize(a.path) === n || normalize(a.name) === n || normalize(a.path.replace(/:/g, ' ')) === n);
+    const clean = String(label || '').split(' · [')[0].trim();
+    const n = normalize(clean);
+    return state.accounts.find(a => normalize(a.path) === n || normalize(a.name) === n || normalize(a.path.replace(/:/g, ' ')) === n ||
+      (a.nameHistory || []).some(item => normalize(item.path) === n || normalize(item.path.replace(/:/g, ' ')) === n));
   }
 
   function renderReports() {
@@ -1108,15 +1782,24 @@
   }
   function economicExpenseTotals(transactions) {
     const totals = new Map();
+    const addExpenseWithAncestors = (accountId, rawAmount) => {
+      const amount = Math.abs(Number(rawAmount) || 0);
+      if (!amount) return;
+      let account = accountById(accountId);
+      const visited = new Set();
+      while (account && !visited.has(String(account.id))) {
+        visited.add(String(account.id));
+        if (account.type === 'EXPENSE' || (account.classification === 'Patrimoniale' && account.includeInBudget === true)) {
+          totals.set(account.id, (totals.get(account.id) || 0) + amount);
+        }
+        account = account.parentId ? accountById(account.parentId) : null;
+      }
+    };
     for (const tx of transactions) {
       if (tx.counterpartSplits?.length) {
-        for (const split of tx.counterpartSplits) {
-          const account = accountById(split.accountId);
-          if (account?.type === 'EXPENSE') totals.set(account.id, (totals.get(account.id) || 0) + Math.abs(Number(split.value) || 0));
-        }
+        for (const split of tx.counterpartSplits) addExpenseWithAncestors(split.accountId, split.value);
       } else {
-        const account = accountById(tx.counterpartAccountId);
-        if (account?.type === 'EXPENSE') totals.set(account.id, (totals.get(account.id) || 0) + Math.abs(tx.amount));
+        addExpenseWithAncestors(tx.counterpartAccountId, tx.amount);
       }
     }
     return totals;
@@ -1182,10 +1865,27 @@
     accounts.forEach(a => { if (counts[a.classification] !== undefined) counts[a.classification]++; });
     $('#accountSummary').innerHTML = Object.entries(counts).map(([label, count]) => `<div class="account-summary-card"><span>Conti ${label.toLowerCase()}</span><strong>${count}</strong></div>`).join('');
     $('#accountsBody').innerHTML = accounts.map(a => {
-      const txCount = state.transactions.filter(t => t.counterpartAccountId === a.id || t.bankAccountId === a.id).length;
+      const txCount = state.transactions.filter(t => t.counterpartAccountId === a.id || t.bankAccountId === a.id || (t.counterpartSplits || []).some(sp => sp.accountId === a.id)).length;
       const cls = a.classification === 'Economica' ? 'class-economic' : a.classification === 'Patrimoniale' ? 'class-balance' : a.classification === 'Tecnica' ? 'class-technical' : 'class-structural';
-      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}</td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td>${txCount}</td></tr>`;
+      const options = ['automatico','Mastro','Mastro e conto','Conto'].map(v => `<option value="${v}" ${(v === 'automatico' ? !a.hierarchyTypeOverride : a.hierarchyType === v && a.hierarchyTypeSource === 'manuale') ? 'selected' : ''}>${v === 'automatico' ? 'Automatico · ' + safeText(a.hierarchyTypeProposal || a.hierarchyType) : v}</option>`).join('');
+      const budgetEligible=a.classification==='Patrimoniale'&&!isLiquidAccount(a)&&a.hierarchyType!=='Mastro';
+      const tags=Array.isArray(a.tags)?a.tags:[];
+      const tagMarkup=tags.length?'<small class="account-tags">'+tags.map(tag=>'<span>'+safeText(tag)+'</span>').join(' ')+'</small>':'';
+      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+'> Includi nel budget</label>' : '—'}</td></tr>`;
     }).join('');
+    $('#accountsBody').querySelectorAll('[data-rename-account]').forEach(button=>button.addEventListener('click',()=>renameAccount(button.dataset.renameAccount)));
+    $('#accountsBody').querySelectorAll('[data-tags-account]').forEach(button=>button.addEventListener('click',()=>editAccountTags(button.dataset.tagsAccount)));
+    $('#accountsBody').querySelectorAll('[data-hierarchy-account]').forEach(select => select.addEventListener('change', async () => {
+      const account = accountById(select.dataset.hierarchyAccount); if (!account) return;
+      if (select.value === 'automatico') delete account.hierarchyTypeOverride;
+      else account.hierarchyTypeOverride = select.value;
+      normalizeState(); await saveState(); renderAccounts(); renderBudgetView(); renderForecastSelection();
+    }));
+    $('#accountsBody').querySelectorAll('[data-budget-include-account]').forEach(input=>input.addEventListener('change',async()=>{
+      const account=accountById(input.dataset.budgetIncludeAccount);if(!account)return;
+      account.includeInBudget=input.checked;
+      await saveState();renderAccounts();renderBudgetView();renderForecastSelection();
+    }));
   }
   function renderRules() {
     const body = $('#rulesBody');
@@ -1251,7 +1951,7 @@
     const file=event.target.files?.[0]; if(!file)return;
     try {
       let imported; const ext=file.name.toLowerCase().split('.').pop();
-      if(ext==='qif'||ext==='txt') imported=parseQif(await file.text()); else if(ext==='csv') imported=parseCsv(await file.text()); else if(ext==='xlsx') imported=await parseXlsx(file); else throw new Error('Formato non supportato.');
+      if(ext==='qif'||ext==='txt') imported=parseQif(await file.text()); else if(ext==='ofx') imported=parseOfx(await file.text()); else if(ext==='csv') imported=parseCsv(await file.text()); else if(ext==='xlsx') imported=await parseXlsx(file); else throw new Error('Formato non supportato.');
       if(!imported.length) throw new Error('Non ho trovato movimenti con data e importo.');
       const start=replaceDemo=>{
         if(replaceDemo) state={...createDemoState(),accounts:defaultAccounts(),transactions:[],rules:[],demo:false,openingBalance:0};
@@ -1263,7 +1963,7 @@
           const chosen=imported.filter(tx=>{const key=transactionFingerprint(tx);const duplicate=known.has(key)||batchKeys.has(key);batchKeys.add(key);return include||!duplicate;});
           chosen.forEach(tx=>{const key=transactionFingerprint(tx);const suggestion=tx.split?{id:null,label:'Movimento suddiviso · rivedi le righe',confidence:.1}:suggestionFor(tx);tx.suggestionId=suggestion.id;tx.suggestionLabel=suggestion.label;tx.confidence=suggestion.confidence;if(tx.category){const cat=findAccountByLabel(tx.category);if(cat){tx.suggestionId=cat.id;tx.suggestionLabel=cat.path;tx.confidence=.96;}}tx.id=uid();tx.status='pending';tx.bankAccountId=selected;tx.source=ext;if(known.has(key))tx.duplicateOverride=true;});
           state.transactions.push(...chosen);state.demo=false;const latest=imported.map(tx=>tx.date).filter(Boolean).sort().at(-1);
-          if(latest){state.selectedMonth=latest.slice(0,7);$('#monthPicker').value=state.selectedMonth;syncReportPeriodPicker(state.selectedMonth);$('#statementMonth').value=state.selectedMonth;}
+          if(latest){state.selectedMonth=latest.slice(0,7);$('#monthPicker').value=state.selectedMonth;syncReportPeriodPicker(state.selectedMonth);}
           state.reportAccountId=selected;$('#accountPicker').value=selected;$('#reportAccountPicker').value=selected;
           saveState().then(()=>{renderAll();navigate('transactions');showNotice('Importazione completata',chosen.length+' movimenti aggiunti. '+(duplicates.length?(include?duplicates.length+' duplicati inseriti comunque.':duplicates.length+' duplicati esclusi.'):'')+' '+chosen.filter(t=>t.status==='pending').length+' da classificare.');});
         };
@@ -1275,13 +1975,35 @@
     const key = transactionFingerprint(candidate);
     return state.transactions.some(tx => tx.status !== 'duplicate' && transactionFingerprint(tx) === key);
   }
-  function transactionFingerprint(tx) { return [parseDate(tx.date), Number(tx.amount).toFixed(2), normalize(transactionDescription(tx)), normalize(transactionCausale(tx))].join('|'); }
+  function transactionFingerprint(tx) { if(tx.fitid)return 'OFX|'+String(tx.fitid).trim()+'|'+parseDate(tx.date)+'|'+Number(tx.amount).toFixed(2); return [parseDate(tx.date), Number(tx.amount).toFixed(2), normalize(transactionDescription(tx)), normalize(transactionCausale(tx))].join('|'); }
   function findImportDuplicates(rows) {
     const seen = new Set(state.transactions.filter(tx => tx.status !== 'duplicate').map(transactionFingerprint));
     const duplicates = [];
     rows.forEach(tx => { const key = transactionFingerprint(tx); if (seen.has(key)) duplicates.push(tx); seen.add(key); });
     return duplicates;
   }
+
+  function parseOfxDate(value) {
+    const m=String(value||'').match(/^(\d{4})(\d{2})(\d{2})/);
+    return m?m[1]+'-'+m[2]+'-'+m[3]:'';
+  }
+  function parseOfx(content) {
+    const source=String(content||'').replace(/^\uFEFF/,'');
+    const blocks=source.match(/<STMTTRN\b[^>]*>[\s\S]*?(?:<\/STMTTRN>|(?=<STMTTRN\b)|$)/gi)||[];
+    const read=(block,tag)=>{
+      const match=block.match(new RegExp('<'+tag+'\\s*>([^<\\r\\n]*)','i'));
+      return match?String(match[1]).trim():'';
+    };
+    return blocks.map(block=>{
+      const date=parseOfxDate(read(block,'DTPOSTED'));
+      const amount=parseAmount(read(block,'TRNAMT'));
+      const fitid=read(block,'FITID');
+      const name=read(block,'NAME')||read(block,'PAYEE')||'';
+      const memo=read(block,'MEMO')||'';
+      return {id:uid('o'),date,amount,fitid,description:name,payee:name,memo,causale:memo};
+    }).filter(tx=>tx.date&&Number.isFinite(tx.amount));
+  }
+
   function parseQif(content) {
     const records = []; let record = {};
     const append = (field, value) => { if (!value) return; record[field] = record[field] ? `${record[field]} ${value}` : value; };
@@ -1484,7 +2206,7 @@
       const parsed=parseGnuCashXml(xml);if(!parsed.accounts.length)throw new Error('Nel file non ho trovato un piano dei conti leggibile.');
       const duplicateCount=findImportDuplicates(parsed.transactions).length;
       const merge=async include=>{
-        const byPath=new Map(state.accounts.map(ac=>[ac.path,ac]));const idMap=new Map();
+        const byPath=new Map();state.accounts.forEach(ac=>{byPath.set(ac.path,ac);(ac.nameHistory||[]).forEach(item=>{if(item.path)byPath.set(item.path,ac);});});const idMap=new Map();
         parsed.accounts.forEach(ac=>{if(ac.type==='ROOT'){idMap.set(ac.id,state.accounts.find(x=>x.type==='ROOT')?.id||'root');return;}const old=byPath.get(ac.path);idMap.set(ac.id,old?old.id:uid('a'));});
         const additions=parsed.accounts.filter(ac=>ac.type!=='ROOT'&&!byPath.has(ac.path)).map(ac=>({...ac,id:idMap.get(ac.id),parentId:idMap.get(ac.parentId)||'root'}));state.accounts.push(...additions);
         const keys=new Set(state.transactions.filter(tx=>tx.status!=='duplicate').map(transactionFingerprint));const seen=new Set();
@@ -1494,7 +2216,7 @@
         parsed.rules.forEach(rule=>{const accountId=idMap.get(rule.accountId)||rule.accountId;const key=[rule.field,rule.token,accountId].join('|');if(!ruleKeys.has(key)){state.rules.push({...rule,id:uid('r'),accountId});ruleKeys.add(key);}});
         state.demo=false;state.bankAccountId=parsed.bankAccountId?(idMap.get(parsed.bankAccountId)||state.bankAccountId):state.bankAccountId;state.reportAccountId='all';state.reportAccountDefaultMigrated=true;
         const dates=imported.map(tx=>parseDate(tx.date)).filter(Boolean).sort();if(dates.length)state.selectedMonth=dates.at(-1).slice(0,7);
-        const saved=await saveState();transactionPage=0;if(dates.length){const m=dates.at(-1).slice(0,7);$('#monthPicker').value=m;syncReportPeriodPicker(m);$('#statementMonth').value=m;}renderAll();navigate('transactions');showNotice(saved?'Libro GnuCash importato':'Importazione non salvata',additions.length+' conti aggiunti; '+imported.length+' movimenti importati. '+(duplicateCount?(include?duplicateCount+' duplicati inseriti comunque.':duplicateCount+' duplicati esclusi.'):'')+' I dati esistenti sono stati conservati.');
+        const saved=await saveState();transactionPage=0;if(dates.length){const m=dates.at(-1).slice(0,7);$('#monthPicker').value=m;syncReportPeriodPicker(m);}renderAll();navigate('transactions');showNotice(saved?'Libro GnuCash importato':'Importazione non salvata',additions.length+' conti aggiunti; '+imported.length+' movimenti importati. '+(duplicateCount?(include?duplicateCount+' duplicati inseriti comunque.':duplicateCount+' duplicati esclusi.'):'')+' I dati esistenti sono stati conservati.');
       };
       if(duplicateCount)showDuplicateChoice('Movimenti GnuCash già presenti','Trovati '+duplicateCount+' possibili duplicati su '+parsed.transactions.length+' movimenti. Scegli se escluderli oppure importarli comunque.',merge);
       else showConfirm('Importare il libro GnuCash?','Saranno aggiunti '+parsed.accounts.length+' conti e '+parsed.transactions.length+' movimenti. I dati esistenti non saranno sostituiti.',()=>merge(false));
@@ -1674,7 +2396,8 @@
       const actual = actualMap.get(id) || 0, expected = baseline.get(id) || 0;
       const delta = actual - expected;
       const previousYear = previousMap.get(id) || 0, yearDelta = actual - previousYear;
-      return { id, name: accountLabel(id).replace(/^.*:/, ''), actual, previousYear, yearDelta, yearPercent: previousYear > 0.005 ? yearDelta / previousYear * 100 : null, expected, delta, percent: expected > 0.005 ? delta / expected * 100 : null };
+      const periodDate = comparisons[0].tx.map(tx=>tx.date).filter(Boolean).sort()[0] || monthSelection() + '-01';
+      return { id, name: accountPathAt(accountById(id), periodDate).replace(/^.*:/, ''), actual, previousYear, yearDelta, yearPercent: previousYear > 0.005 ? yearDelta / previousYear * 100 : null, expected, delta, percent: expected > 0.005 ? delta / expected * 100 : null };
     }).filter(row => baselinePeriods > 0 && Math.abs(row.delta) >= 0.01)
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   }
@@ -1810,7 +2533,7 @@
     }
   }
   function statementContext() {
-    const monthKey = $('#statementMonth').value || monthSelection();
+    const monthKey = monthSelection();
     const transactions = exportPeriodTransactions(monthKey);
     return { monthKey, transactions, totals: cashFlowTotals(transactions), accountName: state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountLabel(state.reportAccountId) };
   }

@@ -1,5 +1,13 @@
 # Gestione C/C Home Assistant App — Changelog
 
+## 1.0.6 — 10 novembre 2026
+
+- Aggiornata l'applicazione Gestione C/C inclusa alla versione 1.7.2.
+- Consolidate le modifiche del piano dei conti, dei tag, dei movimenti, del budget e delle previsioni.
+- Nei Movimenti, allineati i campi Data inizio e Data fine e rimosso il selettore del mese non funzionale.
+- Gli estratti conto PDF e XLSX utilizzano il periodo corrente selezionato nella Panoramica.
+
+
 ## 1.0.4 — 8 novembre 2026
 
 - Uniformata la finestra di anteprima dei PDF: Report Gestione C/C ed estratto conto utilizzano un unico comando «STAMPA/ESPORTA PDF».

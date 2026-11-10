@@ -1,0 +1,30 @@
+name: Validate finance feature
+
+on:
+  push:
+    branches:
+      - feature/analisi-budget-previsioni
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Check JavaScript syntax
+        run: node --check gestione_cc/www/app.js
+      - name: Check Python syntax
+        run: python -m py_compile gestione_cc/server.py
+      - name: Test OFX parser
+        run: node tests/finance-import.test.js

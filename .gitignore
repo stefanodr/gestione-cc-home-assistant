@@ -1,0 +1,3 @@
+# Local Docker test data and secrets
+docker-test/.env
+docker-test/data/
