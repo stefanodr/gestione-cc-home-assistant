@@ -1,3 +1,11 @@
+## 1.0.11 — 10 novembre 2026
+
+- Aggiornata l'applicazione inclusa alla versione Gestione C/C 1.7.6.
+- Corretto il doppio conteggio nei totali gerarchici delle spese: i conti padre non vengono sommati una seconda volta insieme ai rispettivi sottoconti.
+- La riga «Uscite» del report usa il totale dei flussi di cassa in uscita e i relativi confronti, in modo da poter essere riconciliata con il riepilogo del periodo.
+- La media di riferimento considera esclusivamente i periodi completi precedenti al periodo selezionato; i mesi successivi non entrano più nel calcolo.
+- Mantenuti invariati archivio SQLite, autenticazione PIN, configurazione HTTPS e backup.
+
 # Gestione C/C Home Assistant App — Changelog
 
 ## 1.0.10 — 10 novembre 2026
