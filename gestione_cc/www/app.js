@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.6';
+  const APP_VERSION = '1.7.7';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -399,7 +399,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.12</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.13</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -1187,7 +1187,6 @@
     renderAll();
     if (view === 'reports') requestAnimationFrame(drawReportChart);
   }
-  const ACCOUNT_TAGS = ['CONTO CHIUSO','INATTIVO','DA VERIFICARE','SOLO STORICO','NON UTILIZZARE','PRINCIPALE','SECONDARIO','RISPARMIO','EMERGENZA'];
   function accountById(id) { return state.accounts.find(a => a.id === id); }
   function accountDisplayLabel(account) {
     if (!account) return 'Da classificare';
@@ -1195,6 +1194,12 @@
     return accountPathAt(account, localDateKey(new Date())) + (tags.length ? ' · [' + tags.join(', ') + ']' : '');
   }
   function accountLabel(id) { return accountDisplayLabel(accountById(id)); }
+  function accountReportLabel(account) {
+    if (!account) return 'Da classificare';
+    const tags = Array.isArray(account.tags) ? account.tags.map(tag => String(tag ?? '').trim()).filter(Boolean) : [];
+    return accountPathAt(account, localDateKey(new Date())) + (tags.length ? ' ' + tags.join(' ') : '');
+  }
+  function accountReportLabelById(id) { return accountReportLabel(accountById(id)); }
   function accountPathAt(account, date) {
     if (!account) return 'Da classificare';
     const key = String(date || localDateKey(new Date()));
@@ -1230,12 +1235,16 @@
   async function editAccountTags(accountId) {
     const account = accountById(accountId); if (!account) return;
     const current = Array.isArray(account.tags) ? account.tags : [];
-    const answer = window.prompt('Tag ammessi (separati da virgola):\\n' + ACCOUNT_TAGS.join(' · ') + '\\n\\nLascia vuoto per rimuovere tutti i tag.', current.join(', '));
+    const answer = window.prompt('Inserisci uno o più tag personalizzati, uno per riga. È ammesso qualsiasi testo, ad esempio IBAN: IT60S0103070230000000622264. Lascia vuoto per rimuovere tutti i tag.', current.join('\\n'));
     if (answer === null) return;
-    const requested = answer.split(',').map(value=>value.trim().toUpperCase()).filter(Boolean);
-    const invalid = requested.filter(tag=>!ACCOUNT_TAGS.includes(tag));
-    if (invalid.length) { showNotice('Tag non riconosciuto','Valori ammessi: '+ACCOUNT_TAGS.join(', ')); return; }
-    account.tags = [...new Set(requested)];
+    const requested = answer.split(/\\r?\\n/).map(value => value.trim()).filter(Boolean);
+    const unique = [];
+    const seen = new Set();
+    for (const tag of requested) {
+      const key = tag.toLocaleLowerCase('it-IT');
+      if (!seen.has(key)) { seen.add(key); unique.push(tag); }
+    }
+    account.tags = unique;
     await saveState(); renderAll();
   }
   function renderAccountFilters() {
@@ -1770,11 +1779,12 @@
     $('#reportNet').textContent = euro.format(current.net);
     $('#reportNet').className = current.net >= 0 ? 'amount-in' : 'amount-out';
     $('#reportTransfers').textContent = euro.format(current.transfers);
-    $('#reportNameCode').textContent = `Nome del report: ${reportFilenameCode()}`;
+    const accountHeading = state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountReportLabelById(state.reportAccountId);
+    $('#reportNameCode').textContent = `${accountHeading} · ${reportFilenameCode()}`;
     renderComparisonTable('#reportComparisonBody', comparisons);
     const periodNotes = { monthly: 'Confronto con lo stesso mese dei tre anni precedenti.', quarterly: 'Confronto con lo stesso trimestre dei tre anni precedenti.', halfyearly: 'Confronto con lo stesso semestre dei tre anni precedenti.', annual: 'Confronto con gli stessi mesi degli anni precedenti.' };
     const periodNote = periodNotes[reportMode] || periodNotes.monthly;
-    const accountNote = state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountLabel(state.reportAccountId);
+    const accountNote = state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountReportLabelById(state.reportAccountId);
     const transactionCount = comparisons[0].tx.length;
     const txNote = transactionCount ? `${transactionCount} movimenti nel periodo.` : 'Nessun movimento nel periodo selezionato: prova un altro mese o Tutti i conti liquidi.';
     $('#reportComparisonNote').textContent = `${periodNote} Conto: ${accountNote}. ${txNote}`;
@@ -2689,7 +2699,7 @@
   function statementContext() {
     const monthKey = monthSelection();
     const transactions = exportPeriodTransactions(monthKey);
-    return { monthKey, transactions, totals: cashFlowTotals(transactions), accountName: state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountLabel(state.reportAccountId) };
+    return { monthKey, transactions, totals: cashFlowTotals(transactions), accountName: state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountReportLabelById(state.reportAccountId) };
   }
   function overviewStatementContext() {
     const monthKey = monthSelection();
@@ -2710,7 +2720,7 @@
       return { tx, income: amount > 0 ? amount : 0, expense: amount < 0 ? Math.abs(amount) : 0, balance: running };
     });
     return { monthKey, start, end, opening, closing: running, transactions, rows,
-      accountName: accountFilter === 'all' ? 'Tutti i conti liquidi' : accountLabel(accountFilter),
+      accountName: accountFilter === 'all' ? 'Tutti i conti liquidi' : accountReportLabelById(accountFilter),
       totals: cashFlowTotals(transactions) };
   }
   function exportOverviewStatementPdf() {
@@ -2771,7 +2781,7 @@
     const verdict = current.net > .005 ? 'ATTIVO' : current.net < -.005 ? 'PASSIVO' : 'IN PAREGGIO';
     const rows = reportDeviationDisplayRows(comparisons).map(deviationRowHtml).join('');
     const periodRows = comparisons.map(c => `<tr><td>${c.year}</td><td class="num">${euro.format(c.data.income)}</td><td class="num">${euro.format(c.data.expense)}</td><td class="num" style="color:${c.data.net < 0 ? '#b00020' : '#171b1a'};font-weight:${c.data.net < 0 ? '700' : '400'}">${euro.format(c.data.net)}</td><td class="num">${euro.format(c.data.transfers)}</td></tr>`).join('');
-    const scope = state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountLabel(state.reportAccountId);
+    const scope = state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountReportLabelById(state.reportAccountId);
     const label = reportPeriodLabel(), code = reportFilenameCode();
     const baselineText = reportMode === 'monthly' && Number(monthSelection().slice(5, 7)) <= 2 ? 'Confronto con lo stesso mese dell’anno precedente' : 'Media degli altri periodi completi disponibili dello stesso anno';
     const chart = reportChartSvg();
@@ -2790,7 +2800,7 @@
     const categories = reportDeviationDisplayRows(comparisons);
     const current = comparisons[0].data, previous = comparisons[1].data;
     const verdict = current.net > .005 ? 'ATTIVO' : current.net < -.005 ? 'PASSIVO' : 'IN PAREGGIO';
-    const account = state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountLabel(state.reportAccountId);
+    const account = state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountReportLabelById(state.reportAccountId);
     const [selectedYear] = monthSelection().split('-').map(Number);
     const now = new Date();
     const lastMonth = selectedYear === now.getFullYear() ? now.getMonth() : 11;
