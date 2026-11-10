@@ -181,3 +181,9 @@ body.app-ready .app-shell{visibility:visible}
   margin-top: 5px;
   color: #647570;
 }
+
+.deviation-name{color:#344a46}
+.deviation-summary-row td,.deviation-total-row td{font-weight:700!important;color:#344a46!important}
+.deviation-total-row td{border-top:2px solid #dce5e2}
+.deviation-category-row td{font-weight:400!important}
+.deviation-detail-row td{font-style:italic!important;font-weight:400!important}
