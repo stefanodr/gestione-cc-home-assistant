@@ -35,6 +35,47 @@ Gestione C/C è un'applicazione web self-hosted per la gestione dei conti person
 - **Backup e ripristino:** backup JSON e SQLite, copie automatiche locali, backup facoltativo su Google Drive e ripristino con controlli d'integrità.
 - **Accesso protetto:** PIN amministratore di 6 cifre e connessione HTTPS.
 
+### Dettaglio delle funzioni contabili
+
+#### Panoramica finanziaria
+- Riepilogo di entrate, uscite e saldo netto del periodo selezionato.
+- Consultazione dei saldi ricostruiti dai movimenti registrati.
+- Selezione del conto e del periodo di analisi.
+- Grafici per osservare l'andamento dei flussi finanziari nel tempo.
+- Confronto tra periodi omogenei e riepilogo delle uscite per categoria.
+- Evidenza dei movimenti ancora da classificare.
+
+#### Registro e gestione dei movimenti
+- Consultazione cronologica e ricerca dei movimenti.
+- Filtri e selezione di un intervallo tramite data iniziale e data finale.
+- Inserimento manuale e importazione dai formati supportati.
+- Classificazione tramite contropartita e piano dei conti.
+- Ripartizione di una singola operazione su più conti o categorie, con controllo della quadratura.
+- Esportazione dei prospetti nei formati disponibili.
+
+#### Piano dei conti e classificazione
+- Organizzazione gerarchica di conti e sottoconti.
+- Gestione delle categorie economiche e patrimoniali.
+- Compatibilità di importazione con la struttura dei conti GnuCash, nei limiti dei formati supportati.
+- Tag multipli per annotare e organizzare i conti.
+- Suggerimenti di classificazione basati sulle conferme dell'utente e gestione delle regole apprese.
+
+#### Budget, previsioni e report
+- Gestione e consultazione dei budget.
+- Confronto tra valori previsti ed effettivi.
+- Analisi degli scostamenti per periodo e categoria.
+- Consultazione dei flussi e delle previsioni di liquidità.
+- Report mensili, trimestrali, semestrali e annuali, con confronti storici.
+- Esportazione XLSX e anteprima PDF stampabile, secondo le funzioni della versione installata.
+
+#### Importazione e continuità dei dati
+- Importazione di archivi GnuCash e file QIF, CSV e XLSX nei formati supportati.
+- Verifica dell'archivio dopo l'importazione: conti, saldi, date e movimenti ripartiti.
+- Database SQLite centralizzato e persistente sul server Home Assistant, condiviso tra i dispositivi autorizzati.
+- Backup ed esportazione dell'archivio prima di operazioni importanti.
+
+Le funzioni effettivamente disponibili dipendono dalla versione dell'App installata. Per le modifiche puntuali fare riferimento al [CHANGELOG](CHANGELOG.md).
+
 ## Requisiti
 
 - Home Assistant OS con Supervisor e catalogo App.
