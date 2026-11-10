@@ -1,3 +1,9 @@
+## [1.0.14] - 2026-11-10
+
+- Updated the examples shown when editing custom account tags: a fictitious IBAN, CLOSED ACCOUNT, MAIN ACCOUNT, SAVINGS, SALARY, SECONDARY ACCOUNT, PREPAID CARD, FAMILY ACCOUNT and DO NOT USE.
+- Updated the bundled application to version 1.7.8.
+- No changes to existing account tags, the SQLite archive, PIN authentication, HTTPS configuration, LAN access or backups.
+
 ## [1.0.13] - 2026-11-10
 
 - Added multiple custom tags per account, with no predefined list: any text is accepted, including an IBAN, with one tag per line.
