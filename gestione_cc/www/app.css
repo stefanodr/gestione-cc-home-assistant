@@ -144,3 +144,10 @@ body.app-ready .app-shell{visibility:visible}
 
 /* Ricerca avanzata: i due estremi del periodo restano affiancati anche con la regola generale del secondo campo a larghezza intera. */
 .manual-fields label.search-date-field:nth-child(1),.manual-fields label.search-date-field:nth-child(2){grid-column:auto;min-width:0}
+
+
+/* Registro movimenti: filtri data allineati ai controlli della barra. */
+.transaction-date-filter{display:grid;gap:6px;align-content:end;align-self:stretch;color:#80908d;font-size:10px;font-weight:600;white-space:nowrap}
+.transaction-date-filter input{height:36px;min-width:145px;border:1px solid #dce5e2;border-radius:7px;background:#fff;padding:9px 11px;color:#324541;outline:none;font-size:12px}
+.transaction-date-filter input:focus{border-color:#69a79d;box-shadow:0 0 0 3px #e6f3f0}
+@media(max-width:760px){.transaction-date-filter{flex:1 1 145px;min-width:0}.transaction-date-filter input{width:100%;min-width:0}}
