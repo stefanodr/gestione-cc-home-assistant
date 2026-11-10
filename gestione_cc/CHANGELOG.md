@@ -1,5 +1,12 @@
 # Gestione C/C Home Assistant App — Changelog
 
+## 1.0.10 — 10 novembre 2026
+
+- Aggiornata l'applicazione inclusa alla versione Gestione C/C 1.7.5.
+- Riorganizzato il report degli scostamenti con totale Spese, categorie di secondo livello, conti di dettaglio in corsivo e totale Uscite in fondo.
+- Applicata la gerarchia anche ai report PDF e alle esportazioni Excel, mantenendo separati i dati di origine dei grafici.
+- Mantenuti invariati archivio SQLite, autenticazione PIN, configurazione HTTPS e backup.
+
 ## 1.0.8 — 10 novembre 2026
 
 - Corretta la versione dell'add-on mostrata nel piè di pagina dell'interfaccia: ora corrisponde alla versione 1.0.8 distribuita.
