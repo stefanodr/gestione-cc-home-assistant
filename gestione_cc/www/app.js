@@ -645,7 +645,9 @@
     const min = get('searchMin')?.value === '' ? null : Number(get('searchMin').value);
     const max = get('searchMax')?.value === '' ? null : Number(get('searchMax').value);
     const direction = get('searchDirection')?.value || 'all', status = get('searchStatus')?.value || 'all';
-    const account = get('searchAccount')?.value || 'all';
+    const accountText = get('searchAccount')?.value.trim() || '';
+    const matchedAccount = accountText ? state.accounts.find(a => accountDisplayLabel(a) === accountText || a.path === accountText) : null;
+    const account = !accountText ? 'all' : (matchedAccount?.id || '__no_matching_account__');
     return { text, from, to, min, max, direction, status, account };
   }
   function renderSavedFilters() {
@@ -703,8 +705,21 @@
     const account = $('#searchAccount');
     if (account) {
       const old = account.value;
-      account.innerHTML = '<option value="all">Tutti i conti</option>' + state.accounts.filter(a=>a.type!=='ROOT').map(a=>'<option value="' + safeText(a.id) + '">' + safeText(accountDisplayLabel(a)) + '</option>').join('');
-      if ([...account.options].some(o=>o.value===old)) account.value=old;
+      const categoryOrder = path => {
+        const root = normalize(String(path || '').split(':')[0]);
+        if (root === 'attivita') return 0;
+        if (root === 'passivita') return 1;
+        if (root === 'uscite') return 2;
+        if (root === 'entrate') return 3;
+        if (root === 'patrimonio netto') return 4;
+        return 5;
+      };
+      const orderedAccounts = state.accounts.filter(a=>a.type!=='ROOT')
+        .sort((a,b)=>categoryOrder(a.path)-categoryOrder(b.path) || a.path.localeCompare(b.path,'it',{sensitivity:'base'}));
+      const searchList = $('#searchAdvancedAccountOptions');
+      if (searchList) searchList.innerHTML = orderedAccounts.map(a=>'<option value="' + safeText(accountDisplayLabel(a)) + '"></option>').join('');
+      if (old && orderedAccounts.some(a=>a.id===old)) account.value=accountDisplayLabel(accountById(old));
+      else if (!old || old === 'all') account.value='';
     }
     renderSavedFilters();
     const budgetMonth = $('#budgetMonth');
@@ -731,7 +746,7 @@
     $('#runAdvancedSearch')?.addEventListener('click',runAdvancedSearch);
     $('#clearAdvancedSearch')?.addEventListener('click',()=>{
       ['searchFrom','searchTo','searchText','searchMin','searchMax'].forEach(id=>$('#'+id).value='');
-      $('#searchDirection').value='all';$('#searchStatus').value='all';$('#searchAccount').value='all';runAdvancedSearch();
+      $('#searchDirection').value='all';$('#searchStatus').value='all';$('#searchAccount').value='';runAdvancedSearch();
     });
     $('#saveAdvancedFilter')?.addEventListener('click',()=>{
       const name=window.prompt('Nome da assegnare al filtro:');
@@ -744,7 +759,7 @@
       const c=f.criteria||{};
       $('#searchFrom').value=c.from||'';$('#searchTo').value=c.to||'';$('#searchText').value=c.text||'';
       $('#searchMin').value=c.min??'';$('#searchMax').value=c.max??'';
-      $('#searchDirection').value=c.direction||'all';$('#searchStatus').value=c.status||'all';$('#searchAccount').value=c.account||'all';runAdvancedSearch();
+      $('#searchDirection').value=c.direction||'all';$('#searchStatus').value=c.status||'all';$('#searchAccount').value=c.account==='all'?'':(accountById(c.account)?accountDisplayLabel(accountById(c.account)):c.account||'');runAdvancedSearch();
     });
     $('#budgetMonth')?.addEventListener('change',renderBudgetView);
     $('#generateBudgetProposal')?.addEventListener('click',generateBudgetForSelectedMonth);
@@ -1246,7 +1261,9 @@
     if (['BANK', 'CASH'].includes(String(account.type || '').toUpperCase())) return true;
     // Some GnuCash books classify named current-account subaccounts as ASSET.
     // Recognize this common hierarchy so they are not silently omitted.
-    return String(account.type || '').toUpperCase() === 'ASSET' && normalize(account.path || '').includes('attivita correnti');
+    const normalizedPath = normalize(account.path || '');
+    return String(account.type || '').toUpperCase() === 'ASSET' &&
+      (normalizedPath.includes('attivita correnti') || normalizedPath.startsWith('attivita conto corrente'));
   }
   function periodTransactions(year, startMonth, endMonth, endDay = 31) {
     const start = `${year}-${String(startMonth + 1).padStart(2, '0')}-01`;
@@ -1848,7 +1865,7 @@
       const budgetEligible=a.classification==='Patrimoniale'&&!isLiquidAccount(a)&&a.hierarchyType!=='Mastro';
       const tags=Array.isArray(a.tags)?a.tags:[];
       const tagMarkup=tags.length?'<small class="account-tags">'+tags.map(tag=>'<span>'+safeText(tag)+'</span>').join(' ')+'</small>':'';
-      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+'> Includi</label>' : '—'}</td></tr>`;
+      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+'> Includi nel budget</label>' : '—'}</td></tr>`;
     }).join('');
     $('#accountsBody').querySelectorAll('[data-rename-account]').forEach(button=>button.addEventListener('click',()=>renameAccount(button.dataset.renameAccount)));
     $('#accountsBody').querySelectorAll('[data-tags-account]').forEach(button=>button.addEventListener('click',()=>editAccountTags(button.dataset.tagsAccount)));
