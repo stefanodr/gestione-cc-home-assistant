@@ -76,7 +76,7 @@ Nessuna applicazione può garantire sicurezza assoluta. Verifica rete, backup e 
 - I backup automatici locali restano disponibili sul server Home Assistant.
 - In **Impostazioni → Backup · Google Drive** puoi collegare facoltativamente il tuo account Google. [Guida passo-passo in italiano e inglese](docs/GOOGLE_DRIVE_BACKUP.md).
 - Il collegamento usa un OAuth Client di tipo Desktop e un token generato una tantum da rclone sul PC Windows; Gestione C/C conserva il token solo nel volume dati privato dell’App.
-- Se collegato, l’App mantiene un backup di sessione e gli ultimi tre backup notturni (ore 03:00, fuso Europe/Rome). Il comando **Esci** attende il backup se l’archivio è cambiato; la chiusura diretta della scheda è solo un tentativo.
+- Se collegato, l’App mantiene un backup di sessione e gli ultimi tre backup notturni (ore 03:00, fuso Europe/Rome). Il comando **Esci** completa il salvataggio in coda, avvia il backup di sessione in background solo se l’archivio è cambiato e mostra l’esito senza bloccare l’uscita. La chiusura diretta della scheda resta un tentativo best-effort.
 - I file SQLite su Google Drive **non sono cifrati**: chiunque abbia accesso al tuo Drive e ai relativi backup può leggerne il contenuto. Proteggi l’account Google e non condividere i file.
 - Il ripristino da Google Drive crea prima una copia preventiva locale e poi verifica l’integrità SQLite e la struttura dell’archivio.
 - Conserva comunque una copia indipendente e prova il ripristino in modo prudente.
@@ -100,7 +100,7 @@ Quando apri una segnalazione indica versioni Home Assistant/App, architettura e 
 
 ## Stato e licenza
 
-Versione di distribuzione dichiarata: **1.0.5**. Il progetto è distribuito con licenza proprietaria d'uso personale, non con una licenza open source. L'uso personale gratuito è consentito alle persone fisiche nei limiti di `LICENSE`; l'uso professionale, aziendale, la modifica, la redistribuzione e lo sfruttamento commerciale richiedono un accordo scritto, salvo i diritti inderogabili e quelli dei componenti di terze parti. Consultare `COMMERCIAL-LICENSING.md`. La pubblicazione non sostituisce i test nel sistema dell'utente.
+Versione di distribuzione dichiarata: **1.0.7**. Il progetto è distribuito con licenza proprietaria d'uso personale, non con una licenza open source. L'uso personale gratuito è consentito alle persone fisiche nei limiti di `LICENSE`; l'uso professionale, aziendale, la modifica, la redistribuzione e lo sfruttamento commerciale richiedono un accordo scritto, salvo i diritti inderogabili e quelli dei componenti di terze parti. Consultare `COMMERCIAL-LICENSING.md`. La pubblicazione non sostituisce i test nel sistema dell'utente.
 
 ---
 
@@ -167,7 +167,7 @@ No application can guarantee absolute security. Verify networking, backup and re
 - Local automatic snapshots remain available on the Home Assistant host.
 - Under **Settings → Backup · Google Drive**, you can optionally connect your Google account. [Step-by-step guide in Italian and English](docs/GOOGLE_DRIVE_BACKUP.md).
 - Authorization uses a Desktop OAuth client and a one-time token generated with rclone on a Windows PC; credentials are stored only in the App's private data volume.
-- When connected, the App retains one session backup and the latest three nightly backups (03:00, Europe/Rome). **Exit** waits for a backup when the archive has changed; closing the browser tab is best-effort only.
+- When connected, the App retains one session backup and the latest three nightly backups (03:00, Europe/Rome). **Exit** flushes queued saves, starts the session backup in the background only when the archive has changed, and reports the outcome without blocking the exit. Closing the browser tab remains best-effort.
 - Google Drive SQLite files are **not encrypted**. Anyone with access to your Drive and the backup files can read their contents.
 - Restore from Drive creates a local pre-restore snapshot and checks SQLite integrity and archive structure.
 - Keep an independent backup and test restore procedures carefully.
@@ -191,4 +191,4 @@ When reporting an issue, include Home Assistant/App versions, architecture and r
 
 ## Status and licence
 
-Declared distribution version: **1.0.5**. The project is distributed under a proprietary personal-use licence, not an open-source licence. Free personal use by individuals is permitted under `LICENSE`; professional or business use, modification, redistribution and commercial exploitation require a written agreement, subject to mandatory legal rights and third-party component licences. See `COMMERCIAL-LICENSING.md`. A version number does not replace testing on the user's own system.
+Declared distribution version: **1.0.7**. The project is distributed under a proprietary personal-use licence, not an open-source licence. Free personal use by individuals is permitted under `LICENSE`; professional or business use, modification, redistribution and commercial exploitation require a written agreement, subject to mandatory legal rights and third-party component licences. See `COMMERCIAL-LICENSING.md`. A version number does not replace testing on the user's own system.
