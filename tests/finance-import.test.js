@@ -90,9 +90,9 @@ assert.deepEqual(Array.from(forecastContext.forecastRecurringItems('2026-11', se
 const matchingTx = { status: 'confirmed', bankAccountId: 'bank', date: '2026-11-16', amount: -700, description: 'Affitto' };
 forecastContext.state.transactions = [matchingTx];
 assert.equal(forecastContext.transactionIsExplicitlyRecurring(matchingTx, 'rent', '2026-11', selected), true);
-assert.equal(forecastContext.recurringAlreadyRealized(futureRule, '2026-11'), true);
+assert.equal(forecastContext.recurringAlreadyRealized(futureRule, '2026-11-15'), true);
 forecastContext.state.transactions = [{ ...matchingTx, amount: -900 }];
-assert.equal(forecastContext.recurringAlreadyRealized(futureRule, '2026-11'), false);
+assert.equal(forecastContext.recurringAlreadyRealized(futureRule, '2026-11-15'), false);
 
 
 const accountContext = {
