@@ -2,6 +2,14 @@
 
 Notable changes for Gestione C/C Home Assistant App.
 
+## [1.0.6] - 2026-11-10
+
+- Updated the bundled Gestione C/C application to version 1.7.2.
+- Consolidated the account hierarchy, tags, transaction register, budget and forecast updates.
+- Aligned the transaction date-range controls and removed the non-functional month selector.
+- Bank statement PDF and XLSX exports now follow the currently selected Overview period.
+
+
 ## [1.0.5] - 2026-11-08
 
 - Added optional Google Drive backup integration, with OAuth desktop authorization generated on a Windows PC and credentials stored only in the Home Assistant App data volume.
