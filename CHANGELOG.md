@@ -1,3 +1,11 @@
+## [1.0.11] - 2026-11-10
+
+- Updated the bundled Gestione C/C application to version 1.7.6.
+- Fixed double counting in hierarchical expense totals: parent accounts are no longer added again alongside their child accounts.
+- The report's “Outflows” row now uses total cash outflows and corresponding comparisons, allowing reconciliation with the period summary.
+- The reference average now includes only completed periods preceding the selected period; subsequent months are excluded.
+- Preserved the SQLite archive, PIN authentication, HTTPS configuration and backup behavior.
+
 # Changelog
 
 Notable changes for Gestione C/C Home Assistant App.
