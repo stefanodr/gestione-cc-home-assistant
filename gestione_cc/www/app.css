@@ -165,3 +165,19 @@ body.app-ready .app-shell{visibility:visible}
 #view-transactions .transaction-heading-actions input{height:40px}
 #view-transactions .transaction-heading-actions .button{min-height:40px}
 @media(max-width:760px){#view-transactions .transaction-heading-actions{justify-content:flex-start}#view-transactions .transaction-date-control{min-width:calc(50% - 6px)}#view-transactions .transaction-date-control input{width:100%;min-width:0}}
+
+
+/* Mantiene leggibili descrizioni e dettagli bancari estesi, inclusi i memo QIF. */
+.name-cell .name-primary,
+.name-cell .transaction-causale {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.45;
+  max-width: none;
+}
+.name-cell .transaction-causale {
+  margin-top: 5px;
+  color: #647570;
+}
