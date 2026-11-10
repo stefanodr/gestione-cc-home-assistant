@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.4';
+  const APP_VERSION = '1.7.5';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -1854,10 +1854,76 @@
   }
   function reportExpenseIsUnclassified(tx) { return tx.status === 'pending' && tx.amount < 0 && !tx.counterpartAccountId && !tx.counterpartSplits?.length; }
   function reportExpenseAmount(tx) { return economicExpenseAmount(tx) || (reportExpenseIsUnclassified(tx) ? Math.abs(tx.amount) : 0); }
+
+  function aggregateDeviationRows(rows) {
+    const total = rows.reduce((sum, row) => {
+      sum.actual += row.actual; sum.previousYear += row.previousYear; sum.yearDelta += row.yearDelta;
+      sum.expected += row.expected; sum.delta += row.delta; return sum;
+    }, { actual: 0, previousYear: 0, yearDelta: 0, expected: 0, delta: 0 });
+    total.yearPercent = total.previousYear > 0.005 ? total.yearDelta / total.previousYear * 100 : null;
+    total.percent = total.expected > 0.005 ? total.delta / total.expected * 100 : null;
+    return total;
+  }
+  function reportExpenseCategory(account) {
+    let current = account, parent = accountById(current?.parentId);
+    while (parent?.type === 'EXPENSE') {
+      const grandparent = accountById(parent.parentId);
+      if (grandparent?.type !== 'EXPENSE') return current;
+      current = parent; parent = grandparent;
+    }
+    return account;
+  }
+  function reportDeviationDisplayRows(comparisons = selectedComparisons()) {
+    const flatRows = reportDeviationRows(comparisons);
+    if (!flatRows.length) return [];
+    const groups = new Map(), ungrouped = [];
+    for (const row of flatRows) {
+      const account = accountById(row.id);
+      if (!account || account.type !== 'EXPENSE') { ungrouped.push(row); continue; }
+      const category = reportExpenseCategory(account);
+      if (!groups.has(category.id)) groups.set(category.id, { account: category, rows: [] });
+      groups.get(category.id).rows.push(row);
+    }
+    const categoryRows = [];
+    const orderedGroups = [...groups.values()].sort((a, b) => a.account.name.localeCompare(b.account.name, 'it'));
+    for (const group of orderedGroups) {
+      const aggregate = aggregateDeviationRows(group.rows);
+      const details = group.rows.filter(row => row.id !== group.account.id && Math.abs(row.delta) >= 0.01)
+        .sort((a, b) => a.name.localeCompare(b.name, 'it'));
+      if (Math.abs(aggregate.delta) < 0.01 && !details.length) continue;
+      categoryRows.push({ kind: 'category', id: group.account.id, name: group.account.name, ...aggregate });
+      for (const detail of details) {
+        const account = accountById(detail.id);
+        const depth = Math.max(1, String(account?.path || '').split(':').length - String(group.account.path || '').split(':').length);
+        categoryRows.push({ ...detail, kind: 'detail', depth });
+      }
+    }
+    const total = aggregateDeviationRows(flatRows);
+    return [{ kind: 'summary', name: 'Spese', ...total }, ...categoryRows,
+      ...ungrouped.filter(row => Math.abs(row.delta) >= 0.01).map(row => ({ ...row, kind: 'detail', depth: 1 })),
+      { kind: 'total', name: 'Uscite', ...total }];
+  }
+  function deviationYearLabel(row) {
+    const amount = `${row.yearDelta >= 0 ? '+' : '−'}${euro.format(Math.abs(row.yearDelta))}`;
+    const percent = row.yearPercent === null ? 'n.d.' : `${row.yearPercent > 0 ? '+' : ''}${row.yearPercent.toFixed(1).replace('.', ',')}%`;
+    return `${amount} (${percent})`;
+  }
+  function deviationRowHtml(row) {
+    const bold = row.kind === 'summary' || row.kind === 'total', italic = row.kind === 'detail';
+    const indent = row.kind === 'category' ? 12 : row.kind === 'detail' ? Math.min(4, row.depth || 1) * 18 : 0;
+    const style = bold ? 'font-weight:700;' : italic ? 'font-style:italic;' : '';
+    const deltaClass = row.delta < 0 ? 'delta-negative' : 'delta-positive';
+    const yearClass = row.yearDelta < 0 ? 'delta-negative' : 'delta-positive';
+    const percentClass = row.percent < 0 ? 'delta-negative' : 'delta-positive';
+    const percent = row.percent === null ? 'n.d.' : `${row.percent > 0 ? '+' : ''}${row.percent.toFixed(1).replace('.', ',')}%`;
+    return `<tr class="deviation-${row.kind}-row" style="${style}"><td><span class="deviation-name" style="display:block;padding-left:${indent}px">${safeText(row.name)}</span></td><td>${euro.format(row.actual)}</td><td>${euro.format(row.previousYear)}</td><td class="${yearClass}">${deviationYearLabel(row)}</td><td>${euro.format(row.expected)}</td><td class="${deltaClass}">${row.delta >= 0 ? '+' : '−'}${euro.format(Math.abs(row.delta))}</td><td class="${percentClass}">${percent}</td></tr>`;
+  }
+
   function renderCategoryComparison(comparisons) {
     const rows = reportDeviationRows(comparisons);
     $('#deviationBaselineNote').textContent = reportMode === 'monthly' && Number(monthSelection().slice(5, 7)) <= 2 ? 'Per gennaio e febbraio il riferimento è lo stesso mese dell’anno precedente. Da marzo, gli scostamenti sono calcolati sugli altri mesi completi disponibili dello stesso anno. Il confronto annuo resta solo informativo.' : 'Gli scostamenti sono calcolati rispetto alla media degli altri periodi completi disponibili dello stesso anno. Il confronto con l’anno precedente resta separato e non genera segnalazioni.';
-    $('#categoryCompareBody').innerHTML = rows.length ? rows.map(row => `<tr><td class="name-primary">${safeText(row.name)}</td><td>${shortEuro.format(row.actual)}</td><td>${shortEuro.format(row.previousYear)}</td><td class="${row.yearDelta < 0 ? 'delta-negative' : 'delta-positive'}">${row.yearDelta >= 0 ? '+' : '−'}${shortEuro.format(Math.abs(row.yearDelta))} (${row.yearPercent === null ? 'n.d.' : `${row.yearPercent > 0 ? '+' : ''}${row.yearPercent.toFixed(1).replace('.', ',')}%`})</td><td>${shortEuro.format(row.expected)}</td><td class="${row.delta < 0 ? 'delta-negative' : 'delta-positive'}">${row.delta >= 0 ? '+' : '−'}${shortEuro.format(Math.abs(row.delta))}</td><td class="${row.delta < 0 ? 'delta-negative' : 'delta-positive'}">${row.percent === null ? 'n.d.' : `${row.percent > 0 ? '+' : ''}${row.percent.toFixed(1).replace('.', ',')}%`}</td></tr>`).join('') : '<tr><td colspan="7" class="empty-inline">Nessuno scostamento calcolabile nel periodo.</td></tr>';
+    const displayRows = reportDeviationDisplayRows(comparisons);
+    $('#categoryCompareBody').innerHTML = displayRows.length ? displayRows.map(deviationRowHtml).join('') : '<tr><td colspan="7" class="empty-inline">Nessuno scostamento calcolabile nel periodo.</td></tr>';
   }
 
   function renderAccounts() {
@@ -2459,7 +2525,7 @@
       zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`);
       zip.folder('_rels').file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
       zip.folder('xl').file('workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sheet, i) => `<sheet name="${xmlEscape(sheet.name.slice(0, 31))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`);
-      zip.folder('xl').file('styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="€ #,##0.00;[Red]-€ #,##0.00;€ 0.00"/><numFmt numFmtId="165" formatCode="0.0%;[Red]-0.0%"/></numFmts><fonts count="4"><font><sz val="11"/><color rgb="FF243431"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="16"/><color rgb="FF173E39"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FF174B43"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF176E66"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEAF3F0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFDCE5E2"/></left><right style="thin"><color rgb="FFDCE5E2"/></right><top style="thin"><color rgb="FFDCE5E2"/></top><bottom style="thin"><color rgb="FFDCE5E2"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="11"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="14" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`);
+      zip.folder('xl').file('styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="€ #,##0.00;[Red]-€ #,##0.00;€ 0.00"/><numFmt numFmtId="165" formatCode="0.0%;[Red]-0.0%"/></numFmts><fonts count="6"><font><sz val="11"/><color rgb="FF243431"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="16"/><color rgb="FF173E39"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FF174B43"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF243431"/><name val="Calibri"/></font><font><i/><sz val="11"/><color rgb="FF243431"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF176E66"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEAF3F0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFDCE5E2"/></left><right style="thin"><color rgb="FFDCE5E2"/></right><top style="thin"><color rgb="FFDCE5E2"/></top><bottom style="thin"><color rgb="FFDCE5E2"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="17"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="14" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/><xf numFmtId="164" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyNumberFormat="1"/><xf numFmtId="165" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyNumberFormat="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/><xf numFmtId="164" fontId="5" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyNumberFormat="1"/><xf numFmtId="165" fontId="5" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`);
       zip.folder('xl').folder('_rels').file('workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
       const worksheets = zip.folder('xl').folder('worksheets');
       sheets.forEach((sheet, sheetIndex) => {
@@ -2475,6 +2541,11 @@
             if (isSummary) style = 10;
             else if (sheet.percentColumns?.includes(colIndex)) style = 3;
             else if (sheet.currencyColumns?.includes(colIndex) || sheet.currencyColumns === undefined) style = 7;
+          }
+          const rowFont = sheet.rowFontStyles?.[rowIndex];
+          if (rowFont && style !== 1 && style !== 5 && style !== 9 && style !== 10) {
+            const fontStyles = rowFont === 'bold' ? { 6: 11, 7: 12, 3: 13 } : { 6: 14, 7: 15, 3: 16 };
+            style = fontStyles[style] ?? style;
           }
           return typeof cellValue === 'number' && Number.isFinite(cellValue) ? `<c r="${ref}"${style ? ` s="${style}"` : ''}><v>${cellValue}</v></c>` : `<c r="${ref}"${style ? ` s="${style}"` : ''} t="inlineStr"><is><t xml:space="preserve">${xmlEscape(cellValue)}</t></is></c>`;
         }).join('')}</row>`).join('');
@@ -2629,7 +2700,7 @@
     const deviations = reportDeviationRows(comparisons);
     const averageDeviations = deviations.filter(row => row.delta >= 0.01).sort((a, b) => b.delta - a.delta);
     const verdict = current.net > .005 ? 'ATTIVO' : current.net < -.005 ? 'PASSIVO' : 'IN PAREGGIO';
-    const rows = deviations.map(row => `<tr><td>${safeText(row.name)}</td><td class="num">${euro.format(row.actual)}</td><td class="num">${euro.format(row.previousYear)}</td><td class="num" style="color:${row.yearDelta < 0 ? '#b00020' : '#171b1a'};font-weight:${row.yearDelta < 0 ? '700' : '400'}">${row.yearDelta >= 0 ? '+' : '−'}${euro.format(Math.abs(row.yearDelta))} (${row.yearPercent === null ? 'n.d.' : `${row.yearPercent.toFixed(1)}%`})</td><td class="num">${euro.format(row.expected)}</td><td class="num" style="color:${row.delta < 0 ? '#b00020' : '#171b1a'};font-weight:${row.delta < 0 ? '700' : '400'}">${row.delta >= 0 ? '+' : '−'}${euro.format(Math.abs(row.delta))}</td><td class="num" style="color:${row.percent < 0 ? '#b00020' : '#171b1a'};font-weight:${row.percent < 0 ? '700' : '400'}">${row.percent === null ? 'n.d.' : `${row.percent > 0 ? '+' : ''}${row.percent.toFixed(1)}%`}</td></tr>`).join('');
+    const rows = reportDeviationDisplayRows(comparisons).map(deviationRowHtml).join('');
     const periodRows = comparisons.map(c => `<tr><td>${c.year}</td><td class="num">${euro.format(c.data.income)}</td><td class="num">${euro.format(c.data.expense)}</td><td class="num" style="color:${c.data.net < 0 ? '#b00020' : '#171b1a'};font-weight:${c.data.net < 0 ? '700' : '400'}">${euro.format(c.data.net)}</td><td class="num">${euro.format(c.data.transfers)}</td></tr>`).join('');
     const scope = state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountLabel(state.reportAccountId);
     const label = reportPeriodLabel(), code = reportFilenameCode();
@@ -2646,7 +2717,8 @@
   function exportReportXlsx() {
     const comparisons = selectedComparisons();
     const mode = reportPeriodLabel();
-    const categories = reportDeviationRows(comparisons);
+    const deviations = reportDeviationRows(comparisons);
+    const categories = reportDeviationDisplayRows(comparisons);
     const current = comparisons[0].data, previous = comparisons[1].data;
     const verdict = current.net > .005 ? 'ATTIVO' : current.net < -.005 ? 'PASSIVO' : 'IN PAREGGIO';
     const account = state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountLabel(state.reportAccountId);
@@ -2674,22 +2746,25 @@
       ['Movimenti', comparisons[0].tx.length + ' nel periodo', comparisons[1].tx.length + ' nel periodo', '']
     ];
     const flowRows = [['Anno', 'Entrate', 'Uscite', 'Saldo netto', 'Trasferimenti', 'Numero movimenti'], ...comparisons.map(c => [String(c.year), c.data.income, c.data.expense, c.data.net, c.data.transfers, c.tx.length])];
-    const categoryRows = [['Categoria', 'Spesa periodo', 'Stesso periodo anno precedente', 'Variazione annua', 'Variazione annua %', 'Media attesa stesso anno', 'Scostamento dalla media', 'Variazione dalla media %'], ...categories.map(row => [row.name, row.actual, row.previousYear, row.yearDelta, row.yearPercent === null ? 'n.d.' : row.yearPercent / 100, row.expected, row.delta, row.percent === null ? 'n.d.' : row.percent / 100])];
+    const categoryRows = [['Categoria', 'Spesa periodo', 'Anno prec.', 'Var. annua', 'Media attesa', 'Scostamento', 'Var. % media'], ...categories.map(row => [`${row.kind === 'detail' ? '   '.repeat(Math.min(4, row.depth || 1)) : row.kind === 'category' ? '  ' : ''}${row.name}`, row.actual, row.previousYear, deviationYearLabel(row), row.expected, row.delta, row.percent === null ? 'n.d.' : row.percent / 100])];
+    const categoryFontStyles = Object.fromEntries(categories.map((row, index) => [index + 1, row.kind === 'detail' ? 'italic' : row.kind === 'summary' || row.kind === 'total' ? 'bold' : null]).filter(([, style]) => style));
+    const chartCategoryRows = [['Categoria', 'Spesa periodo', 'Stesso periodo anno precedente', 'Variazione annua', 'Variazione annua %', 'Media attesa stesso anno', 'Scostamento dalla media', 'Variazione dalla media %'], ...deviations.filter(row => Math.abs(row.delta) >= 0.01).map(row => [row.name, row.actual, row.previousYear, row.yearDelta, row.yearPercent === null ? 'n.d.' : row.yearPercent / 100, row.expected, row.delta, row.percent === null ? 'n.d.' : row.percent / 100])];
     const txRows = [['Data', 'Descrizione completa', 'Causale', 'Conto corrente', 'Importo', 'Contropartita/e', 'Stato'], ...comparisons[0].tx.map(tx => [tx.date, transactionDescription(tx) || transactionCausale(tx) || 'Movimento', transactionCausale(tx), accountLabel(tx.bankAccountId), tx.amount, tx.counterpartSplits?.length ? tx.counterpartSplits.map(s => accountLabel(s.accountId) + ' (' + euro.format(s.value) + ')').join('; ') : accountLabel(tx.counterpartAccountId), tx.status])];
-    const mainDeviations = categories.filter(row => row.delta >= 0.01).slice(0, 5);
+    const mainDeviations = deviations.filter(row => row.delta >= 0.01).sort((a, b) => b.delta - a.delta).slice(0, 5);
     if (mainDeviations.length) summaryRows.push([], ['Scostamenti principali rispetto agli altri periodi disponibili dello stesso anno'], ['Categoria', 'Spesa periodo', 'Media attesa', 'Scostamento'], ...mainDeviations.map(row => [row.name, row.actual, row.expected, row.delta]));
     const charts = [
       { title: 'Andamento mensile di entrate e uscite', categorySheet: 'Andamento', categoryCol: 0, firstDataRow: 2, lastDataRow: trendRows.length, series: [{ sheet: 'Andamento', col: 1, nameCol: 1 }, { sheet: 'Andamento', col: 2, nameCol: 2 }], startCol: 0, startRow: 1, endCol: 14, endRow: 18 }
     ];
-    if (categories.length) charts.push({
-      title: 'Spese del periodo e media di riferimento', categorySheet: 'Scostamenti', categoryCol: 0, firstDataRow: 2, lastDataRow: categoryRows.length,
-      series: [{ sheet: 'Scostamenti', col: 1, nameCol: 1 }, { sheet: 'Scostamenti', col: 5, nameCol: 5 }],
+    if (chartCategoryRows.length > 1) charts.push({
+      title: 'Spese del periodo e media di riferimento', categorySheet: 'Dati grafico', categoryCol: 0, firstDataRow: 2, lastDataRow: chartCategoryRows.length,
+      series: [{ sheet: 'Dati grafico', col: 1, nameCol: 1 }, { sheet: 'Dati grafico', col: 5, nameCol: 5 }],
       startCol: 0, startRow: 20, endCol: 14, endRow: 37
     });
     downloadXlsx(reportFilenameCode() + '.xlsx', [
       { name: 'Riepilogo', rows: summaryRows, titleRow: 0, headerRow: 6, headerRows: [14], currencyColumns: [1, 2, 3], widths: [48, 22, 32, 22], autoFilter: false },
       { name: 'Confronto', rows: flowRows, currencyColumns: [1, 2, 3, 4], widths: [14, 19, 19, 19, 19, 18] },
-      { name: 'Scostamenti', rows: categoryRows, currencyColumns: [1, 2, 3, 5, 6], percentColumns: [4, 7], widths: [28, 20, 27, 20, 18, 24, 22, 22] },
+      { name: 'Scostamenti', rows: categoryRows, currencyColumns: [1, 2, 4, 5], percentColumns: [6], rowFontStyles: categoryFontStyles, widths: [30, 20, 20, 30, 20, 20, 18] },
+      { name: 'Dati grafico', rows: chartCategoryRows, currencyColumns: [1, 2, 3, 5, 6], percentColumns: [4, 7], widths: [28, 20, 27, 20, 18, 24, 22, 22] },
       { name: 'Andamento', rows: trendRows, currencyColumns: [1, 2, 3], widths: [18, 20, 20, 20] },
       { name: 'Grafici', rows: [['GRAFICI DEL REPORT'], ['Grafici modificabili in Excel e LibreOffice.'], ['Dati di origine nei fogli Andamento e Scostamenti.']], titleRow: 0, headerRow: 0, autoFilter: false, charts: charts },
       { name: 'Movimenti', rows: txRows, currencyColumns: [4], dateColumns: [0], widths: [15, 48, 42, 36, 18, 55, 17] }
