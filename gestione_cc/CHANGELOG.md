@@ -1,6 +1,6 @@
 # Gestione C/C Home Assistant App — Changelog
 
-## 1.0.5 — 10 novembre 2026
+## 1.0.6 — 10 novembre 2026
 
 - Aggiornata l'applicazione Gestione C/C inclusa alla versione 1.7.2.
 - Consolidate le modifiche del piano dei conti, dei tag, dei movimenti, del budget e delle previsioni.
