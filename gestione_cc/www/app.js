@@ -407,7 +407,7 @@
     $('#monthPicker').value = selectedMonth;
     syncReportPeriodPicker(selectedMonth);
     if (needsSave) await saveState();
-    $('#statementMonth').value = selectedMonth;
+    
     $('#welcomeDate').textContent = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()).toUpperCase();
     document.body.classList.add('app-ready');
     $('#appLoading')?.classList.add('hidden');
@@ -513,8 +513,8 @@
     $('#confirmExclude')?.addEventListener('click', async () => { const fn=confirmCallback; closeModals(); if(!fn)return; showNotice('Operazione in corso','Attendi il completamento.'); try{await fn(false);}catch(error){showNotice('Operazione non completata',error.message||String(error));} });
     $$('.nav-item').forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
     $$('[data-goto]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.goto)));
-    $('#monthPicker').addEventListener('change', () => { state.selectedMonth = $('#monthPicker').value; syncReportPeriodPicker(state.selectedMonth); $('#statementMonth').value = state.selectedMonth; saveState(); renderAll(); });
-    $('#reportMonth').addEventListener('change', () => { state.selectedMonth = overviewMonthForReportPeriod($('#reportMonth').value, reportMode); $('#monthPicker').value = state.selectedMonth; $('#statementMonth').value = state.selectedMonth; saveState(); renderAll(); });
+    $('#monthPicker').addEventListener('change', () => { state.selectedMonth = $('#monthPicker').value; syncReportPeriodPicker(state.selectedMonth);  saveState(); renderAll(); });
+    $('#reportMonth').addEventListener('change', () => { state.selectedMonth = overviewMonthForReportPeriod($('#reportMonth').value, reportMode); $('#monthPicker').value = state.selectedMonth;  saveState(); renderAll(); });
     $('#monthPrev')?.addEventListener('click', () => moveSelectedPeriod(-1, 'overview'));
     $('#monthNext')?.addEventListener('click', () => moveSelectedPeriod(1, 'overview'));
     $('#reportPeriodPrev')?.addEventListener('click', () => moveSelectedPeriod(-1, 'report'));
@@ -537,7 +537,7 @@
     $('#cancelManualTransaction')?.addEventListener('click', closeManualTransaction);
     $('#manualBankAccount')?.addEventListener('change', populateManualCounterAccounts);
     $('#saveManualTransaction')?.addEventListener('click', saveManualTransaction);
-    $('#reportPeriodMode')?.addEventListener('change', event => { reportMode = event.target.value || 'monthly'; const next = syncReportPeriodPicker(state.selectedMonth); state.selectedMonth = overviewMonthForReportPeriod(next); $('#monthPicker').value = state.selectedMonth; $('#statementMonth').value = state.selectedMonth; state.reportMode = reportMode; saveState(); renderAll(); });
+    $('#reportPeriodMode')?.addEventListener('change', event => { reportMode = event.target.value || 'monthly'; const next = syncReportPeriodPicker(state.selectedMonth); state.selectedMonth = overviewMonthForReportPeriod(next); $('#monthPicker').value = state.selectedMonth;  state.reportMode = reportMode; saveState(); renderAll(); });
     $('#importBank').addEventListener('click', () => $('#bankFile').click());
     $('#importBankSecondary').addEventListener('click', () => $('#bankFile').click());
     $('#emptyImport').addEventListener('click', () => $('#bankFile').click());
@@ -622,7 +622,7 @@
       syncReportPeriodPicker(nextMonth, reportMode);
     }
     $('#monthPicker').value = state.selectedMonth;
-    $('#statementMonth').value = state.selectedMonth;
+    
     saveState();
     renderAll();
   }
@@ -1963,7 +1963,7 @@
           const chosen=imported.filter(tx=>{const key=transactionFingerprint(tx);const duplicate=known.has(key)||batchKeys.has(key);batchKeys.add(key);return include||!duplicate;});
           chosen.forEach(tx=>{const key=transactionFingerprint(tx);const suggestion=tx.split?{id:null,label:'Movimento suddiviso · rivedi le righe',confidence:.1}:suggestionFor(tx);tx.suggestionId=suggestion.id;tx.suggestionLabel=suggestion.label;tx.confidence=suggestion.confidence;if(tx.category){const cat=findAccountByLabel(tx.category);if(cat){tx.suggestionId=cat.id;tx.suggestionLabel=cat.path;tx.confidence=.96;}}tx.id=uid();tx.status='pending';tx.bankAccountId=selected;tx.source=ext;if(known.has(key))tx.duplicateOverride=true;});
           state.transactions.push(...chosen);state.demo=false;const latest=imported.map(tx=>tx.date).filter(Boolean).sort().at(-1);
-          if(latest){state.selectedMonth=latest.slice(0,7);$('#monthPicker').value=state.selectedMonth;syncReportPeriodPicker(state.selectedMonth);$('#statementMonth').value=state.selectedMonth;}
+          if(latest){state.selectedMonth=latest.slice(0,7);$('#monthPicker').value=state.selectedMonth;syncReportPeriodPicker(state.selectedMonth);}
           state.reportAccountId=selected;$('#accountPicker').value=selected;$('#reportAccountPicker').value=selected;
           saveState().then(()=>{renderAll();navigate('transactions');showNotice('Importazione completata',chosen.length+' movimenti aggiunti. '+(duplicates.length?(include?duplicates.length+' duplicati inseriti comunque.':duplicates.length+' duplicati esclusi.'):'')+' '+chosen.filter(t=>t.status==='pending').length+' da classificare.');});
         };
@@ -2216,7 +2216,7 @@
         parsed.rules.forEach(rule=>{const accountId=idMap.get(rule.accountId)||rule.accountId;const key=[rule.field,rule.token,accountId].join('|');if(!ruleKeys.has(key)){state.rules.push({...rule,id:uid('r'),accountId});ruleKeys.add(key);}});
         state.demo=false;state.bankAccountId=parsed.bankAccountId?(idMap.get(parsed.bankAccountId)||state.bankAccountId):state.bankAccountId;state.reportAccountId='all';state.reportAccountDefaultMigrated=true;
         const dates=imported.map(tx=>parseDate(tx.date)).filter(Boolean).sort();if(dates.length)state.selectedMonth=dates.at(-1).slice(0,7);
-        const saved=await saveState();transactionPage=0;if(dates.length){const m=dates.at(-1).slice(0,7);$('#monthPicker').value=m;syncReportPeriodPicker(m);$('#statementMonth').value=m;}renderAll();navigate('transactions');showNotice(saved?'Libro GnuCash importato':'Importazione non salvata',additions.length+' conti aggiunti; '+imported.length+' movimenti importati. '+(duplicateCount?(include?duplicateCount+' duplicati inseriti comunque.':duplicateCount+' duplicati esclusi.'):'')+' I dati esistenti sono stati conservati.');
+        const saved=await saveState();transactionPage=0;if(dates.length){const m=dates.at(-1).slice(0,7);$('#monthPicker').value=m;syncReportPeriodPicker(m);}renderAll();navigate('transactions');showNotice(saved?'Libro GnuCash importato':'Importazione non salvata',additions.length+' conti aggiunti; '+imported.length+' movimenti importati. '+(duplicateCount?(include?duplicateCount+' duplicati inseriti comunque.':duplicateCount+' duplicati esclusi.'):'')+' I dati esistenti sono stati conservati.');
       };
       if(duplicateCount)showDuplicateChoice('Movimenti GnuCash già presenti','Trovati '+duplicateCount+' possibili duplicati su '+parsed.transactions.length+' movimenti. Scegli se escluderli oppure importarli comunque.',merge);
       else showConfirm('Importare il libro GnuCash?','Saranno aggiunti '+parsed.accounts.length+' conti e '+parsed.transactions.length+' movimenti. I dati esistenti non saranno sostituiti.',()=>merge(false));
@@ -2533,7 +2533,7 @@
     }
   }
   function statementContext() {
-    const monthKey = $('#statementMonth').value || monthSelection();
+    const monthKey = monthSelection();
     const transactions = exportPeriodTransactions(monthKey);
     return { monthKey, transactions, totals: cashFlowTotals(transactions), accountName: state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountLabel(state.reportAccountId) };
   }
