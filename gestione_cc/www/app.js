@@ -2507,7 +2507,9 @@
         for (let m = 0; m <= Math.min(lastCompleteMonth, 10); m++) referenceMonths.push(m);
       } else {
         for (let m = 0; m <= Math.min(lastCompleteMonth, 11); m++) {
-          if (m < start || m > periodEnd) referenceMonths.push(m);
+          // The selected period is compared only with completed periods
+          // that precede it; later months must never influence its baseline.
+          if (m < start) referenceMonths.push(m);
         }
       }
       baselinePeriods = referenceMonths.length;
