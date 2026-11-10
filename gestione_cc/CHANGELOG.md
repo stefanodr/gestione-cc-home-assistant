@@ -1,3 +1,9 @@
+## 1.0.14 — 10 novembre 2026
+
+- Aggiornati gli esempi mostrati durante la modifica dei tag personalizzati: IBAN fittizio, CONTO CHIUSO, CONTO PRINCIPALE, RISPARMI, STIPENDIO, CONTO SECONDARIO, CARTA PREPAGATA, CONTO FAMILIARE e DA NON UTILIZZARE.
+- Aggiornata la versione dell'app inclusa a 1.7.8.
+- Nessuna modifica ai tag già assegnati, all'archivio SQLite, all'autenticazione PIN, alla configurazione HTTPS, all'accesso LAN o ai backup.
+
 ## 1.0.13 — 10 novembre 2026
 
 - Introdotti tag personalizzati multipli per ciascun conto, senza un elenco predefinito: è possibile inserire qualsiasi testo, incluso un IBAN, con un tag per riga.
