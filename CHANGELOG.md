@@ -2,6 +2,15 @@
 
 Notable changes for Gestione C/C Home Assistant App.
 
+## [1.0.9] - 2026-11-10
+
+- Updated the Home Assistant application interface to the compatible Gestione C/C 1.7.4 feature set.
+- Improved Excel header detection for bank statements with introductory rows before the transaction table.
+- Improved the display of long QIF transaction details, including multi-line wrapping and the “Dettagli” label.
+- Preserved the Home Assistant-specific server API, PIN authentication, HTTPS setup and persistent SQLite storage.
+- No database migration or data reset is required.
+
+
 ## [1.0.6] - 2026-11-10
 
 - Updated the bundled Gestione C/C application to version 1.7.2.
