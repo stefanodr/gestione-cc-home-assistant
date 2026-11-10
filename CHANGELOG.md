@@ -2,6 +2,13 @@
 
 Notable changes for Gestione C/C Home Assistant App.
 
+## [1.0.10] - 2026-11-10
+
+- Updated the bundled Gestione C/C application to version 1.7.5.
+- Reorganized the spending deviation report into a hierarchy with a bold Expenses total, regular second-level categories, italic detail accounts and a final bold Outflows total.
+- Applied the same presentation to PDF and Excel reports while keeping chart source data separate.
+- Preserved the SQLite archive, PIN authentication, HTTPS configuration and backup behavior.
+
 ## [1.0.9] - 2026-11-10
 
 - Updated the Home Assistant application interface to the compatible Gestione C/C 1.7.4 feature set.
