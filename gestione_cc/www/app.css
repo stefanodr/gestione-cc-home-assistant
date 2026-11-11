@@ -219,3 +219,8 @@ body.app-ready .app-shell{visibility:visible}
   .bulk-selection-actions select{width:100%;max-width:none}
   .bulk-selection-actions .row-action,.bulk-selection-actions .button{flex:1 1 auto}
 }
+
+
+/* 1.7.10 — Allineamento delle colonne numeriche nei report. */
+.report-category-table .data-table th:not(:first-child),
+.report-category-table .data-table td:not(:first-child){text-align:right;white-space:nowrap}
