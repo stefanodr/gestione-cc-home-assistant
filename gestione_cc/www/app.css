@@ -187,3 +187,35 @@ body.app-ready .app-shell{visibility:visible}
 .deviation-total-row td{border-top:2px solid #dce5e2}
 .deviation-category-row td{font-weight:400!important}
 .deviation-detail-row td{font-style:italic!important;font-weight:400!important}
+
+
+/* 1.7.9 — Filtri e modifica selettiva delle contropartite nel registro. */
+.transaction-bulk-toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);background:#f8fbfa}
+.bulk-selection-info{display:grid;gap:4px;min-width:170px}
+.bulk-selection-info strong{font-size:12px;color:#344945}
+.bulk-selection-info span{font-size:10px;line-height:1.4;color:#81908d;max-width:360px}
+.bulk-selection-actions{display:flex;align-items:flex-end;gap:7px;flex-wrap:wrap}
+.bulk-selection-actions label{display:grid;gap:4px;color:#80908d;font-size:10px;font-weight:650}
+.bulk-selection-actions select{height:34px;min-width:190px;max-width:280px;border:1px solid #dce5e2;border-radius:7px;background:#fff;padding:7px 9px;color:#344945;font-size:11px}
+.bulk-selection-actions .button{min-height:34px;padding:8px 11px}
+.tx-select-cell{width:54px;text-align:center!important}
+.tx-select-cell input{width:16px;height:16px;accent-color:var(--teal);cursor:pointer}
+.tx-select-cell input:disabled{cursor:not-allowed;opacity:.35}
+.account-modal-card{width:min(520px,100%);text-align:left}
+.account-modal-card .modal-symbol{margin:0 0 12px}
+.account-modal-card>p{color:#71817c;font-size:11px;line-height:1.5}
+.account-modal-fields{display:grid;gap:8px;margin:18px 0;text-align:left}
+.account-modal-fields>label:not(.account-economic-toggle){font-size:10px;color:#6f807b;font-weight:650}
+.account-modal-fields>input,.account-modal-fields select{width:100%;min-width:0;border:1px solid #dce5e2;border-radius:7px;background:#fff;padding:10px;color:#344945;font-size:12px}
+.account-economic-toggle{display:flex;align-items:center;gap:9px;margin:8px 0 4px;color:#405550;font-size:11px;font-weight:650;cursor:pointer}
+.account-economic-toggle input{width:17px;height:17px;margin:0;accent-color:var(--teal)}
+#accountEconomicTypeWrap{display:grid;gap:7px}
+#accountEconomicTypeWrap label{font-size:10px;color:#6f807b;font-weight:650}
+.account-modal-card .modal-actions{justify-content:flex-end}
+@media(max-width:760px){
+  .transaction-bulk-toolbar{align-items:stretch}
+  .bulk-selection-actions{width:100%;align-items:stretch}
+  .bulk-selection-actions label{flex:1 1 100%}
+  .bulk-selection-actions select{width:100%;max-width:none}
+  .bulk-selection-actions .row-action,.bulk-selection-actions .button{flex:1 1 auto}
+}
