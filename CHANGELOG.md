@@ -1,3 +1,10 @@
+## [1.0.16] - 2026-11-11
+
+- Improved alignment in the cash-flow report tables: the Category column remains unchanged, while all following columns are right-aligned within their respective columns.
+- Standardized amount formatting in report tables and PDF output, placing the € symbol before the amount.
+- Applied the same formatting to the period comparison in the PDF and Report view. Excel export remains unchanged because it was already correctly formatted.
+- Updated the bundled application to version 1.7.10. No changes to the SQLite archive, PIN, HTTPS configuration, LAN access or backups.
+
 ## [1.0.15] - 2026-11-11
 
 - Simplified new-account creation in a single dialog, with a checkbox for economic accounts and an income/expense selector.
