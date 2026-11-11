@@ -1,3 +1,11 @@
+## [1.0.15] - 2026-11-11
+
+- Simplified new-account creation in a single dialog, with a checkbox for economic accounts and an income/expense selector.
+- Added a counterpart-account filter to the Transactions view, alongside the existing date and status filters.
+- Added selective bulk counterpart editing: users can select individual transactions or all filtered results across pages, choose a replacement counterpart, review the confirmation and then save.
+- Transactions split across multiple counterpart accounts are excluded from bulk editing to prevent unintended changes to their allocations.
+- Updated the bundled application to version 1.7.9. No changes to the SQLite archive, PIN, HTTPS configuration, LAN access or backups.
+
 ## [1.0.14] - 2026-11-10
 
 - Updated the examples shown when editing custom account tags: a fictitious IBAN, CLOSED ACCOUNT, MAIN ACCOUNT, SAVINGS, SALARY, SECONDARY ACCOUNT, PREPAID CARD, FAMILY ACCOUNT and DO NOT USE.
