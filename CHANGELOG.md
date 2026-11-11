@@ -1,3 +1,11 @@
+## [1.0.18] - 2026-11-11
+
+- Corrected report deviation consistency: when actual “Spese” and “Uscite” totals reconcile, expected average, deviation and percentage now use the same aggregated values.
+- Kept “Uscite” based on cash-flow totals whenever the actual scopes do not reconcile.
+- Applied the shared calculation to the on-screen report, PDF and Excel export.
+- Preserved the treatment of loan principal repayments as personal costs, as well as SQLite data, PIN, HTTPS, LAN access and backups.
+- Updated the bundled application to version 1.7.12.
+
 ## [1.0.17] - 2026-11-11
 
 - Decoupled logout from Google Drive backup completion: after queued database writes finish, the server queues the backup and immediately invalidates the session.
