@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.10';
+  const APP_VERSION = '1.7.11';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -285,8 +285,17 @@
       if (status) status.textContent = result.connected ? 'Collegato' : 'Non collegato';
       const sessionAt = $('#driveSessionBackupAt');
       const nightlyAt = $('#driveNightlyBackupAt');
+      const sessionResult = $('#driveSessionBackupResult');
       if (sessionAt) sessionAt.textContent = result.last_session_backup || 'Non ancora eseguito';
       if (nightlyAt) nightlyAt.textContent = result.last_nightly_backup || 'Non ancora eseguito';
+      if (sessionResult) {
+        const job = result.last_session_job;
+        sessionResult.textContent = !job ? 'Nessun logout con backup registrato' :
+          job.status === 'done' ? (job.result?.skipped ? 'Ultimo logout: nessun backup necessario' : 'Ultimo backup di sessione completato') :
+          job.status === 'failed' ? 'Ultimo backup non riuscito: ' + (job.error || 'errore non specificato') :
+          'Ultimo backup: ' + job.status;
+        if (job?.at) sessionResult.textContent += ' · ' + job.at;
+      }
       const select = $('#driveBackupSelect');
       if (select) {
         const selected = select.value;
@@ -402,7 +411,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.16</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.17</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -3020,66 +3029,21 @@
     ]);
   }
   async function exitApp() {
-    let saveFailed = false;
     try {
-      // Flush any queued write. Do not write the state a second time on exit:
-      // the server revision is used to detect whether a Drive backup is needed.
       await saveQueue;
     } catch (error) {
-      saveFailed = true;
       console.error('Salvataggio finale non riuscito', error);
-    }
-
-    let backupJobId = null;
-    let backupStartFailed = false;
-    if (!saveFailed) {
-      try {
-        const started = await apiRequest('/api/drive/session-backup/start', { method: 'POST', body: '{}' });
-        backupJobId = started.job_id || null;
-      } catch (error) {
-        backupStartFailed = true;
-        console.error('Impossibile avviare il backup di chiusura', error);
-      }
-    }
-
-    document.body.innerHTML = '<main style="font:16px Segoe UI,Arial;padding:48px;color:#1b2a2a;max-width:720px"><h1>Gestione C/C è stata chiusa</h1><p>Puoi chiudere questa scheda del browser. Il servizio Home Assistant resta attivo e disponibile agli altri dispositivi autorizzati della rete locale.</p><p id="exitBackupStatus" role="status">Verifica del backup in corso…</p></main>';
-    const status = document.getElementById('exitBackupStatus');
-
-    if (saveFailed) {
-      status.textContent = 'Attenzione: il salvataggio finale non è riuscito. Il backup non è stato avviato; verifica l’archivio prima di continuare.';
-      window.alert('Gestione C/C è uscita, ma il salvataggio finale non è riuscito. Verifica l’archivio prima di continuare.');
+      window.alert('Non posso uscire in sicurezza: il salvataggio finale non è riuscito. Verifica la connessione e riprova.');
       return;
     }
-    if (backupStartFailed || !backupJobId) {
-      status.textContent = 'Attenzione: non è stato possibile avviare la verifica del backup. Controlla lo stato di Google Drive nelle impostazioni.';
-      if (backupStartFailed) window.alert('Gestione C/C è uscita, ma non è stato possibile avviare il backup di chiusura. Verifica Google Drive nelle impostazioni.');
-      return;
+    try {
+      await apiRequest('/api/logout', { method: 'POST', body: '{}' });
+      csrfToken = null;
+      document.body.innerHTML = '<main style="font:16px Segoe UI,Arial;padding:48px;color:#1b2a2a;max-width:720px"><h1>Logout completato</h1><p>La sessione è stata chiusa e il backup è stato affidato al server Home Assistant.</p><p>Puoi chiudere subito questa finestra del browser: il backup continuerà in background anche senza la scheda aperta.</p><p>Al prossimo accesso potrai controllare l’esito nella sezione Google Drive delle Impostazioni.</p></main>';
+    } catch (error) {
+      console.error('Logout non confermato dal server', error);
+      window.alert('Non è stato possibile confermare il logout con il server. La sessione potrebbe essere ancora attiva: verifica la connessione e riprova prima di chiudere il browser.');
     }
-
-    const checkBackup = async () => {
-      try {
-        const result = await apiRequest('/api/drive/session-backup/status?id=' + encodeURIComponent(backupJobId));
-        if (result.status === 'queued' || result.status === 'running') {
-          status.textContent = 'Uscita completata. Il backup, se necessario, sta proseguendo in background…';
-          window.setTimeout(checkBackup, 1000);
-          return;
-        }
-        if (result.status === 'failed') {
-          status.textContent = 'Attenzione: il backup Google Drive non è riuscito. ' + (result.error || 'Verifica la connessione e riprova.');
-          window.alert('Gestione C/C è uscita, ma il backup Google Drive non è riuscito. ' + (result.error || 'Verifica la connessione e riprova.'));
-          return;
-        }
-        if (result.result?.skipped) {
-          status.textContent = 'Uscita completata. Nessun backup necessario: non ci sono modifiche dall’ultimo backup oppure Google Drive non è collegato.';
-        } else {
-          status.textContent = 'Uscita completata. Backup Google Drive completato correttamente.';
-        }
-      } catch (error) {
-        status.textContent = 'Uscita completata, ma non è stato possibile verificare l’esito del backup. Controlla lo stato di Google Drive nelle impostazioni.';
-        window.alert('Gestione C/C è uscita, ma non è stato possibile verificare l’esito del backup. Controlla Google Drive nelle impostazioni.');
-      }
-    };
-    void checkBackup();
   }
   function deletePersonalData() {
     showConfirm('Eliminare movimenti e regole?', 'Saranno cancellati tutti i movimenti e le regole apprese dal browser. I conti resteranno. Se il backup Drive è attivo, verrà aggiornato senza la cronologia.', async () => {
@@ -3117,14 +3081,6 @@
     $('#confirmAction').textContent='Inserisci comunque';$('#confirmExclude')?.classList.remove('hidden');$('#confirmModal').classList.remove('hidden');
   }
   function closeModals() { $$('.modal-backdrop').forEach(m => m.classList.add('hidden')); confirmCallback = null; $('#confirmExclude')?.classList.add('hidden'); if($('#confirmAction')) $('#confirmAction').textContent='Continua'; }
-
-  window.addEventListener('pagehide', () => {
-    if (!csrfToken) return;
-    try {
-      const payload = new Blob([JSON.stringify({})], { type: 'application/json' });
-      fetch('/api/drive/session-backup', { method: 'POST', body: payload, credentials: 'same-origin', keepalive: true, headers: { 'X-CSRF-Token': csrfToken } }).catch(() => {});
-    } catch (_) {}
-  });
 
   initialize();
 })();
