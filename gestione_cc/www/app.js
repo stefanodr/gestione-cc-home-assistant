@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.11';
+  const APP_VERSION = '1.7.12';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -411,7 +411,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.17</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.18</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -2034,11 +2034,15 @@
     return total;
   }
   function reportCashFlowDeviationTotal(comparisons) {
-    // "Uscite" must reconcile to the cash-outflow total in the period summary.
-    // Its expected value uses the same elapsed-period monthly reference logic,
-    // but on cash movements rather than only classified expense accounts.
+    // "Uscite" always reports the cash-flow total. When its actual amount
+    // reconciles with the classified "Spese" total, use the same expected
+    // amount as "Spese" so the deviation and percentage cannot diverge.
     const actual = comparisons[0]?.data?.expense || 0;
     const previousYear = comparisons[1]?.data?.expense || 0;
+    const expenseRows = reportDeviationRows(comparisons, true);
+    const expenseTotal = aggregateDeviationRows(expenseRows);
+    const actualMatchesExpenses = expenseRows.length > 0 &&
+      Math.abs(expenseTotal.actual - actual) <= 0.01;
     const [year, selectedMonth] = monthSelection().split('-').map(Number);
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -2075,6 +2079,7 @@
         expected = monthlyAverage * exposure;
       }
     }
+    if (actualMatchesExpenses) expected = expenseTotal.expected;
     const delta = actual - expected;
     const yearDelta = actual - previousYear;
     return {
@@ -2669,7 +2674,7 @@
     const ids = new Set([...byYear.values()].flatMap(map => [...map.keys()]));
     return [...ids].map(id => ({ label: accountLabel(id).replace(/^.*:/, ''), values: comparisons.map(c => byYear.get(c.year).get(id) || 0) })).sort((a, b) => b.values[0] - a.values[0]);
   }
-  function reportDeviationRows(comparisons = selectedComparisons()) {
+  function reportDeviationRows(comparisons = selectedComparisons(), includeZeroDelta = false) {
     const actualMap = economicExpenseTotals(comparisons[0].tx);
     const baseline = new Map();
     const [year, selectedMonth] = monthSelection().split('-').map(Number);
@@ -2736,7 +2741,7 @@
       const previousYear = previousMap.get(id) || 0, yearDelta = actual - previousYear;
       const periodDate = comparisons[0].tx.map(tx=>tx.date).filter(Boolean).sort()[0] || monthSelection() + '-01';
       return { id, name: accountPathAt(accountById(id), periodDate).replace(/^.*:/, ''), actual, previousYear, yearDelta, yearPercent: previousYear > 0.005 ? yearDelta / previousYear * 100 : null, expected, delta, percent: expected > 0.005 ? delta / expected * 100 : null };
-    }).filter(row => baselinePeriods > 0 && Math.abs(row.delta) >= 0.01)
+    }).filter(row => baselinePeriods > 0 && (includeZeroDelta || Math.abs(row.delta) >= 0.01))
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   }
   function reportChartRows() {
