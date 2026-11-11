@@ -1,3 +1,12 @@
+## 1.0.17 — 11 novembre 2026
+
+- Reso il logout indipendente dal completamento del backup Google Drive: dopo il salvataggio delle modifiche in coda, il server accoda l'operazione e invalida immediatamente la sessione.
+- Il backup viene eseguito da un worker lato server e continua anche dopo la chiusura della scheda o della finestra del browser.
+- La coda e lo stato delle operazioni sono persistiti nel database dell'add-on; le attività interrotte da un riavvio del servizio vengono rimesse in coda all'avvio successivo.
+- Registrato l'esito dell'ultimo backup di sessione, consultabile dopo il nuovo accesso nella sezione Google Drive delle Impostazioni.
+- Rimosso il backup best-effort all'evento di chiusura della pagina, ora sostituito dall'accodamento esplicito e autenticato durante il logout.
+- Aggiornata l'applicazione inclusa alla versione 1.7.11. Nessuna modifica ai dati contabili, al PIN, alla configurazione HTTPS o all'accesso LAN.
+
 ## 1.0.16 — 11 novembre 2026
 
 - Migliorato l'allineamento delle tabelle del report dei flussi: la colonna Categoria resta invariata, mentre tutte le colonne successive sono allineate a destra nella rispettiva colonna.
