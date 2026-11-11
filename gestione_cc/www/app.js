@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.9';
+  const APP_VERSION = '1.7.10';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -20,6 +20,8 @@
   const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
   const euro = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2, useGrouping: true });
   const shortEuro = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0, useGrouping: true });
+  const reportNumber = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: true });
+  const reportShortNumber = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0, useGrouping: true });
 
   function uid(prefix = 'm') { return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`; }
   function localDateKey(date) {
@@ -400,7 +402,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.15</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.16</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -1432,7 +1434,7 @@
   }
   function renderComparisonTable(selector, comparisons) {
     const body = $(selector);
-    body.innerHTML = comparisons.map((item, i) => `<tr class="${i === 0 ? 'current-year' : ''}"><td>${item.year}${i === 0 ? ' · periodo scelto' : ''}</td><td>${shortEuro.format(item.data.income)}</td><td>${shortEuro.format(item.data.expense)}</td><td class="${item.data.net >= 0 ? 'amount-in' : 'amount-out'}">${shortEuro.format(item.data.net)}</td></tr>`).join('');
+    body.innerHTML = comparisons.map((item, i) => `<tr class="${i === 0 ? 'current-year' : ''}"><td>${item.year}${i === 0 ? ' · periodo scelto' : ''}</td><td>${reportShortEuro(item.data.income)}</td><td>${reportShortEuro(item.data.expense)}</td><td class="${item.data.net >= 0 ? 'amount-in' : 'amount-out'}">${reportShortEuro(item.data.net)}</td></tr>`).join('');
   }
   function renderCategoryBars(transactions) {
     const totals = new Map();
@@ -2113,10 +2115,12 @@
       { kind: 'total', name: 'Uscite', ...cashFlowTotal }];
   }
   function deviationYearLabel(row) {
-    const amount = `${row.yearDelta >= 0 ? '+' : '−'}${euro.format(Math.abs(row.yearDelta))}`;
+    const amount = `€ ${row.yearDelta >= 0 ? '+' : '−'}${reportNumber.format(Math.abs(row.yearDelta))}`;
     const percent = row.yearPercent === null ? 'n.d.' : `${row.yearPercent > 0 ? '+' : ''}${row.yearPercent.toFixed(1).replace('.', ',')}%`;
     return `${amount} (${percent})`;
   }
+  function reportEuro(value) { return `€ ${reportNumber.format(value)}`; }
+  function reportShortEuro(value) { return `€ ${reportShortNumber.format(value)}`; }
   function deviationRowHtml(row) {
     const bold = row.kind === 'summary' || row.kind === 'total', italic = row.kind === 'detail';
     const indent = row.kind === 'category' ? 12 : row.kind === 'detail' ? Math.min(4, row.depth || 1) * 18 : 0;
@@ -2125,7 +2129,7 @@
     const yearClass = row.yearDelta < 0 ? 'delta-negative' : 'delta-positive';
     const percentClass = row.percent < 0 ? 'delta-negative' : 'delta-positive';
     const percent = row.percent === null ? 'n.d.' : `${row.percent > 0 ? '+' : ''}${row.percent.toFixed(1).replace('.', ',')}%`;
-    return `<tr class="deviation-${row.kind}-row" style="${style}"><td><span class="deviation-name" style="display:block;padding-left:${indent}px">${safeText(row.name)}</span></td><td>${euro.format(row.actual)}</td><td>${euro.format(row.previousYear)}</td><td class="${yearClass}">${deviationYearLabel(row)}</td><td>${euro.format(row.expected)}</td><td class="${deltaClass}">${row.delta >= 0 ? '+' : '−'}${euro.format(Math.abs(row.delta))}</td><td class="${percentClass}">${percent}</td></tr>`;
+    return `<tr class="deviation-${row.kind}-row" style="${style}"><td><span class="deviation-name" style="display:block;padding-left:${indent}px">${safeText(row.name)}</span></td><td class="num">${reportEuro(row.actual)}</td><td class="num">${reportEuro(row.previousYear)}</td><td class="num ${yearClass}">${deviationYearLabel(row)}</td><td class="num">${reportEuro(row.expected)}</td><td class="num ${deltaClass}">€ ${row.delta >= 0 ? '+' : '−'}${reportNumber.format(Math.abs(row.delta))}</td><td class="num ${percentClass}">${percent}</td></tr>`;
   }
 
   function renderCategoryComparison(comparisons) {
@@ -2946,7 +2950,7 @@
     const averageDeviations = deviations.filter(row => row.delta >= 0.01).sort((a, b) => b.delta - a.delta);
     const verdict = current.net > .005 ? 'ATTIVO' : current.net < -.005 ? 'PASSIVO' : 'IN PAREGGIO';
     const rows = reportDeviationDisplayRows(comparisons).map(deviationRowHtml).join('');
-    const periodRows = comparisons.map(c => `<tr><td>${c.year}</td><td class="num">${euro.format(c.data.income)}</td><td class="num">${euro.format(c.data.expense)}</td><td class="num" style="color:${c.data.net < 0 ? '#b00020' : '#171b1a'};font-weight:${c.data.net < 0 ? '700' : '400'}">${euro.format(c.data.net)}</td><td class="num">${euro.format(c.data.transfers)}</td></tr>`).join('');
+    const periodRows = comparisons.map(c => `<tr><td>${c.year}</td><td class="num">${reportEuro(c.data.income)}</td><td class="num">${reportEuro(c.data.expense)}</td><td class="num" style="color:${c.data.net < 0 ? '#b00020' : '#171b1a'};font-weight:${c.data.net < 0 ? '700' : '400'}">${reportEuro(c.data.net)}</td><td class="num">${reportEuro(c.data.transfers)}</td></tr>`).join('');
     const scope = state.reportAccountId === 'all' ? 'Tutti i conti liquidi' : accountReportLabelById(state.reportAccountId);
     const label = reportPeriodLabel(), code = reportFilenameCode();
     const baselineText = reportMode === 'monthly' && Number(monthSelection().slice(5, 7)) <= 2 ? 'Confronto con lo stesso mese dell’anno precedente' : 'Media degli altri periodi completi disponibili dello stesso anno';
