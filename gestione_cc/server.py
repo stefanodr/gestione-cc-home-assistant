@@ -54,6 +54,8 @@ def init_db():
             c.execute("ALTER TABLE app_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
         c.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, salt BLOB NOT NULL, password_hash BLOB NOT NULL, iterations INTEGER NOT NULL)")
         c.execute("CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL)")
+        c.execute("CREATE TABLE IF NOT EXISTS background_jobs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result_json TEXT, error TEXT)")
+        c.execute("UPDATE background_jobs SET status='queued', updated_at=datetime('now') WHERE status='running'")
         opts = read_options()
         username = str(opts.get("admin_username", "admin")).strip() or "admin"
         pin = str(opts.get("bootstrap_pin", ""))
@@ -108,8 +110,7 @@ def maybe_auto_backup():
 # Google Drive backup configuration is stored only in the persistent /data volume.
 DRIVE_CONFIG = DATA / "google_drive.json"
 DRIVE_LOCK = __import__("threading").RLock()
-SESSION_BACKUP_JOBS = {}
-SESSION_BACKUP_JOBS_LOCK = __import__("threading").Lock()
+BACKGROUND_JOBS_LOCK = __import__("threading").Lock()
 DRIVE_API = "https://www.googleapis.com/drive/v3"
 DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -305,18 +306,54 @@ def drive_session_backup(force=False):
             try: local.unlink()
             except OSError: pass
 
-def run_session_backup_job(job_id):
-    try:
-        with SESSION_BACKUP_JOBS_LOCK:
-            SESSION_BACKUP_JOBS[job_id] = {"status": "running"}
-        result = drive_session_backup()
-        with SESSION_BACKUP_JOBS_LOCK:
-            SESSION_BACKUP_JOBS[job_id] = {"status": "done", "result": result}
-    except Exception as error:
-        message = str(error)[:500]
-        print("GestioneCC: backup di chiusura non riuscito: " + message)
-        with SESSION_BACKUP_JOBS_LOCK:
-            SESSION_BACKUP_JOBS[job_id] = {"status": "failed", "error": message}
+def enqueue_session_backup_job():
+    job_id = secrets.token_urlsafe(24)
+    with db() as connection:
+        connection.execute(
+            "INSERT INTO background_jobs(id,kind,status,created_at,updated_at) VALUES(?, 'drive_session_backup', 'queued', datetime('now'), datetime('now'))",
+            (job_id,)
+        )
+    return job_id
+
+
+def background_job_worker():
+    # SQLite keeps queued work across browser closure and add-on restarts.
+    while True:
+        with BACKGROUND_JOBS_LOCK:
+            with db() as connection:
+                job = connection.execute(
+                    "SELECT id FROM background_jobs WHERE status='queued' ORDER BY created_at LIMIT 1"
+                ).fetchone()
+                if job:
+                    connection.execute(
+                        "UPDATE background_jobs SET status='running', updated_at=datetime('now') WHERE id=?",
+                        (job["id"],)
+                    )
+        if not job:
+            time.sleep(1)
+            continue
+        job_id = job["id"]
+        try:
+            result = drive_session_backup()
+            with db() as connection:
+                connection.execute(
+                    "UPDATE background_jobs SET status='done', result_json=?, error=NULL, updated_at=datetime('now') WHERE id=?",
+                    (json.dumps(result, ensure_ascii=False), job_id)
+                )
+            cfg = drive_read_config()
+            cfg["last_session_job"] = {"status": "done", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "result": result}
+            drive_write_config(cfg)
+        except Exception as error:
+            message = str(error)[:500]
+            print("GestioneCC: backup di chiusura non riuscito: " + message)
+            with db() as connection:
+                connection.execute(
+                    "UPDATE background_jobs SET status='failed', error=?, updated_at=datetime('now') WHERE id=?",
+                    (message, job_id)
+                )
+            cfg = drive_read_config()
+            cfg["last_session_job"] = {"status": "failed", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "error": message}
+            drive_write_config(cfg)
 
 
 def drive_nightly_backup():
@@ -446,8 +483,9 @@ class Handler(BaseHTTPRequestHandler):
             if not item: return
             from urllib.parse import parse_qs
             job_id = parse_qs(urlparse(self.path).query).get("id", [""])[0]
-            with SESSION_BACKUP_JOBS_LOCK:
-                job = SESSION_BACKUP_JOBS.get(job_id)
+            with db() as connection:
+                row = connection.execute("SELECT status,result_json,error FROM background_jobs WHERE id=? AND kind='drive_session_backup'", (job_id,)).fetchone()
+            job = ({"status": row["status"], "result": json.loads(row["result_json"]) if row["result_json"] else None, "error": row["error"]} if row else None)
             if not job:
                 self.send_json(404, {"error": "Operazione di backup non trovata"})
                 return
@@ -464,6 +502,7 @@ class Handler(BaseHTTPRequestHandler):
                     "connected": connected,
                     "last_session_backup": cfg.get("last_session_backup"),
                     "last_nightly_backup": cfg.get("last_nightly_backup"),
+                    "last_session_job": cfg.get("last_session_job"),
                     "backups": backups
                 })
             except Exception as error:
@@ -634,18 +673,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/drive/session-backup/start":
             item = self.require_auth(csrf=True)
             if not item: return
-            job_id = secrets.token_urlsafe(18)
-            with SESSION_BACKUP_JOBS_LOCK:
-                SESSION_BACKUP_JOBS[job_id] = {"status": "queued"}
-                if len(SESSION_BACKUP_JOBS) > 100:
-                    for old_id in list(SESSION_BACKUP_JOBS)[:-50]:
-                        SESSION_BACKUP_JOBS.pop(old_id, None)
-            __import__("threading").Thread(
-                target=run_session_backup_job,
-                args=(job_id,),
-                daemon=True,
-                name="drive-session-backup"
-            ).start()
+            job_id = enqueue_session_backup_job()
             self.send_json(202, {"ok": True, "job_id": job_id})
             return
         if path == "/api/drive/session-backup":
@@ -783,12 +811,13 @@ class Handler(BaseHTTPRequestHandler):
             item = self.require_auth(csrf=True)
             if not item: return
             try:
-                backup_result = drive_session_backup()
+                job_id = enqueue_session_backup_job()
             except Exception as error:
-                self.send_json(502, {"error":"Non ho potuto completare il backup su Google Drive. La sessione resta aperta: " + str(error)})
+                self.send_json(500, {"error":"Impossibile accodare il backup; la sessione resta aperta: " + str(error)})
                 return
             sessions.pop(self.cookie_token(), None)
-            self.send_json(200, {"ok":True,"backup":backup_result}, {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
+            self.send_json(202, {"ok":True,"job_id":job_id,"backup_status":"queued"},
+                           {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
             return
         if path == "/api/import":
             item = self.require_auth(csrf=True)
@@ -865,6 +894,7 @@ if __name__ == "__main__":
     except ValueError as error:
         raise RuntimeError("lan_network non valida: usare una rete IPv4/IPv6 in formato CIDR.") from error
     __import__("threading").Thread(target=drive_backup_scheduler, daemon=True, name="drive-backup-scheduler").start()
+    __import__("threading").Thread(target=background_job_worker, daemon=True, name="background-job-worker").start()
     httpd = LANOnlyHTTPServer(("0.0.0.0", 8443), Handler, allowed_network)
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     print("Gestione C/C HTTPS in ascolto sulla porta 8443")
