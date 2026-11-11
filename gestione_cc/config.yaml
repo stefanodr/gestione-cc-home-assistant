@@ -1,7 +1,7 @@
 name: "Gestione C/C"
 slug: "gestione_cc"
 description: "Gestione C/C privata, con archivio centralizzato e accesso LAN autenticato"
-version: "1.0.16"
+version: "1.0.17"
 url: "https://github.com/stefanodr/gestione-cc-home-assistant"
 webui: "https://[HOST]:[PORT:8443]"
 arch:
