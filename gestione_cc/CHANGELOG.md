@@ -1,3 +1,11 @@
+## 1.0.15 — 11 novembre 2026
+
+- Semplificata la creazione di un nuovo conto: tutti i dati sono inseriti in un'unica schermata, con casella di spunta per indicare un conto economico e scelta del tipo (entrata o uscita).
+- Aggiunto nei Movimenti il filtro per contropartita, oltre ai filtri per data e stato.
+- Introdotta la modifica massiva selettiva della contropartita: è possibile spuntare singoli movimenti oppure selezionare tutti i risultati filtrati, anche su più pagine, scegliere la nuova contropartita e confermare prima del salvataggio.
+- I movimenti ripartiti su più contropartite restano esclusi dalla modifica massiva, per evitare di alterare involontariamente le ripartizioni.
+- Aggiornata l'applicazione inclusa alla versione 1.7.9. Nessuna modifica all'archivio SQLite, al PIN, alla configurazione HTTPS, all'accesso LAN o ai backup.
+
 ## 1.0.14 — 10 novembre 2026
 
 - Aggiornati gli esempi mostrati durante la modifica dei tag personalizzati: IBAN fittizio, CONTO CHIUSO, CONTO PRINCIPALE, RISPARMI, STIPENDIO, CONTO SECONDARIO, CARTA PREPAGATA, CONTO FAMILIARE e DA NON UTILIZZARE.
