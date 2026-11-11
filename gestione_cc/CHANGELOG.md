@@ -1,3 +1,11 @@
+## 1.0.18 — 11 novembre 2026
+
+- Corretta la coerenza del report degli scostamenti: quando il totale effettivo di «Spese» coincide con quello di «Uscite», media attesa, scostamento e variazione percentuale di «Uscite» riprendono gli stessi valori aggregati di «Spese».
+- Mantenuto il totale «Uscite» basato sui flussi di cassa quando i due perimetri effettivi non coincidono.
+- Applicata la correzione al report a video, al PDF e all'esportazione Excel tramite la funzione condivisa.
+- Mantenuti invariati i criteri di inclusione dei rimborsi del capitale dei finanziamenti, l'archivio SQLite, il PIN, HTTPS, l'accesso LAN e i backup.
+- Aggiornata l'applicazione inclusa alla versione 1.7.12.
+
 ## 1.0.17 — 11 novembre 2026
 
 - Reso il logout indipendente dal completamento del backup Google Drive: dopo il salvataggio delle modifiche in coda, il server accoda l'operazione e invalida immediatamente la sessione.
