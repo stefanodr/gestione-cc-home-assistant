@@ -1,3 +1,10 @@
+## 1.0.16 — 11 novembre 2026
+
+- Migliorato l'allineamento delle tabelle del report dei flussi: la colonna Categoria resta invariata, mentre tutte le colonne successive sono allineate a destra nella rispettiva colonna.
+- Uniformata la visualizzazione degli importi nelle tabelle del report e nel PDF, con il simbolo € prima della cifra.
+- Applicata la stessa formattazione al confronto dei periodi nel PDF e nella schermata Report. L'esportazione Excel resta invariata perché già correttamente formattata.
+- Aggiornata l'applicazione inclusa alla versione 1.7.10. Nessuna modifica all'archivio SQLite, al PIN, alla configurazione HTTPS, all'accesso LAN o ai backup.
+
 ## 1.0.15 — 11 novembre 2026
 
 - Semplificata la creazione di un nuovo conto: tutti i dati sono inseriti in un'unica schermata, con casella di spunta per indicare un conto economico e scelta del tipo (entrata o uscita).
