@@ -1,3 +1,12 @@
+## [1.0.17] - 2026-11-11
+
+- Decoupled logout from Google Drive backup completion: after queued database writes finish, the server queues the backup and immediately invalidates the session.
+- The backup runs in a server-side worker and continues after the browser tab or window is closed.
+- The job queue and operation state are persisted in the add-on database; jobs interrupted by a service restart are re-queued on the next startup.
+- The result of the latest session backup is recorded and can be checked after the next login in the Google Drive section of Settings.
+- Removed the best-effort page-close backup handler; it is replaced by the explicit authenticated queue operation during logout.
+- Updated the bundled application to version 1.7.11. No changes to accounting data, PIN, HTTPS configuration or LAN access.
+
 ## [1.0.16] - 2026-11-11
 
 - Improved alignment in the cash-flow report tables: the Category column remains unchanged, while all following columns are right-aligned within their respective columns.
