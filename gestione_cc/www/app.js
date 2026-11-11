@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.8';
+  const APP_VERSION = '1.7.9';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -11,6 +11,7 @@
   let state;
   let reportMode = 'monthly';
   let transactionPage = 0;
+  let transactionSelection = new Set();
   let confirmCallback = null;
   let resizeTimer;
   let editingRecurringId = null;
@@ -399,7 +400,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.14</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.15</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -521,17 +522,22 @@
     $('#reportPeriodNext')?.addEventListener('click', () => moveSelectedPeriod(1, 'report'));
     $('#accountPicker').addEventListener('change', () => { state.reportAccountId = $('#accountPicker').value; $('#reportAccountPicker').value = state.reportAccountId; saveState(); renderAll(); });
     $('#reportAccountPicker').addEventListener('change', () => { state.reportAccountId = $('#reportAccountPicker').value; $('#accountPicker').value = state.reportAccountId; saveState(); renderAll(); });
-    $('#transactionFilter').addEventListener('change', () => { transactionPage = 0; renderTransactions(); });
-    $('#transactionDateFrom')?.addEventListener('change', () => { transactionPage = 0; renderTransactions(); });
-    $('#transactionDateTo')?.addEventListener('change', () => { transactionPage = 0; renderTransactions(); });
+    const resetTransactionFilters = () => { transactionSelection.clear(); transactionPage = 0; renderTransactions(); };
+    $('#transactionFilter').addEventListener('change', resetTransactionFilters);
+    $('#transactionDateFrom')?.addEventListener('change', resetTransactionFilters);
+    $('#transactionDateTo')?.addEventListener('change', resetTransactionFilters);
+    $('#transactionCounterpartFilter')?.addEventListener('change', resetTransactionFilters);
     $('#clearTransactionDates')?.addEventListener('click', () => {
       $('#transactionDateFrom').value = '';
       $('#transactionDateTo').value = '';
-      transactionPage = 0;
-      renderTransactions();
+      resetTransactionFilters();
     });
     $('#transactionPrev').addEventListener('click', () => { transactionPage = Math.max(0, transactionPage - 1); renderTransactions(); });
     $('#transactionNext').addEventListener('click', () => { transactionPage++; renderTransactions(); });
+    $('#transactionSelectAll')?.addEventListener('click', selectAllFilteredTransactions);
+    $('#transactionDeselectAll')?.addEventListener('click', clearTransactionSelection);
+    $('#transactionBulkCounterpart')?.addEventListener('change', () => updateTransactionBulkUi());
+    $('#applyBulkCounterpart')?.addEventListener('click', applyBulkCounterpartChange);
     $('#addManualTransaction')?.addEventListener('click', openManualTransaction);
     $('#closeManualTransaction')?.addEventListener('click', closeManualTransaction);
     $('#cancelManualTransaction')?.addEventListener('click', closeManualTransaction);
@@ -597,7 +603,11 @@
     $('#resetDemo')?.addEventListener('click', () => showConfirm('Ripristinare i dati dimostrativi?', 'Il contenuto attuale del prototipo sarà sostituito. Esporta un backup prima di continuare, se vuoi conservarlo.', async () => {
       state = createDemoState(); await saveState(); renderAll(); showNotice('Prototipo ripristinato', 'I dati dimostrativi sono di nuovo disponibili.');
     }));
-    $('#addAccount').addEventListener('click', addAccount);
+    $('#addAccount').addEventListener('click', openAddAccount);
+    $('#accountEconomicCheckbox')?.addEventListener('change', () => $('#accountEconomicTypeWrap')?.classList.toggle('hidden', !$('#accountEconomicCheckbox').checked));
+    $('#cancelAddAccount')?.addEventListener('click', closeAddAccount);
+    $('#closeAddAccount')?.addEventListener('click', closeAddAccount);
+    $('#saveNewAccount')?.addEventListener('click', addAccount);
     $('#importAccountsExcel')?.addEventListener('click', () => $('#accountFile').click());
     $('#accountFile')?.addEventListener('change', importAccountsFromExcel);
     $('#downloadAccountTemplate')?.addEventListener('click', downloadAccountTemplate);
@@ -1546,16 +1556,111 @@
     ctx.moveTo(x + r, y); ctx.arcTo(x + width, y, x + width, y + height, r); ctx.arcTo(x + width, y + height, x, y + height, r); ctx.arcTo(x, y + height, x, y, r); ctx.arcTo(x, y, x + width, y, r); ctx.closePath();
   }
 
-  function renderTransactions() {
-    refreshAccountSearchOptions();
+  function isBulkEditableTransaction(item) {
+    return !(Array.isArray(item.counterpartSplits) && item.counterpartSplits.length > 1);
+  }
+  function filteredTransactions() {
     const filter = $('#transactionFilter')?.value || 'all';
     const dateFrom = $('#transactionDateFrom')?.value || '';
     const dateTo = $('#transactionDateTo')?.value || '';
+    const counterpartFilter = $('#transactionCounterpartFilter')?.value || 'all';
     let tx = [...state.transactions].sort((a, b) => parseDate(b.date).localeCompare(parseDate(a.date)));
     if (filter === 'pending') tx = tx.filter(t => t.status === 'pending');
     if (filter === 'confirmed') tx = tx.filter(t => t.status === 'confirmed');
     if (dateFrom) tx = tx.filter(t => parseDate(t.date) >= dateFrom);
     if (dateTo) tx = tx.filter(t => parseDate(t.date) <= dateTo);
+    if (counterpartFilter !== 'all') {
+      tx = tx.filter(item => {
+        const ids = [item.counterpartAccountId, item.suggestionId, ...(item.counterpartSplits || []).map(split => split.accountId)].filter(Boolean);
+        return ids.includes(counterpartFilter);
+      });
+    }
+    return tx;
+  }
+  function populateTransactionCounterpartControls() {
+    const accounts = state.accounts.filter(a => !['ROOT', 'TRADING'].includes(a.type))
+      .sort((a, b) => a.path.localeCompare(b.path, 'it', { sensitivity: 'base' }));
+    const filter = $('#transactionCounterpartFilter');
+    if (filter) {
+      const selected = filter.value || 'all';
+      filter.innerHTML = '<option value="all">Tutte le contropartite</option>' +
+        accounts.map(a => `<option value="${safeText(a.id)}">${safeText(accountDisplayLabel(a))}</option>`).join('');
+      filter.value = accounts.some(a => a.id === selected) ? selected : 'all';
+    }
+    const bulk = $('#transactionBulkCounterpart');
+    if (bulk) {
+      const selected = bulk.value || '';
+      bulk.innerHTML = '<option value="">Scegli nuova contropartita…</option>' +
+        accounts.map(a => `<option value="${safeText(a.id)}">${safeText(accountDisplayLabel(a))}</option>`).join('');
+      bulk.value = accounts.some(a => a.id === selected) ? selected : '';
+    }
+  }
+  function updateTransactionBulkUi(filtered = filteredTransactions()) {
+    const validIds = new Set(state.transactions.filter(isBulkEditableTransaction).map(item => item.id));
+    transactionSelection = new Set([...transactionSelection].filter(id => validIds.has(id)));
+    const eligible = filtered.filter(isBulkEditableTransaction);
+    const count = $('#transactionSelectionCount');
+    if (count) count.textContent = `${transactionSelection.size} selezionati`;
+    const selectAll = $('#transactionSelectAll');
+    if (selectAll) selectAll.disabled = eligible.length === 0;
+    const deselect = $('#transactionDeselectAll');
+    if (deselect) deselect.disabled = transactionSelection.size === 0;
+    const apply = $('#applyBulkCounterpart');
+    if (apply) apply.disabled = transactionSelection.size === 0 || !$('#transactionBulkCounterpart')?.value;
+    const toolbar = $('#transactionBulkToolbar');
+    if (toolbar) toolbar.classList.toggle('hidden', eligible.length === 0 && transactionSelection.size === 0);
+  }
+  function selectAllFilteredTransactions() {
+    filteredTransactions().filter(isBulkEditableTransaction).forEach(item => transactionSelection.add(item.id));
+    renderTransactions();
+  }
+  function clearTransactionSelection() {
+    transactionSelection.clear();
+    renderTransactions();
+  }
+  function applyBulkCounterpartChange() {
+    const accountId = $('#transactionBulkCounterpart')?.value || '';
+    const account = accountById(accountId);
+    const selected = [...transactionSelection]
+      .map(id => state.transactions.find(item => item.id === id))
+      .filter(item => item && isBulkEditableTransaction(item));
+    if (!selected.length) {
+      showNotice('Nessun movimento selezionato', 'Seleziona almeno un movimento modificabile nell’elenco.');
+      return;
+    }
+    if (!account) {
+      showNotice('Scegli la nuova contropartita', 'Seleziona il conto da assegnare ai movimenti selezionati.');
+      return;
+    }
+    const conflicts = selected.filter(item => item.bankAccountId === accountId);
+    if (conflicts.length) {
+      showNotice('Contropartita non valida', 'La nuova contropartita coincide con il conto corrente di ' + conflicts.length + ' movimento/i selezionato/i. Scegli un altro conto.');
+      return;
+    }
+    showConfirm(
+      'Confermare la modifica massiva?',
+      `La contropartita "${account.path}" verrà assegnata esclusivamente a ${selected.length} movimenti selezionati. Data, importo, descrizione, causale e conto corrente resteranno invariati.`,
+      async () => {
+        selected.forEach(item => {
+          item.counterpartAccountId = accountId;
+          item.counterpartSplits = [{ accountId, value: -Number(item.amount || 0), memo: item.memo || '' }];
+          item.suggestionId = accountId;
+          item.suggestionLabel = account.path;
+          item.status = 'confirmed';
+          item.confidence = 1;
+        });
+        const saved = await saveState();
+        if (!saved) throw new Error('Il salvataggio non è riuscito. Verifica la connessione prima di ripetere l’operazione.');
+        transactionSelection.clear();
+        renderAll();
+        showNotice('Contropartita aggiornata', `Modificata la contropartita di ${selected.length} movimenti. Gli altri dati sono rimasti invariati.`);
+      }
+    );
+  }
+  function renderTransactions() {
+    refreshAccountSearchOptions();
+    populateTransactionCounterpartControls();
+    const tx = filteredTransactions();
     const body = $('#transactionsBody'); if (!body) return;
     $('#emptyTransactions').classList.toggle('hidden', tx.length > 0);
     const pageSize = 100;
@@ -1575,6 +1680,7 @@
       const secondaryLabel = item.source === 'qif' ? 'Dettagli:' : 'Causale:';
       const causaleRow = description && causale ? `<span class="name-secondary transaction-causale"><strong>${secondaryLabel}</strong> ${safeText(causale)}</span>` : '';
       const isSplit = Array.isArray(item.counterpartSplits) && item.counterpartSplits.length > 1;
+      const selectionCell = `<input type="checkbox" data-select-tx="${safeText(item.id)}" aria-label="Seleziona movimento ${safeText(primaryText)}" ${isSplit ? 'disabled title="Movimento ripartito: modifica le contropartite singolarmente"' : ''} ${transactionSelection.has(item.id) ? 'checked' : ''}>`;
       const accountCell = isSplit
         ? '<span class="account-type">Ripartito</span>'
         : item.status === 'confirmed'
@@ -1588,8 +1694,13 @@
         : item.status === 'confirmed'
           ? `<button class="row-action row-action-review" data-edit-tx="${safeText(item.id)}">Rivedi</button> <button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Ripartisci</button>`
           : `<button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Dividi</button> <button class="row-action row-action-review" data-confirm-tx="${safeText(item.id)}">Conferma</button>`;
-      return `<tr><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountPathAt(accountById(item.bankAccountId), item.date))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td>${actions} <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
+      return `<tr><td class="tx-select-cell">${selectionCell}</td><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountPathAt(accountById(item.bankAccountId), item.date))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td>${actions} <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
     }).join('');
+    $$('[data-select-tx]', body).forEach(input => input.addEventListener('change', () => {
+      if (input.checked) transactionSelection.add(input.dataset.selectTx);
+      else transactionSelection.delete(input.dataset.selectTx);
+      updateTransactionBulkUi(tx);
+    }));
     $$('[data-confirm-tx]', body).forEach(btn => btn.addEventListener('click', () => confirmTransaction(btn.dataset.confirmTx)));
     $$('[data-split-tx]', body).forEach(btn => btn.addEventListener('click', () => openSplitEditor(btn.dataset.splitTx)));
     $$('[data-edit-tx]', body).forEach(btn => btn.addEventListener('click', async () => {
@@ -1602,10 +1713,12 @@
       const label = item.payee || item.memo || 'movimento senza descrizione';
       if (!window.confirm(`Eliminare il movimento “${label}” del ${formatDate(item.date)} (${euro.format(item.amount)}) dall’archivio di Gestione C/C?`)) return;
       state.transactions = state.transactions.filter(t => t.id !== item.id);
+      transactionSelection.delete(item.id);
       transactionPage = Math.min(transactionPage, Math.max(0, Math.ceil(state.transactions.length / pageSize) - 1));
       await saveState(); renderAll();
       showNotice('Movimento eliminato', 'È stato rimosso dall’archivio locale di Gestione C/C. Il file GnuCash o bancario originale non è stato modificato.');
     }));
+    updateTransactionBulkUi(tx);
   }
   function refreshAccountSearchOptions() {
     const list = $('#accountSearchOptions'); if (!list || !state) return;
@@ -2080,15 +2193,49 @@
   function downloadAccountTemplate() {
     downloadXlsx('Modello-piano-dei-conti.xlsx',[{name:'Piano dei conti',rows:[['Percorso conto','Tipo GnuCash','Classificazione'],['Attività','ASSET','Patrimoniale'],['Attività:Conto corrente','BANK','Patrimoniale'],['Uscite','EXPENSE','Economica'],['Uscite:Casa','EXPENSE','Economica'],['Entrate','INCOME','Economica']],widths:[42,22,24]}]);
   }
+  function openAddAccount() {
+    $('#accountNameInput').value = '';
+    $('#accountEconomicCheckbox').checked = false;
+    $('#accountEconomicTypeWrap').classList.add('hidden');
+    $('#accountEconomicType').value = 'EXPENSE';
+    $('#accountModal').classList.remove('hidden');
+    $('#accountNameInput').focus();
+  }
+  function closeAddAccount() {
+    $('#accountModal').classList.add('hidden');
+  }
   async function addAccount() {
-    const name = window.prompt('Nome del nuovo conto (es. Uscite:Abbonamenti):');
-    if (!name?.trim()) return;
-    const parentGuess = state.accounts.find(a => a.path === name.trim().split(':').slice(0, -1).join(':'));
-    const chooseEconomic = window.confirm('Questo conto è economico (entrata o spesa)?\nScegli “Annulla” per inserirlo come patrimoniale.');
-    const type = chooseEconomic ? window.confirm('È un conto di spesa?\nSì = Uscita. No = Entrata.') ? 'EXPENSE' : 'INCOME' : 'ASSET';
-    const cleanName = name.trim().split(':').pop();
-    const account = { id: uid('a'), name: cleanName, path: name.trim(), type, classification: classifyType(type), parentId: parentGuess?.id || 'root' };
-    state.accounts.push(account); await saveState(); renderAll();
+    const rawName = $('#accountNameInput').value.trim();
+    if (!rawName) {
+      showNotice('Nome conto mancante', 'Inserisci il nome o il percorso del nuovo conto.');
+      $('#accountNameInput').focus();
+      return;
+    }
+    const parts = rawName.split(':').map(part => part.trim());
+    if (parts.some(part => !part)) {
+      showNotice('Percorso conto non valido', 'Controlla il percorso: i nomi dei livelli devono essere separati da due punti, senza segmenti vuoti.');
+      return;
+    }
+    const path = parts.join(':');
+    if (state.accounts.some(account => normalize(account.path) === normalize(path))) {
+      showNotice('Conto già presente', 'Nel piano dei conti esiste già un conto con questo percorso.');
+      return;
+    }
+    const parentPath = parts.slice(0, -1).join(':');
+    const parentGuess = parentPath ? state.accounts.find(account => normalize(account.path) === normalize(parentPath)) : null;
+    const economic = $('#accountEconomicCheckbox').checked;
+    const type = economic ? ($('#accountEconomicType').value === 'INCOME' ? 'INCOME' : 'EXPENSE') : 'ASSET';
+    const account = { id: uid('a'), name: parts.at(-1), path, type, classification: classifyType(type), parentId: parentGuess?.id || 'root' };
+    state.accounts.push(account);
+    const saved = await saveState();
+    if (!saved) {
+      state.accounts = state.accounts.filter(item => item.id !== account.id);
+      showNotice('Conto non salvato', 'Il server non ha confermato il salvataggio. Verifica la connessione e riprova.');
+      return;
+    }
+    closeAddAccount();
+    renderAll();
+    showNotice('Conto creato', 'Il conto “' + path + '” è stato aggiunto al piano dei conti.');
   }
 
   async function onBankFile(event) {
