@@ -1641,6 +1641,15 @@
       'Confermare la modifica massiva?',
       `La contropartita "${account.path}" verrà assegnata esclusivamente a ${selected.length} movimenti selezionati. Data, importo, descrizione, causale e conto corrente resteranno invariati.`,
       async () => {
+        const previousValues = selected.map(item => ({
+          item,
+          counterpartAccountId: item.counterpartAccountId,
+          counterpartSplits: Array.isArray(item.counterpartSplits) ? JSON.parse(JSON.stringify(item.counterpartSplits)) : item.counterpartSplits,
+          suggestionId: item.suggestionId,
+          suggestionLabel: item.suggestionLabel,
+          status: item.status,
+          confidence: item.confidence
+        }));
         selected.forEach(item => {
           item.counterpartAccountId = accountId;
           item.counterpartSplits = [{ accountId, value: -Number(item.amount || 0), memo: item.memo || '' }];
@@ -1650,7 +1659,17 @@
           item.confidence = 1;
         });
         const saved = await saveState();
-        if (!saved) throw new Error('Il salvataggio non è riuscito. Verifica la connessione prima di ripetere l’operazione.');
+        if (!saved) {
+          previousValues.forEach(previous => {
+            previous.item.counterpartAccountId = previous.counterpartAccountId;
+            previous.item.counterpartSplits = previous.counterpartSplits;
+            previous.item.suggestionId = previous.suggestionId;
+            previous.item.suggestionLabel = previous.suggestionLabel;
+            previous.item.status = previous.status;
+            previous.item.confidence = previous.confidence;
+          });
+          throw new Error('Il salvataggio non è riuscito. Le modifiche sono state annullate in memoria; verifica la connessione prima di riprovare.');
+        }
         transactionSelection.clear();
         renderAll();
         showNotice('Contropartita aggiornata', `Modificata la contropartita di ${selected.length} movimenti. Gli altri dati sono rimasti invariati.`);
