@@ -7,9 +7,13 @@ import hmac
 import json
 import os
 import math
+import re
 import secrets
+import shutil
 import sqlite3
 import ssl
+import subprocess
+import tempfile
 import time
 import urllib.error
 from http import HTTPStatus
@@ -24,7 +28,7 @@ DB_PATH = DATA / "gestione_cc.sqlite3"
 OPTIONS_FILE = Path(os.environ.get("ADDON_OPTIONS_FILE", "/data/options.json"))
 SSL_DIR = Path(os.environ.get("SSL_DIR", "/data/tls"))
 BACKUP_DIR = DATA / "backups"
-MAX_BODY = 120 * 1024 * 1024
+MAX_BODY = 512 * 1024 * 1024  # Large JSON restores may include base64-encoded document files.
 SESSION_SECONDS = 8 * 60 * 60
 sessions = {}
 login_failures = {}
@@ -58,8 +62,19 @@ def init_db():
         c.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
         c.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
+        c.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_document_category ON document_index(category,document_date)")
+        try: c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(attachment_id UNINDEXED, filename, category, extracted_text, supplier, document_date, amount, fiscal_code, tax_code)")
+        except sqlite3.OperationalError: pass
         c.execute("CREATE TABLE IF NOT EXISTS background_jobs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result_json TEXT, error TEXT)")
         c.execute("UPDATE background_jobs SET status='queued', updated_at=datetime('now') WHERE status='running'")
+        # Backfill attachments created by versions before the OCR index existed.
+        for attachment in c.execute("SELECT a.id FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id WHERE d.attachment_id IS NULL").fetchall():
+            attachment_id = str(attachment["id"])
+            c.execute("INSERT INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',datetime('now'))", (attachment_id,))
+            job_id = secrets.token_urlsafe(24)
+            c.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at,result_json) VALUES(?, 'document_ocr', 'queued', datetime('now'), datetime('now'), ?)",
+                      (job_id, json.dumps({"attachment_id": attachment_id})))
         opts = read_options()
         username = str(opts.get("admin_username", "admin")).strip() or "admin"
         pin = str(opts.get("bootstrap_pin", ""))
@@ -292,7 +307,104 @@ def ensure_transaction_feature_tables():
         connection.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
         connection.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
+        connection.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_document_category ON document_index(category,document_date)")
+        try: connection.execute("CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(attachment_id UNINDEXED, filename, category, extracted_text, supplier, document_date, amount, fiscal_code, tax_code)")
+        except sqlite3.OperationalError: pass
 
+
+
+def valid_attachment_signature(mime, content):
+    data = bytes(content or b"")
+    return (
+        (mime == "application/pdf" and data.startswith(b"%PDF-")) or
+        (mime == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
+        (mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n"))
+    )
+
+
+def classify_document(text, filename=""):
+    sample = (str(filename) + "\n" + str(text or "")[:12000]).lower()
+    if re.search(r"\b(modello\s+)?f24\b|codice tributo|erario|inps|inail", sample): return "f24"
+    if re.search(r"bollettino|conto corrente postale|ccp\b|pago", sample): return "bollettino"
+    if re.search(r"fattura|documento commerciale|imponibile|iva\s+(?:22|10|4)\s*%", sample): return "fattura"
+    return "altro"
+
+
+def extract_document_metadata(text):
+    value = str(text or "")
+    date_match = re.search(r"\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b", value)
+    fiscal_match = re.search(r"\b[A-Z]{6}[A-Z0-9]{2}[A-Z][A-Z0-9]{2}[A-Z][A-Z0-9]{3}[A-Z]\b", value.upper())
+    tax_match = re.search(r"(?i)cod(?:ice)?\s*tributo\s*[:\-]?\s*([A-Z0-9]{3,6})", value)
+    amount_match = re.search(r"(?i)(?:totale\s+(?:da\s+)?pagare|importo\s+totale|totale\s+documento|importo)\s*[:€ ]{0,8}([0-9.]{1,12},[0-9]{2})", value)
+    lines = [re.sub(r"\s+", " ", line).strip() for line in value.splitlines() if line.strip()]
+    supplier = next((line[:160] for line in lines[:12] if len(line)>3 and not re.search(r"fattura|codice fiscale|partita iva|pagina",line,re.I)),None)
+    return {"supplier":supplier,"document_date":date_match.group(1) if date_match else None,
+            "amount":amount_match.group(1) if amount_match else None,"fiscal_code":fiscal_match.group(0) if fiscal_match else None,
+            "tax_code":tax_match.group(1).upper() if tax_match else None}
+
+
+def process_document_ocr(attachment_id):
+    with db() as connection:
+        row=connection.execute("SELECT filename,mime,content FROM attachments WHERE id=?",(attachment_id,)).fetchone()
+    if not row: return {"skipped":True}
+    text=""
+    with tempfile.TemporaryDirectory(prefix="gestione-cc-ocr-") as folder:
+        source=Path(folder)/("documento"+Path(row["filename"]).suffix.lower())
+        source.write_bytes(row["content"])
+        if row["mime"]=="application/pdf":
+            result=subprocess.run(["pdftotext","-layout",str(source),"-"],capture_output=True,text=True,timeout=60)
+            text=result.stdout if result.returncode==0 else ""
+            if len(re.sub(r"\s","",text))<80:
+                page_count = 30
+                page_match = None
+                try:
+                    info = subprocess.run(["pdfinfo",str(source)],capture_output=True,text=True,timeout=30,check=True).stdout
+                    page_match = re.search(r"(?m)^Pages:\s+(\d+)",info)
+                    if page_match: page_count = min(30,max(1,int(page_match.group(1))))
+                except Exception:
+                    pass
+                prefix=str(Path(folder)/"pagina")
+                subprocess.run(["pdftoppm","-f","1","-l",str(page_count),"-r","160","-png",str(source),prefix],capture_output=True,timeout=180,check=True)
+                text="\n".join(subprocess.run(["tesseract",str(page),"stdout","-l","ita","--psm","3"],capture_output=True,text=True,timeout=120,check=True).stdout for page in sorted(Path(folder).glob("pagina-*.png")))
+                if page_match and int(page_match.group(1))>30: text += "\n[OCR interrotto dopo le prime 30 pagine]";
+        else:
+            text=subprocess.run(["tesseract",str(source),"stdout","-l","ita","--psm","3"],capture_output=True,text=True,timeout=120,check=True).stdout
+    text=text[:1000000]
+    category=classify_document(text,row["filename"])
+    metadata=extract_document_metadata(text)
+    now=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())
+    with db() as connection:
+        if not connection.execute("SELECT 1 FROM attachments WHERE id=?", (attachment_id,)).fetchone():
+            return {"skipped": True, "reason": "attachment_deleted"}
+        connection.execute("""INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code,updated_at,error)
+            VALUES(?,?,?,?,?,?,?,?,?,?,NULL) ON CONFLICT(attachment_id) DO UPDATE SET status=excluded.status,category=excluded.category,
+            extracted_text=excluded.extracted_text,supplier=excluded.supplier,document_date=excluded.document_date,amount=excluded.amount,
+            fiscal_code=excluded.fiscal_code,tax_code=excluded.tax_code,updated_at=excluded.updated_at,error=NULL""",
+            (attachment_id,"done",category,text,metadata["supplier"],metadata["document_date"],metadata["amount"],metadata["fiscal_code"],metadata["tax_code"],now))
+        try:
+            connection.execute("DELETE FROM document_fts WHERE attachment_id=?",(attachment_id,))
+            connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",
+                (attachment_id,row["filename"],category,text,metadata["supplier"] or "",metadata["document_date"] or "",metadata["amount"] or "",metadata["fiscal_code"] or "",metadata["tax_code"] or ""))
+        except sqlite3.OperationalError: pass
+    return {"status":"done","category":category}
+
+
+def enqueue_document_ocr(attachment_id):
+    # Keep the job id independent from the attachment id; the payload carries
+    # the document reference without changing a primary key after insertion.
+    job_id = secrets.token_urlsafe(24)
+    payload = json.dumps({"attachment_id": attachment_id})
+    with db() as connection:
+        connection.execute(
+            "INSERT INTO background_jobs(id,kind,status,created_at,updated_at,result_json) VALUES(?, 'document_ocr', 'queued', datetime('now'), datetime('now'), ?)",
+            (job_id, payload)
+        )
+        connection.execute(
+            "UPDATE document_index SET status='queued',error=NULL WHERE attachment_id=?",
+            (attachment_id,)
+        )
+    return job_id
 
 def record_transaction_changes(connection, old_state, new_state, event="updated"):
     """Persist a field-level, append-only history for transaction changes."""
@@ -360,7 +472,7 @@ def background_job_worker():
         with BACKGROUND_JOBS_LOCK:
             with db() as connection:
                 job = connection.execute(
-                    "SELECT id FROM background_jobs WHERE status='queued' ORDER BY created_at LIMIT 1"
+                    "SELECT id,kind,result_json FROM background_jobs WHERE status='queued' ORDER BY created_at LIMIT 1"
                 ).fetchone()
                 if job:
                     connection.execute(
@@ -371,27 +483,35 @@ def background_job_worker():
             time.sleep(1)
             continue
         job_id = job["id"]
+        payload = {}
         try:
-            result = drive_session_backup()
+            payload = json.loads(job["result_json"] or "{}") if job["kind"] == "document_ocr" else {}
+            result = process_document_ocr(str(payload.get("attachment_id", ""))) if job["kind"] == "document_ocr" else drive_session_backup()
             with db() as connection:
                 connection.execute(
                     "UPDATE background_jobs SET status='done', result_json=?, error=NULL, updated_at=datetime('now') WHERE id=?",
                     (json.dumps(result, ensure_ascii=False), job_id)
                 )
-            cfg = drive_read_config()
-            cfg["last_session_job"] = {"status": "done", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "result": result}
-            drive_write_config(cfg)
+            if job["kind"] == "drive_session_backup":
+                cfg = drive_read_config()
+                cfg["last_session_job"] = {"status": "done", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "result": result}
+                drive_write_config(cfg)
         except Exception as error:
             message = str(error)[:500]
-            print("GestioneCC: backup di chiusura non riuscito: " + message)
+            print("GestioneCC: job " + str(job["kind"]) + " non riuscito: " + message)
             with db() as connection:
                 connection.execute(
                     "UPDATE background_jobs SET status='failed', error=?, updated_at=datetime('now') WHERE id=?",
                     (message, job_id)
                 )
-            cfg = drive_read_config()
-            cfg["last_session_job"] = {"status": "failed", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "error": message}
-            drive_write_config(cfg)
+            if job["kind"] == "document_ocr":
+                attachment_id = str(payload.get("attachment_id", ""))
+                with db() as connection:
+                    connection.execute("UPDATE document_index SET status='failed',error=?,updated_at=datetime('now') WHERE attachment_id=?", (message, attachment_id))
+            else:
+                cfg = drive_read_config()
+                cfg["last_session_job"] = {"status": "failed", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "error": message}
+                drive_write_config(cfg)
 
 
 def drive_nightly_backup():
@@ -539,6 +659,29 @@ class Handler(BaseHTTPRequestHandler):
                     (tx_id,)).fetchall()
             self.send_json(200, {"items":[dict(r) for r in rows]})
             return
+        if path == "/api/documents/search":
+            item = self.require_auth()
+            if not item: return
+            from urllib.parse import parse_qs
+            query=parse_qs(urlparse(self.path).query)
+            term=str(query.get("q",[""])[0]).strip()[:200]
+            category=str(query.get("category",[""])[0])[:24]
+            try: offset=max(0,min(1000000,int(query.get("offset",["0"])[0])))
+            except (TypeError,ValueError): offset=0
+            with db() as connection:
+                base_sql=""" FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id"""
+                clauses=[]; params=[]
+                if category in ("fattura","f24","bollettino","altro"): clauses.append("d.category=?"); params.append(category)
+                if term:
+                    clauses.append("(a.filename LIKE ? OR d.extracted_text LIKE ? OR d.supplier LIKE ? OR d.document_date LIKE ? OR d.amount LIKE ? OR d.fiscal_code LIKE ? OR d.tax_code LIKE ?)")
+                    params.extend(["%"+term+"%"]*7)
+                where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
+                sql="""SELECT a.id,a.transaction_id,a.filename,a.mime,a.size,a.created_at,COALESCE(d.status,'queued') AS ocr_status,COALESCE(d.category,'altro') AS category,d.supplier,d.document_date,d.amount,d.fiscal_code,d.tax_code,substr(COALESCE(d.extracted_text,''),1,400) AS excerpt""" + base_sql + where + " ORDER BY a.created_at DESC LIMIT 100 OFFSET ?"
+                rows=connection.execute(sql,params+[offset]).fetchall()
+                count=connection.execute("SELECT COUNT(*)"+base_sql+where,params).fetchone()[0]
+                total=connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
+            self.send_json(200,{"items":[dict(row) for row in rows],"total_count":int(count),"offset":offset,"page_size":100,"total_bytes":int(total),"warning":int(total)>=100*1024*1024})
+            return
         if path == "/api/attachments/download":
             item = self.require_auth()
             if not item: return
@@ -663,13 +806,13 @@ class Handler(BaseHTTPRequestHandler):
             with db() as c:
                 attachment_rows = c.execute("SELECT id,transaction_id,filename,mime,size,content,created_at FROM attachments ORDER BY id").fetchall()
             total = sum(int(row["size"]) for row in attachment_rows)
-            if total > 80 * 1024 * 1024:
-                self.send_json(413, {"error":"Gli allegati superano il limite di 80 MB per il backup JSON. Usa il backup SQLite."}); return
             attachments = [{"id":r["id"],"transaction_id":r["transaction_id"],"filename":r["filename"],"mime":r["mime"],"size":r["size"],"created_at":r["created_at"],"content":base64.b64encode(r["content"]).decode("ascii")} for r in attachment_rows]
             with db() as c:
                 history_rows = c.execute("SELECT id,at,transaction_id,event,changes_json FROM transaction_audit ORDER BY id").fetchall()
+                document_rows = c.execute("SELECT attachment_id,status,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code,updated_at,error FROM document_index").fetchall()
             history = [{"id":r["id"],"at":r["at"],"transaction_id":r["transaction_id"],"event":r["event"],"changes":json.loads(r["changes_json"])} for r in history_rows]
-            payload = {"format":"conti-chiari-local-backup","version":3,"exportedAt":time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),"state":state,"attachments":attachments,"history":history}
+            documents = [dict(r) for r in document_rows]
+            payload = {"format":"conti-chiari-local-backup","version":4,"exportedAt":time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),"state":state,"attachments":attachments,"history":history,"documents":documents}
             self.send_json(200, payload, {"Content-Disposition": 'attachment; filename="Conti-Chiari-backup.json"'})
             return
         if path == "/api/sqlite-backup":
@@ -742,13 +885,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not tx_id or not uploaded:
                     raise ValueError("Movimento o file non specificato.")
                 filename, mime, content = uploaded
-                if len(content) < 1 or len(content) > 10 * 1024 * 1024:
-                    raise ValueError("Ogni allegato deve avere dimensione massima di 10 MB.")
+                if len(content) < 1 or len(content) > 5 * 1024 * 1024:
+                    raise ValueError("Ogni allegato deve avere dimensione massima di 5 MB.")
                 allowed = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}
                 suffix = Path(filename).suffix.lower()
-                valid_signature = ((mime == "application/pdf" and content.startswith(b"%PDF-")) or
-                                   (mime == "image/jpeg" and content.startswith(b"\\xff\\xd8\\xff")) or
-                                   (mime == "image/png" and content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")))
+                valid_signature = valid_attachment_signature(mime, content)
                 if (mime not in allowed or suffix not in {allowed[mime], ".jpeg" if mime == "image/jpeg" else allowed[mime]}
                     or not valid_signature):
                     raise ValueError("Sono consentiti soltanto file PDF, JPEG e PNG validi.")
@@ -758,20 +899,43 @@ class Handler(BaseHTTPRequestHandler):
                     tx_ids = {str(x.get("id")) for x in json.loads(state_row["state_json"]).get("transactions", [])} if state_row else set()
                     if tx_id not in tx_ids:
                         raise ValueError("Il movimento selezionato non esiste più.")
+                    per_transaction = connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments WHERE transaction_id=?", (tx_id,)).fetchone()[0]
+                    if int(per_transaction) + len(content) > 15 * 1024 * 1024:
+                        raise ValueError("Gli allegati di questa registrazione non possono superare complessivamente 15 MB.")
                     total = connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
-                    if int(total) + len(content) > 80 * 1024 * 1024:
-                        raise ValueError("Spazio allegati massimo raggiunto (80 MB).")
                     attachment_id = secrets.token_urlsafe(18)
                     connection.execute(
                         "INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
                         (attachment_id, tx_id, filename, mime, len(content), sqlite3.Binary(content), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
+                    connection.execute("INSERT INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',?)", (attachment_id,time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
                     connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
                         (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), tx_id, "attachment_added",
                          json.dumps({"attachment": {"old": None, "new": {"id": attachment_id, "filename": filename, "size": len(content)}}}, ensure_ascii=False)))
                     connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_added:" + tx_id,))
-                self.send_json(201, {"ok":True,"id":attachment_id,"filename":filename,"size":len(content)})
+                enqueue_document_ocr(attachment_id)
+                total_after=int(total)+len(content)
+                self.send_json(201, {"ok":True,"id":attachment_id,"filename":filename,"size":len(content),"ocr_status":"queued","storage_warning":total_after>=100*1024*1024,"total_bytes":total_after})
             except Exception as error:
                 self.send_json(400, {"error":str(error)})
+            return
+        if path == "/api/documents/update":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            attachment_id = str(payload.get("id", ""))[:160]
+            category = str(payload.get("category", "altro"))
+            if category not in ("fattura", "f24", "bollettino", "altro"):
+                self.send_json(400, {"error":"Categoria documento non valida."}); return
+            with db() as connection:
+                row = connection.execute("SELECT a.transaction_id,a.filename,d.extracted_text,d.supplier,d.document_date,d.amount,d.fiscal_code,d.tax_code FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id WHERE a.id=?", (attachment_id,)).fetchone()
+                if not row:
+                    self.send_json(404, {"error":"Documento non trovato."}); return
+                connection.execute("UPDATE document_index SET category=?,updated_at=? WHERE attachment_id=?", (category,time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),attachment_id))
+                try:
+                    connection.execute("DELETE FROM document_fts WHERE attachment_id=?", (attachment_id,))
+                    connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)", (attachment_id,row["filename"],category,row["extracted_text"] or "",row["supplier"] or "",row["document_date"] or "",row["amount"] or "",row["fiscal_code"] or "",row["tax_code"] or ""))
+                except sqlite3.OperationalError: pass
+                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)", (time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),row["transaction_id"],"attachment_category_changed",json.dumps({"attachment":{"id":attachment_id,"filename":row["filename"],"category":category}},ensure_ascii=False)))
+            self.send_json(200, {"ok":True})
             return
         if path == "/api/attachments/delete":
             item = self.require_auth(csrf=True)
@@ -782,6 +946,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:
                     self.send_json(404, {"error":"Allegato non trovato"}); return
                 connection.execute("DELETE FROM attachments WHERE id=?", (attachment_id,))
+                connection.execute("DELETE FROM document_index WHERE attachment_id=?", (attachment_id,))
+                try: connection.execute("DELETE FROM document_fts WHERE attachment_id=?", (attachment_id,))
+                except sqlite3.OperationalError: pass
                 connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
                     (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_deleted",
                      json.dumps({"attachment": {"old": {"id": attachment_id, "filename": row["filename"], "size": row["size"]}, "new": None}}, ensure_ascii=False)))
@@ -1009,6 +1176,9 @@ class Handler(BaseHTTPRequestHandler):
                 history_payload = payload.get("history", [])
                 if not isinstance(history_payload, list) or len(history_payload) > 1000000:
                     raise ValueError("Storico nel backup non valido.")
+                documents_payload = payload.get("documents", [])
+                if not isinstance(documents_payload, list) or len(documents_payload) > 10000:
+                    raise ValueError("Indice documenti nel backup non valido.")
                 c.execute("DELETE FROM transaction_audit")
                 for entry in history_payload:
                     if not isinstance(entry, dict) or not entry.get("transaction_id") or not entry.get("at") or not entry.get("event") or not isinstance(entry.get("changes"), dict):
@@ -1016,8 +1186,10 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
                         (str(entry["at"]),str(entry["transaction_id"]),str(entry["event"]),json.dumps(entry["changes"],ensure_ascii=False,separators=(",",":"))))
                 c.execute("DELETE FROM attachments")
+                c.execute("DELETE FROM document_index")
+                try: c.execute("DELETE FROM document_fts")
+                except sqlite3.OperationalError: pass
                 restored = 0
-                valid_tx_ids = {str(tx["id"]) for tx in state["transactions"]}
                 seen_attachment_ids = set()
                 for attachment in attachment_payload:
                     if not isinstance(attachment, dict): raise ValueError("Allegato nel backup non valido.")
@@ -1026,18 +1198,32 @@ class Handler(BaseHTTPRequestHandler):
                     attachment_id = str(attachment.get("id", ""))
                     tx_id = str(attachment.get("transaction_id", ""))
                     filename = Path(str(attachment.get("filename", "allegato"))).name[:180]
-                    valid_signature = ((mime == "application/pdf" and data.startswith(b"%PDF-")) or
-                                       (mime == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
-                                       (mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")))
+                    valid_signature = valid_attachment_signature(mime, data)
                     if (mime not in ("application/pdf", "image/jpeg", "image/png") or
                         not valid_signature or len(data) < 1 or len(data) > 10 * 1024 * 1024 or
-                        not attachment_id or attachment_id in seen_attachment_ids or tx_id not in valid_tx_ids):
+                        not attachment_id or attachment_id in seen_attachment_ids or not tx_id):
                         raise ValueError("Allegato nel backup non valido.")
                     seen_attachment_ids.add(attachment_id)
                     restored += len(data)
-                    if restored > 80 * 1024 * 1024: raise ValueError("Dimensione allegati nel backup eccessiva.")
                     c.execute("INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
                         (attachment_id,tx_id,filename,mime,len(data),sqlite3.Binary(data),str(attachment.get("created_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))))
+                for document in documents_payload:
+                    if not isinstance(document,dict) or str(document.get("attachment_id","")) not in seen_attachment_ids: raise ValueError("Metadati OCR non validi.")
+                    attachment_id=str(document["attachment_id"]); category=str(document.get("category","altro"))
+                    if category not in ("fattura","f24","bollettino","altro"): category="altro"
+                    extracted=str(document.get("extracted_text",""))[:1000000]
+                    c.execute("INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code,updated_at,error) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                        (attachment_id,str(document.get("status","done")),category,extracted,document.get("supplier"),document.get("document_date"),document.get("amount"),document.get("fiscal_code"),document.get("tax_code"),str(document.get("updated_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),document.get("error")))
+                    arow=c.execute("SELECT filename FROM attachments WHERE id=?",(attachment_id,)).fetchone()
+                    try: c.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",(attachment_id,arow["filename"],category,extracted,document.get("supplier") or "",document.get("document_date") or "",document.get("amount") or "",document.get("fiscal_code") or "",document.get("tax_code") or ""))
+                    except sqlite3.OperationalError: pass
+                # Older JSON backups have attachments but no OCR index; queue them for local processing.
+                indexed_ids = {str(row["attachment_id"]) for row in c.execute("SELECT attachment_id FROM document_index").fetchall()}
+                for attachment_id in seen_attachment_ids - indexed_ids:
+                    c.execute("INSERT INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',datetime('now'))", (attachment_id,))
+                    job_id = secrets.token_urlsafe(24)
+                    c.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at,result_json) VALUES(?, 'document_ocr', 'queued', datetime('now'), datetime('now'), ?)",
+                              (job_id, json.dumps({"attachment_id": attachment_id})))
                 c.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("state_imported",))
             self.send_json(200, {"ok":True,"revision":revision,"accounts":len(state["accounts"]),"transactions":len(state["transactions"])})
             return

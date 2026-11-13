@@ -1,3 +1,13 @@
+## 1.0.20 — 13 novembre 2026
+
+- Sostituita la gestione testuale degli allegati con una finestra dedicata per ogni movimento: il pulsante UPLOAD apre direttamente il selettore file; ogni allegato può essere scaricato o eliminato dall'elenco.
+- Aggiornati i limiti: 5 MB per file e 15 MB complessivi per movimento. Rimosso il limite fisso complessivo dell'archivio; al raggiungimento di 100 MB viene mostrato un avviso non bloccante.
+- Aggiunta l'estrazione locale del testo dai PDF e l'OCR in italiano per PDF scannerizzati (fino a 30 pagine) e immagini JPEG/PNG. Nessun invio a servizi esterni.
+- Aggiunta la classificazione automatica Fattura/F24/Bollettino/Altro e il riconoscimento indicativo di data, importo, fornitore/ente, codice fiscale e codice tributo; la categoria è modificabile.
+- Aggiunto il menu Archivio documenti con ricerca nel testo OCR e nei metadati, filtro per categoria, download e collegamento al movimento originale.
+- Inclusi indice OCR e metadati nei backup JSON; i backup SQLite e Google Drive continuano a includere l'intero database. Gli allegati preesistenti vengono messi in coda per l'indicizzazione dopo l'aggiornamento.
+- Preservati storico, allegati e documenti anche quando il movimento originario non è più presente. Nessuna modifica alle funzioni contabili esistenti, al PIN, a HTTPS o all'accesso LAN.
+
 ## 1.0.18 — 11 novembre 2026
 
 - Corretta la coerenza del report degli scostamenti: quando il totale effettivo di «Spese» coincide con quello di «Uscite», media attesa, scostamento e variazione percentuale di «Uscite» riprendono gli stessi valori aggregati di «Spese».

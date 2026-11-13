@@ -2,9 +2,9 @@
 
 Gestione C/C is a self-hosted personal finance application for Home Assistant. It centralises transactions and account data in a persistent SQLite database, with a PIN-protected HTTPS interface intended for local-network access.
 
-Features include GnuCash and bank-file import, transaction categorisation and splits, a hierarchical chart of accounts, cash-flow dashboards, historical reports, XLSX/PDF output, and JSON/SQLite backup and restore.
+Features include GnuCash and bank-file import, transaction categorisation and splits, a hierarchical chart of accounts, cash-flow dashboards, historical reports, XLSX/PDF output, transaction attachments, a searchable document archive with local Italian OCR, and JSON/SQLite backup and restore.
 
-**Italiano:** Gestione C/C è un'applicazione per la gestione dei conti personali, con archivio SQLite centralizzato, accesso HTTPS protetto da PIN, importazione GnuCash e movimenti bancari, classificazione, report e backup.
+**Italiano:** Gestione C/C è un'applicazione per la gestione dei conti personali, con archivio SQLite centralizzato, accesso HTTPS protetto da PIN, importazione GnuCash e movimenti bancari, classificazione, allegati ai movimenti, Archivio documenti ricercabile con OCR locale in italiano, report e backup.
 
 > This is a Home Assistant **App**, not a Marketplace integration or dashboard card. Install it through the Home Assistant App repository catalogue.
 
@@ -17,7 +17,3 @@ Add `https://github.com/stefanodr/gestione-cc-home-assistant` to **Settings → 
 ## Support
 
 Please use the [GitHub issue tracker](https://github.com/stefanodr/gestione-cc-home-assistant/issues). Never post real financial records, backups, PINs, cookies or private keys.
-
-## Version
-
-1.0.10

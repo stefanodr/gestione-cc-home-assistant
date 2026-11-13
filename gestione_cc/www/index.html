@@ -28,6 +28,7 @@
         <button class="nav-item active" data-view="overview"><span class="nav-icon">◫</span>Panoramica</button>
         <button class="nav-item" data-view="transactions"><span class="nav-icon">⇄</span>Movimenti <span class="nav-count" id="pendingNavCount">0</span></button>
         <button class="nav-item" data-view="search"><span class="nav-icon">⌕</span>Ricerca avanzata</button>
+        <button class="nav-item" data-view="documents"><span class="nav-icon">▤</span>Archivio documenti</button>
         <button class="nav-item" data-view="budget"><span class="nav-icon">€</span>Budget</button>
         <button class="nav-item" data-view="forecast"><span class="nav-icon">↗</span>Previsioni</button>
         <button class="nav-item" data-view="reports"><span class="nav-icon">▥</span>Report</button>
@@ -37,7 +38,7 @@
       </nav>
       <div class="sidebar-spacer"></div>
       <div class="local-card"><span class="local-dot"></span><div><strong>Archivio centralizzato</strong><small>server domestico · accesso autenticato</small><small class="storage-meta">Database: <span id="databasePath">lettura percorso…</span></small><small class="storage-meta">Dimensione: <span id="databaseSize">calcolo…</span></small></div></div>
-      <div class="sidebar-foot" id="appVersion"><span>Gestione C/C · v1.7.4</span><span class="sidebar-copyright">© Stefano Di Ricco</span></div>
+      <div class="sidebar-foot" id="appVersion"><span>Gestione C/C</span><span class="sidebar-copyright">© Stefano Di Ricco</span></div>
     </aside>
 
     <main class="main-area">
@@ -112,6 +113,21 @@
         </article>
         <article class="panel table-panel"><div class="panel-heading" style="padding:16px 18px"><h2 id="searchResultCount">Imposta i filtri e avvia la ricerca</h2><select id="savedFilterPicker"><option value="">Filtri salvati…</option></select></div><div class="table-scroll"><table class="data-table"><thead><tr><th>Data</th><th>Descrizione</th><th>Importo</th><th>Conto</th><th>Contropartita</th><th>Stato</th></tr></thead><tbody id="advancedSearchBody"></tbody></table></div></article>
       </section>
+      <section class="content-view" id="view-documents">
+        <div class="page-heading"><div><p class="eyebrow">DOCUMENTI E ALLEGATI</p><h1>Archivio documenti</h1><p class="subtitle">Cerca nei nomi dei file e nel testo estratto da PDF e immagini. I dati riconosciuti automaticamente possono richiedere una verifica.</p></div></div>
+        <article class="panel" style="padding:18px;margin-bottom:15px">
+          <div class="manual-fields">
+            <label>Testo, fornitore, CF o codice tributo<input id="documentSearchText" type="search" placeholder="Es. Enel, F24, codice fiscale…"></label>
+            <label>Categoria<select id="documentSearchCategory"><option value="">Tutte le categorie</option><option value="fattura">Fattura</option><option value="f24">F24</option><option value="bollettino">Bollettino</option><option value="altro">Altro</option></select></label>
+          </div>
+          <div class="heading-actions" style="margin-top:12px"><button class="button button-primary" id="runDocumentSearch">Cerca documenti</button><button class="button button-outline" id="clearDocumentSearch">Azzera</button></div>
+        </article>
+        <p id="documentStorageWarning" class="inline-note hidden">ⓘ L'archivio documenti ha raggiunto 100 MB. È un avviso: puoi continuare a caricare allegati.</p>
+        <article class="panel table-panel"><div class="panel-heading" style="padding:16px 18px"><h2 id="documentResultCount">Caricamento archivio…</h2><span class="panel-subtitle" id="documentStorageTotal"></span></div><div class="table-scroll"><table class="data-table"><thead><tr><th>Documento</th><th>Categoria</th><th>Data rilevata</th><th>Importo rilevato</th><th>Fornitore / ente</th><th>Stato OCR</th><th></th></tr></thead><tbody id="documentsBody"></tbody></table></div></article>
+        <div class="pagination-bar"><span id="documentPageStatus">—</span><div><button class="row-action" id="documentPrev">‹ Precedenti</button><button class="row-action" id="documentNext">Successivi ›</button></div></div>
+        <p class="panel-footnote">La classificazione e i metadati sono suggerimenti estratti automaticamente; controllali sul documento originale.</p>
+      </section>
+
       <section class="content-view" id="view-budget">
         <div class="page-heading"><div><p class="eyebrow">CONTROLLO SPESE</p><h1>Budget mensile</h1><p class="subtitle">Proposta automatica basata sullo storico. Ogni mese conserva la propria versione: le rigenerazioni non sovrascrivono i budget precedenti.</p></div><div class="period-control"><label for="budgetMonth">Mese</label><input id="budgetMonth" type="month"></div></div>
         <article class="panel" style="padding:16px 18px;margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button class="button button-primary" id="generateBudgetProposal">Genera proposta automatica</button><button class="button button-outline" id="generateHistoricalBudgets">Ricalcola budget gennaio–ottobre</button><button class="button button-outline" id="confirmBudgetSnapshot" disabled>Conferma budget</button><button class="button button-outline" id="saveBudgetEdits" disabled>Salva modifiche come nuova versione</button></div><p class="panel-subtitle" id="budgetSnapshotStatus" style="margin:12px 0 0">Caricamento budget…</p></article>
@@ -187,6 +203,16 @@
   <input id="sqliteBackupFile" type="file" accept=".sqlite3,application/vnd.sqlite3,application/octet-stream" hidden>
   <datalist id="accountSearchOptions"></datalist>
 
+  <input id="attachmentFilePicker" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" hidden>
+  <div class="modal-backdrop hidden" id="attachmentsModal" role="dialog" aria-modal="true" aria-labelledby="attachmentsModalTitle">
+    <div class="modal-card attachment-modal-card">
+      <button class="modal-close" id="closeAttachmentsModal" aria-label="Chiudi">×</button>
+      <div class="modal-symbol">▤</div><h2 id="attachmentsModalTitle">Allegati del movimento</h2><p id="attachmentsTransactionLabel"></p>
+      <div class="attachment-modal-actions"><button class="button button-primary" id="uploadAttachmentButton" type="button">UPLOAD · Carica allegato</button><span id="attachmentLimitHint" class="panel-subtitle">Massimo 5 MB per file e 15 MB complessivi per movimento.</span></div>
+      <div id="attachmentList" class="attachment-list"></div>
+      <div class="modal-actions"><button class="button button-quiet" id="doneAttachmentsModal" type="button">Chiudi</button></div>
+    </div>
+  </div>
   <div class="modal-backdrop hidden" id="noticeModal" role="dialog" aria-modal="true" aria-labelledby="noticeTitle"><div class="modal-card"><button class="modal-close" data-close-modal aria-label="Chiudi">×</button><div class="modal-symbol" id="noticeSymbol">✓</div><h2 id="noticeTitle">Operazione completata</h2><p id="noticeText"></p><button class="button button-primary" data-close-modal>Va bene</button></div></div>
   <div class="modal-backdrop hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle"><div class="modal-card"><button class="modal-close" data-close-modal aria-label="Chiudi">×</button><div class="modal-symbol amber">!</div><h2 id="confirmTitle">Conferma importazione</h2><p id="confirmText"></p><div class="modal-actions"><button class="button button-quiet" data-close-modal>Annulla</button><button class="button button-quiet hidden" id="confirmExclude">Escludi duplicati</button><button class="button button-primary" id="confirmAction">Continua</button></div></div></div>
   <div class="modal-backdrop hidden" id="splitModal" role="dialog" aria-modal="true" aria-labelledby="splitDialogTitle"><div class="modal-card split-modal-card"><button class="modal-close" id="closeSplitTop" aria-label="Chiudi">×</button><div class="modal-symbol">⇄</div><h2 id="splitDialogTitle">Ripartisci il movimento</h2><p id="splitTitle" class="split-transaction-title"></p><p id="splitSubtitle"></p><div class="split-rows-head"><span>Categoria o contropartita</span><span>Importo assegnato</span><span></span></div><div id="splitRows" class="split-rows"></div><button class="text-button split-add" id="addSplitRow">＋ Aggiungi riga</button><div class="split-totals"><span>Totale assegnato</span><strong id="splitTotal">—</strong><span>Da assegnare</span><strong id="splitRemaining">—</strong></div><div class="modal-actions"><button class="button button-quiet" id="cancelSplit">Annulla</button><button class="button button-primary" id="saveSplit">Salva riparto</button></div></div></div>
