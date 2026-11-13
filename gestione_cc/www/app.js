@@ -1215,6 +1215,7 @@
     $('#currentSection').textContent = names[view] || 'Panoramica';
     renderAll();
     if (view === 'reports') requestAnimationFrame(drawReportChart);
+    if (view === 'documents') void searchDocuments();
   }
   function accountById(id) { return state.accounts.find(a => a.id === id); }
   function accountDisplayLabel(account) {
