@@ -1,3 +1,8 @@
+## [1.0.24] - 2026-11-13
+
+- Corretta anche la registrazione del pulsante Allegati nella tabella Movimenti: il codice usava il selettore singolo con `forEach`. Ora utilizza una raccolta esplicita di elementi.
+- Verificata la correzione precedente dell'editor di suddivisione dei movimenti.
+
 ## [1.0.23] - 2026-11-13
 
 - Corretto definitivamente l'errore JavaScript `forEach is not a function` nell'editor di suddivisione dei movimenti: ora le raccolte di campi sono ottenute esplicitamente con `querySelectorAll`, senza usare il selettore singolo.
