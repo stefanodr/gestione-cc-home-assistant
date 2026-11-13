@@ -308,20 +308,20 @@ def ensure_transaction_feature_tables():
 
 
 def classify_document(text, filename=""):
-    sample = (str(filename) + "\\n" + str(text or "")[:12000]).lower()
-    if re.search(r"\\b(modello\\s+)?f24\\b|codice tributo|erario|inps|inail", sample): return "f24"
-    if re.search(r"bollettino|conto corrente postale|ccp\\b|pago", sample): return "bollettino"
-    if re.search(r"fattura|documento commerciale|imponibile|iva\\s+(?:22|10|4)\\s*%", sample): return "fattura"
+    sample = (str(filename) + "\n" + str(text or "")[:12000]).lower()
+    if re.search(r"\b(modello\s+)?f24\b|codice tributo|erario|inps|inail", sample): return "f24"
+    if re.search(r"bollettino|conto corrente postale|ccp\b|pago", sample): return "bollettino"
+    if re.search(r"fattura|documento commerciale|imponibile|iva\s+(?:22|10|4)\s*%", sample): return "fattura"
     return "altro"
 
 
 def extract_document_metadata(text):
     value = str(text or "")
-    date_match = re.search(r"\\b(\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4})\\b", value)
-    fiscal_match = re.search(r"\\b[A-Z]{6}[A-Z0-9]{2}[A-Z][A-Z0-9]{2}[A-Z][A-Z0-9]{3}[A-Z]\\b", value.upper())
-    tax_match = re.search(r"(?i)cod(?:ice)?\\s*tributo\\s*[:\\-]?\\s*([A-Z0-9]{3,6})", value)
-    amount_match = re.search(r"(?i)(?:totale\\s+(?:da\\s+)?pagare|importo\\s+totale|totale\\s+documento|importo)\\s*[:€ ]{0,8}([0-9.]{1,12},[0-9]{2})", value)
-    lines = [re.sub(r"\\s+", " ", line).strip() for line in value.splitlines() if line.strip()]
+    date_match = re.search(r"\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b", value)
+    fiscal_match = re.search(r"\b[A-Z]{6}[A-Z0-9]{2}[A-Z][A-Z0-9]{2}[A-Z][A-Z0-9]{3}[A-Z]\b", value.upper())
+    tax_match = re.search(r"(?i)cod(?:ice)?\s*tributo\s*[:\-]?\s*([A-Z0-9]{3,6})", value)
+    amount_match = re.search(r"(?i)(?:totale\s+(?:da\s+)?pagare|importo\s+totale|totale\s+documento|importo)\s*[:€ ]{0,8}([0-9.]{1,12},[0-9]{2})", value)
+    lines = [re.sub(r"\s+", " ", line).strip() for line in value.splitlines() if line.strip()]
     supplier = next((line[:160] for line in lines[:12] if len(line)>3 and not re.search(r"fattura|codice fiscale|partita iva|pagina",line,re.I)),None)
     return {"supplier":supplier,"document_date":date_match.group(1) if date_match else None,
             "amount":amount_match.group(1) if amount_match else None,"fiscal_code":fiscal_match.group(0) if fiscal_match else None,
@@ -339,10 +339,10 @@ def process_document_ocr(attachment_id):
         if row["mime"]=="application/pdf":
             result=subprocess.run(["pdftotext","-layout",str(source),"-"],capture_output=True,text=True,timeout=60)
             text=result.stdout if result.returncode==0 else ""
-            if len(re.sub(r"\\s","",text))<80:
+            if len(re.sub(r"\s","",text))<80:
                 prefix=str(Path(folder)/"pagina")
                 subprocess.run(["pdftoppm","-f","1","-l","8","-r","160","-png",str(source),prefix],capture_output=True,timeout=120,check=True)
-                text="\\n".join(subprocess.run(["tesseract",str(page),"stdout","-l","ita","--psm","3"],capture_output=True,text=True,timeout=120,check=True).stdout for page in sorted(Path(folder).glob("pagina-*.png")))
+                text="\n".join(subprocess.run(["tesseract",str(page),"stdout","-l","ita","--psm","3"],capture_output=True,text=True,timeout=120,check=True).stdout for page in sorted(Path(folder).glob("pagina-*.png")))
         else:
             text=subprocess.run(["tesseract",str(source),"stdout","-l","ita","--psm","3"],capture_output=True,text=True,timeout=120,check=True).stdout
     text=text[:1000000]
@@ -364,14 +364,20 @@ def process_document_ocr(attachment_id):
 
 
 def enqueue_document_ocr(attachment_id):
-    job_id=secrets.token_urlsafe(24)
+    # Keep the job id independent from the attachment id; the payload carries
+    # the document reference without changing a primary key after insertion.
+    job_id = secrets.token_urlsafe(24)
+    payload = json.dumps({"attachment_id": attachment_id})
     with db() as connection:
-        connection.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at) VALUES(?, 'document_ocr', 'queued', datetime('now'), datetime('now'))",(job_id,))
-        connection.execute("UPDATE document_index SET status='queued' WHERE attachment_id=?",(attachment_id,))
-    # The attachment id is used as the job id so the worker can resolve the document.
-    with db() as connection:
-        connection.execute("UPDATE background_jobs SET id=? WHERE id=?",(attachment_id,job_id))
-    return attachment_id
+        connection.execute(
+            "INSERT INTO background_jobs(id,kind,status,created_at,updated_at,result_json) VALUES(?, 'document_ocr', 'queued', datetime('now'), datetime('now'), ?)",
+            (job_id, payload)
+        )
+        connection.execute(
+            "UPDATE document_index SET status='queued',error=NULL WHERE attachment_id=?",
+            (attachment_id,)
+        )
+    return job_id
 
 def record_transaction_changes(connection, old_state, new_state, event="updated"):
     """Persist a field-level, append-only history for transaction changes."""
@@ -439,7 +445,7 @@ def background_job_worker():
         with BACKGROUND_JOBS_LOCK:
             with db() as connection:
                 job = connection.execute(
-                    "SELECT id,kind FROM background_jobs WHERE status='queued' ORDER BY created_at LIMIT 1"
+                    "SELECT id,kind,result_json FROM background_jobs WHERE status='queued' ORDER BY created_at LIMIT 1"
                 ).fetchone()
                 if job:
                     connection.execute(
@@ -451,7 +457,8 @@ def background_job_worker():
             continue
         job_id = job["id"]
         try:
-            result = process_document_ocr(job_id) if job["kind"] == "document_ocr" else drive_session_backup()
+            payload = json.loads(job["result_json"] or "{}") if job["kind"] == "document_ocr" else {}
+            result = process_document_ocr(str(payload.get("attachment_id", ""))) if job["kind"] == "document_ocr" else drive_session_backup()
             with db() as connection:
                 connection.execute(
                     "UPDATE background_jobs SET status='done', result_json=?, error=NULL, updated_at=datetime('now') WHERE id=?",
@@ -463,7 +470,7 @@ def background_job_worker():
                 drive_write_config(cfg)
         except Exception as error:
             message = str(error)[:500]
-            print("GestioneCC: backup di chiusura non riuscito: " + message)
+            print("GestioneCC: job " + str(job["kind"]) + " non riuscito: " + message)
             with db() as connection:
                 connection.execute(
                     "UPDATE background_jobs SET status='failed', error=?, updated_at=datetime('now') WHERE id=?",
