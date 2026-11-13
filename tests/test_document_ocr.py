@@ -16,11 +16,11 @@ for node in TREE.body:
 class DocumentOcrHelpersTest(unittest.TestCase):
     def test_attachment_signatures(self):
         valid = NAMESPACE["valid_attachment_signature"]
-        self.assertTrue(valid("image/jpeg", b"\\xff\\xd8\\xff" + b"jpeg"))
-        self.assertTrue(valid("image/png", b"\\x89PNG\\r\\n\\x1a\\n" + b"png"))
+        self.assertTrue(valid("image/jpeg", b"\xff\xd8\xff" + b"jpeg"))
+        self.assertTrue(valid("image/png", b"\x89PNG\r\n\\x1a\n" + b"png"))
         self.assertTrue(valid("application/pdf", b"%PDF-1.7"))
         self.assertFalse(valid("image/jpeg", b"not a jpeg"))
-        self.assertFalse(valid("image/png", b"\\x89PNGbad"))
+        self.assertFalse(valid("image/png", b"\x89PNGbad"))
         self.assertFalse(valid("application/pdf", b"not a pdf"))
 
 
