@@ -457,9 +457,10 @@ def process_document_ocr(attachment_id):
             fiscal_code=excluded.fiscal_code,tax_code=excluded.tax_code,updated_at=excluded.updated_at,error=NULL""",
             (attachment_id,"done",category,text,metadata["supplier"],metadata["document_date"],metadata["document_number"],metadata["amount"],metadata["fiscal_code"],metadata["tax_code"],now))
         try:
+            indexed = connection.execute("SELECT supplier,document_date,amount,fiscal_code,tax_code FROM document_index WHERE attachment_id=?", (attachment_id,)).fetchone()
             connection.execute("DELETE FROM document_fts WHERE attachment_id=?",(attachment_id,))
             connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",
-                (attachment_id,row["filename"],category,text,metadata["supplier"] or "",metadata["document_date"] or "",metadata["amount"] or "",metadata["fiscal_code"] or "",metadata["tax_code"] or ""))
+                (attachment_id,row["filename"],category,text,indexed["supplier"] or "",indexed["document_date"] or "",indexed["amount"] or "",indexed["fiscal_code"] or "",indexed["tax_code"] or ""))
         except sqlite3.OperationalError: pass
     return {"status":"done","category":category}
 
