@@ -760,7 +760,7 @@ class Handler(BaseHTTPRequestHandler):
                     clauses.append("(a.filename LIKE ? OR d.extracted_text LIKE ? OR d.supplier LIKE ? OR d.document_date LIKE ? OR d.document_number LIKE ? OR d.amount LIKE ? OR d.fiscal_code LIKE ? OR d.tax_code LIKE ?)")
                     params.extend(["%"+term+"%"]*8)
                 where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
-                sql="""SELECT a.id,a.transaction_id,a.filename,a.mime,a.size,a.created_at,COALESCE(d.status,'queued') AS ocr_status,COALESCE(d.category,'altro') AS category,d.supplier,d.document_date,d.document_number,d.amount,d.fiscal_code,d.tax_code,substr(COALESCE(d.extracted_text,''),1,400) AS excerpt""" + base_sql + where + " ORDER BY a.created_at DESC LIMIT 100 OFFSET ?"
+                sql="""SELECT a.id,a.transaction_id,a.filename,a.mime,a.size,a.created_at,COALESCE(d.status,'queued') AS ocr_status,COALESCE(d.category,'altro') AS category,d.supplier,d.document_date,d.document_number,d.amount,d.fiscal_code,d.tax_code,d.error AS ocr_error,substr(COALESCE(d.extracted_text,''),1,400) AS excerpt""" + base_sql + where + " ORDER BY a.created_at DESC LIMIT 100 OFFSET ?"
                 rows=connection.execute(sql,params+[offset]).fetchall()
                 count=connection.execute("SELECT COUNT(*)"+base_sql+where,params).fetchone()[0]
                 total=connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
