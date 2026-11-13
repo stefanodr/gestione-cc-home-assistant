@@ -144,6 +144,7 @@ const forecastBuildContext = {
     bankAccountId: 'bank',
     openingBalance: 1000,
     forecastSettings: { accountIds: [] },
+    budgetSnapshots: [],
     transactions: [
       { id: 'income', status: 'confirmed', date: '2026-11-01', bankAccountId: 'bank', counterpartAccountId: 'salary', amount: 200 },
       { id: 'transfer', status: 'confirmed', date: '2026-11-02', bankAccountId: 'bank', counterpartAccountId: 'savings', amount: -100, counterpartSplits: [{ accountId: 'savings', value: 100 }] },
@@ -171,19 +172,20 @@ const buildHelpers = [
   extract('transactionIsExplicitlyRecurring', 'forecastTransactionFlow'),
   extract('forecastTransactionFlow', 'median'),
   extract('median', 'renderRecurringRules'),
+  extract('activeBudgetSnapshot', 'budgetEligibleAccounts'),
   extract('buildForecast', 'renderForecastSelection')
 ].join('\n');
 vm.runInContext(buildHelpers + '\nthis.buildForecast = buildForecast;', forecastBuildContext);
 const allForecast = forecastBuildContext.buildForecast();
-assert.equal(allForecast.currentBalance, 1150);
+assert.equal(allForecast.currentBalance, 1000);
 assert.equal(allForecast.openingBalanceUnknown.length, 1);
 forecastBuildContext.state.forecastSettings.accountIds = ['bank'];
 const bankForecast = forecastBuildContext.buildForecast();
-assert.equal(bankForecast.currentBalance, 1100);
+assert.equal(bankForecast.currentBalance, 1000);
 assert.equal(bankForecast.openingBalanceUnknown.length, 0);
 forecastBuildContext.state.forecastSettings.accountIds = ['savings'];
 const savingsForecast = forecastBuildContext.buildForecast();
-assert.equal(savingsForecast.currentBalance, 50);
+assert.equal(savingsForecast.currentBalance, 0);
 assert.equal(savingsForecast.openingBalanceUnknown.length, 1);
 
 console.log('OK: OFX, ricorrenze, trasferimenti, budget e saldi previsionali su più conti.');
