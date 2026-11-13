@@ -5,6 +5,7 @@ on:
     branches:
       - feature/analisi-budget-previsioni
       - feature/prossima-versione-migliorie
+      - feature/document-archive-ocr
   pull_request:
     branches:
       - main
@@ -27,8 +28,8 @@ jobs:
         run: node --check gestione_cc/www/app.js
       - name: Check Python syntax
         run: python -m py_compile gestione_cc/server.py
-      - name: Check Python syntax
-        run: python -m py_compile gestione_cc/server.py
+      - name: Test document OCR helpers
+        run: python tests/test_document_ocr.py
       - name: Test transaction audit history
         run: python tests/test_transaction_audit.py
       - name: Test OFX parser
