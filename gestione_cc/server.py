@@ -313,11 +313,6 @@ def record_transaction_changes(connection, old_state, new_state, event="updated"
             if not changes:
                 continue
             action = event
-        if count >= 1000:
-            connection.execute(
-                "INSERT INTO audit(at,event) VALUES(?,?)",
-                (now, "transaction_history_truncated_after_1000_changes"))
-            break
         connection.execute(
             "INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
             (now, tx_id, action, json.dumps(changes, ensure_ascii=False, separators=(",", ":"))))
@@ -671,7 +666,10 @@ class Handler(BaseHTTPRequestHandler):
             if total > 80 * 1024 * 1024:
                 self.send_json(413, {"error":"Gli allegati superano il limite di 80 MB per il backup JSON. Usa il backup SQLite."}); return
             attachments = [{"id":r["id"],"transaction_id":r["transaction_id"],"filename":r["filename"],"mime":r["mime"],"size":r["size"],"created_at":r["created_at"],"content":base64.b64encode(r["content"]).decode("ascii")} for r in attachment_rows]
-            payload = {"format":"conti-chiari-local-backup","version":2,"exportedAt":time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),"state":state,"attachments":attachments}
+            with db() as c:
+                history_rows = c.execute("SELECT id,at,transaction_id,event,changes_json FROM transaction_audit ORDER BY id").fetchall()
+            history = [{"id":r["id"],"at":r["at"],"transaction_id":r["transaction_id"],"event":r["event"],"changes":json.loads(r["changes_json"])} for r in history_rows]
+            payload = {"format":"conti-chiari-local-backup","version":3,"exportedAt":time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),"state":state,"attachments":attachments,"history":history}
             self.send_json(200, payload, {"Content-Disposition": 'attachment; filename="Conti-Chiari-backup.json"'})
             return
         if path == "/api/sqlite-backup":
@@ -767,6 +765,9 @@ class Handler(BaseHTTPRequestHandler):
                     connection.execute(
                         "INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
                         (attachment_id, tx_id, filename, mime, len(content), sqlite3.Binary(content), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
+                    connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                        (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), tx_id, "attachment_added",
+                         json.dumps({"attachment": {"old": None, "new": {"id": attachment_id, "filename": filename, "size": len(content)}}}, ensure_ascii=False)))
                     connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_added:" + tx_id,))
                 self.send_json(201, {"ok":True,"id":attachment_id,"filename":filename,"size":len(content)})
             except Exception as error:
@@ -777,10 +778,13 @@ class Handler(BaseHTTPRequestHandler):
             if not item: return
             attachment_id = str(payload.get("id", ""))[:160]
             with db() as connection:
-                row = connection.execute("SELECT transaction_id FROM attachments WHERE id=?", (attachment_id,)).fetchone()
+                row = connection.execute("SELECT transaction_id,filename,size FROM attachments WHERE id=?", (attachment_id,)).fetchone()
                 if not row:
                     self.send_json(404, {"error":"Allegato non trovato"}); return
                 connection.execute("DELETE FROM attachments WHERE id=?", (attachment_id,))
+                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                    (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_deleted",
+                     json.dumps({"attachment": {"old": {"id": attachment_id, "filename": row["filename"], "size": row["size"]}, "new": None}}, ensure_ascii=False)))
                 connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_deleted:" + row["transaction_id"],))
             self.send_json(200, {"ok":True})
             return
@@ -1002,6 +1006,15 @@ class Handler(BaseHTTPRequestHandler):
                 attachment_payload = payload.get("attachments", [])
                 if not isinstance(attachment_payload, list) or len(attachment_payload) > 10000:
                     raise ValueError("Elenco allegati nel backup non valido.")
+                history_payload = payload.get("history", [])
+                if not isinstance(history_payload, list) or len(history_payload) > 1000000:
+                    raise ValueError("Storico nel backup non valido.")
+                c.execute("DELETE FROM transaction_audit")
+                for entry in history_payload:
+                    if not isinstance(entry, dict) or not entry.get("transaction_id") or not entry.get("at") or not entry.get("event") or not isinstance(entry.get("changes"), dict):
+                        raise ValueError("Evento storico nel backup non valido.")
+                    c.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                        (str(entry["at"]),str(entry["transaction_id"]),str(entry["event"]),json.dumps(entry["changes"],ensure_ascii=False,separators=(",",":"))))
                 c.execute("DELETE FROM attachments")
                 restored = 0
                 valid_tx_ids = {str(tx["id"]) for tx in state["transactions"]}
