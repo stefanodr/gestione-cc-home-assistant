@@ -477,8 +477,9 @@ def background_job_worker():
                     (message, job_id)
                 )
             if job["kind"] == "document_ocr":
+                attachment_id = str(payload.get("attachment_id", ""))
                 with db() as connection:
-                    connection.execute("UPDATE document_index SET status='failed',error=?,updated_at=datetime('now') WHERE attachment_id=?", (message, job_id))
+                    connection.execute("UPDATE document_index SET status='failed',error=?,updated_at=datetime('now') WHERE attachment_id=?", (message, attachment_id))
             else:
                 cfg = drive_read_config()
                 cfg["last_session_job"] = {"status": "failed", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "error": message}
