@@ -1,7 +1,7 @@
 # Gestione C/C — Home Assistant App
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/stefanodr/gestione-cc/main/assets/brand-logo.svg" alt="Logo Gestione C/C" width="112">
+  <img src="brand-logo.png" alt="Logo Gestione C/C" width="150">
 </p>
 
 <p align="center">
