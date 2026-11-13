@@ -1041,7 +1041,10 @@ class Handler(BaseHTTPRequestHandler):
                     connection.execute("DELETE FROM document_fts WHERE attachment_id=?", (attachment_id,))
                     connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)", (attachment_id,row["filename"],category,row["extracted_text"] or "",row["supplier"] or "",row["document_date"] or "",row["amount"] or "",row["fiscal_code"] or "",row["tax_code"] or ""))
                 except sqlite3.OperationalError: pass
-                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)", (time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),row["transaction_id"],"attachment_category_changed",json.dumps({"attachment":{"id":attachment_id,"filename":row["filename"],"category":category}},ensure_ascii=False)))
+                if row["transaction_id"]:
+                    connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)", (time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),row["transaction_id"],"attachment_category_changed",json.dumps({"attachment":{"id":attachment_id,"filename":row["filename"],"category":category}},ensure_ascii=False)))
+                else:
+                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("standalone_document_category_changed:" + attachment_id,))
             self.send_json(200, {"ok":True})
             return
         if path == "/api/documents/metadata":
@@ -1085,9 +1088,12 @@ class Handler(BaseHTTPRequestHandler):
                     connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",
                         (attachment_id,row["filename"],indexed["category"],indexed["extracted_text"] or "",indexed["supplier"] or "",indexed["document_date"] or "",indexed["amount"] or "",indexed["fiscal_code"] or "",indexed["tax_code"] or ""))
                 except sqlite3.OperationalError: pass
-                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
-                    (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_metadata_corrected",
-                     json.dumps({"attachment_id":attachment_id,"filename":row["filename"],"fields":audit_fields}, ensure_ascii=False)))
+                if row["transaction_id"]:
+                    connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                        (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_metadata_corrected",
+                         json.dumps({"attachment_id":attachment_id,"filename":row["filename"],"fields":audit_fields}, ensure_ascii=False)))
+                else:
+                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("standalone_document_metadata_corrected:" + attachment_id,))
             self.send_json(200, {"ok":True})
             return
         if path == "/api/attachments/delete":
@@ -1102,10 +1108,13 @@ class Handler(BaseHTTPRequestHandler):
                 connection.execute("DELETE FROM document_index WHERE attachment_id=?", (attachment_id,))
                 try: connection.execute("DELETE FROM document_fts WHERE attachment_id=?", (attachment_id,))
                 except sqlite3.OperationalError: pass
-                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
-                    (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_deleted",
-                     json.dumps({"attachment": {"old": {"id": attachment_id, "filename": row["filename"], "size": row["size"]}, "new": None}}, ensure_ascii=False)))
-                connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_deleted:" + row["transaction_id"],))
+                if row["transaction_id"]:
+                    connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                        (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_deleted",
+                         json.dumps({"attachment": {"old": {"id": attachment_id, "filename": row["filename"], "size": row["size"]}, "new": None}}, ensure_ascii=False)))
+                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_deleted:" + row["transaction_id"],))
+                else:
+                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("standalone_document_deleted:" + attachment_id,))
             self.send_json(200, {"ok":True})
             return
         if path == "/api/drive/connect":
@@ -1349,7 +1358,7 @@ class Handler(BaseHTTPRequestHandler):
                     data = base64.b64decode(str(attachment.get("content", "")), validate=True)
                     mime = str(attachment.get("mime", ""))
                     attachment_id = str(attachment.get("id", ""))
-                    tx_id = str(attachment.get("transaction_id", ""))
+                    tx_id = str(attachment.get("transaction_id") or "") or None
                     filename = Path(str(attachment.get("filename", "allegato"))).name[:180]
                     valid_signature = valid_attachment_signature(mime, data)
                     if (mime not in ("application/pdf", "image/jpeg", "image/png") or
