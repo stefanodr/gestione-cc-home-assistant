@@ -11,6 +11,7 @@
   let state;
   let reportMode = 'monthly';
   let transactionPage = 0;
+  let documentSearchOffset = 0;
   let transactionSelection = new Set();
   let confirmCallback = null;
   let resizeTimer;
@@ -528,9 +529,12 @@
     $('#doneAttachmentsModal')?.addEventListener('click',()=>$('#attachmentsModal').classList.add('hidden'));
     $('#uploadAttachmentButton')?.addEventListener('click',()=>$('#attachmentFilePicker').click());
     $('#attachmentFilePicker')?.addEventListener('change',async event=>{const file=event.target.files?.[0];event.target.value='';if(file)await uploadTransactionAttachment(file);});
-    $('#runDocumentSearch')?.addEventListener('click',searchDocuments);
-    $('#clearDocumentSearch')?.addEventListener('click',()=>{$('#documentSearchText').value='';$('#documentSearchCategory').value='';searchDocuments();});
-    $('#documentSearchText')?.addEventListener('keydown',event=>{if(event.key==='Enter')searchDocuments();});
+    $('#runDocumentSearch')?.addEventListener('click',()=>searchDocuments(true));
+    $('#clearDocumentSearch')?.addEventListener('click',()=>{$('#documentSearchText').value='';$('#documentSearchCategory').value='';searchDocuments(true);});
+    $('#documentSearchText')?.addEventListener('keydown',event=>{if(event.key==='Enter')searchDocuments(true);});
+    $('#documentSearchCategory')?.addEventListener('change',()=>searchDocuments(true));
+    $('#documentPrev')?.addEventListener('click',()=>{documentSearchOffset=Math.max(0,documentSearchOffset-100);searchDocuments();});
+    $('#documentNext')?.addEventListener('click',()=>{documentSearchOffset+=100;searchDocuments();});
 
     $$('[data-goto]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.goto)));
     $('#monthPicker').addEventListener('change', () => { state.selectedMonth = $('#monthPicker').value; syncReportPeriodPicker(state.selectedMonth);  saveState(); renderAll(); });
@@ -1790,13 +1794,17 @@
       if(data.storage_warning)showNotice('Archivio documenti oltre 100 MB','È stato raggiunto il livello di avviso. Puoi continuare a caricare documenti.');
     }catch(error){showNotice('Caricamento non riuscito',error.message||String(error));}
   }
-  async function searchDocuments() {
+  async function searchDocuments(resetPage = false) {
+    if(resetPage)documentSearchOffset=0;
     const term=$('#documentSearchText').value.trim(),category=$('#documentSearchCategory').value;
-    const params=new URLSearchParams();if(term)params.set('q',term);if(category)params.set('category',category);
+    const params=new URLSearchParams();if(term)params.set('q',term);if(category)params.set('category',category);params.set('offset',String(documentSearchOffset));
     try{
       const result=await apiRequest('/api/documents/search?'+params.toString());
       const items=result.items||[];
-      $('#documentResultCount').textContent=items.length+' documenti trovati';
+      $('#documentResultCount').textContent=Number(result.total_count||0)+' documenti trovati';
+      $('#documentPageStatus').textContent=items.length?'Documenti '+(documentSearchOffset+1)+'–'+(documentSearchOffset+items.length)+' di '+Number(result.total_count||0):'Nessun documento';
+      $('#documentPrev').disabled=documentSearchOffset<=0;
+      $('#documentNext').disabled=documentSearchOffset+items.length>=Number(result.total_count||0);
       $('#documentStorageTotal').textContent=(Number(result.total_bytes||0)/1024/1024).toFixed(2)+' MB complessivi';
       $('#documentStorageWarning').classList.toggle('hidden',!result.warning);
       $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-state">Nessun documento trovato.</td></tr>';
