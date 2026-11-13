@@ -1,4 +1,4 @@
-## Prossima versione — in preparazione
+## [1.0.21] - 2026-11-13
 
 - Aggiunta l'anteprima inline dei PDF e delle immagini nell'Archivio documenti, senza passare dal download.
 - Migliorata l'estrazione OCR del fornitore/ente, escludendo riferimenti come numero cliente e codice cliente; aggiunti data e numero documento. La migrazione SQLite è additiva e mantiene i documenti già archiviati.
