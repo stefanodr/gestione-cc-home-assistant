@@ -1330,19 +1330,20 @@
     const historyEstimate=(account,month)=>{
       const values=historyMonths.map(key=>categoryMonthly(account.id,key));
       const active=values.filter(value=>value>0);
-      // Keep the existing anti-sporadic rule across the full observation
-      // window, then estimate the target calendar month from the same month
-      // in previous years. This preserves seasonality (e.g. annual bills,
-      // summer/winter spending) instead of repeating one median 12 times.
+      const byCalendarMonth=Array.from({length:12},(_,index)=>historyMonths
+        .filter(key=>Number(key.slice(5,7))===index+1)
+        .map(key=>categoryMonthly(account.id,key)).filter(value=>value>0));
+      const repeatedSeasonalMonths=byCalendarMonth.filter(items=>items.length>=2).length;
+      // A category is not sporadic if it is regularly active through the year,
+      // or if it repeats in at least two calendar months across different
+      // years (seasonal utilities, insurance, school and similar costs).
       const minimumActiveMonths=Math.max(3,Math.ceil(values.length*0.4));
-      if(active.length<minimumActiveMonths)return {amount:0,source:'sporadico'};
-      const targetMonth=String(month).slice(5,7);
-      const seasonal=historyMonths
-        .filter(key=>key.slice(5,7)===targetMonth)
-        .map(key=>categoryMonthly(account.id,key));
-      const seasonalActive=seasonal.filter(value=>value>0);
-      if(!seasonalActive.length)return {amount:0,source:'storico stagionale'};
-      return {amount:median(seasonalActive),source:'storico stagionale'};
+      if(active.length<minimumActiveMonths&&repeatedSeasonalMonths<2)return {amount:0,source:'sporadico'};
+      const targetMonth=Number(String(month).slice(5,7))-1;
+      const seasonal=byCalendarMonth[targetMonth]||[];
+      // When the target month has no observations, fall back to the category
+      // median; otherwise use its own month-of-year profile.
+      return {amount:seasonal.length?median(seasonal):median(active),source:seasonal.length?'storico stagionale':'storico'};
     };
     const forecast=[];
     let balance=openingBalance;
