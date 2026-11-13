@@ -2022,8 +2022,8 @@
       $('#attachmentLimitHint').textContent='Allegato caricato. Attendo il riconoscimento dei dati…';
       const result=await waitForDocumentOcr(data.id,data.filename);
       await refreshTransactionAttachments();
+      if(data.storage_warning)$('#attachmentLimitHint').textContent+=' · Archivio documenti oltre 100 MB (avviso)';
       openDocumentMetadataEditor(result.item,'movement',result.pending||result.item?.ocr_status==='failed');
-      if(data.storage_warning)showNotice('Archivio documenti oltre 100 MB','È stato raggiunto il livello di avviso. Puoi continuare a caricare documenti.');
     }catch(error){showNotice('Caricamento non riuscito',error.message||String(error));}
   }
     async function searchDocuments(resetPage = false) {
