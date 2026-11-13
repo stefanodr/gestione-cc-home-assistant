@@ -1,6 +1,6 @@
 # Gestione C/C — Documentation / Documentazione
 
-**Versione / Version:** 1.0.5
+**Versione / Version:** 1.0.19
 
 [Italiano](#italiano) · [English](#english)
 
@@ -58,7 +58,13 @@ La chiave privata della CA e le chiavi TLS restano nella directory persistente d
 
 ## 6. Dati, importazione e compatibilità
 
-Il database centrale è `/data/gestione_cc.sqlite3`. L'archivio comprende piano dei conti, movimenti, regole e impostazioni applicative.
+Il database centrale è `/data/gestione_cc.sqlite3`. L'archivio comprende piano dei conti, movimenti, regole, impostazioni, allegati e storico delle modifiche.
+
+### Allegati e storico dei movimenti
+
+Dalla riga di un movimento usa **Allegati** per aggiungere, scaricare o eliminare file PDF, JPEG o PNG. Il limite è 10 MB per file e 80 MB complessivi. I file sono conservati come BLOB nel database SQLite, non in una cartella pubblica del web server; sono accessibili solo dopo autenticazione.
+
+Usa **Storico** per consultare le modifiche registrate per quel movimento. Lo storico è append-only e conserva data/ora, tipo di evento e valori precedenti/nuovi dei campi modificati. Le modifiche sono registrate quando il server riceve e salva lo stato; le modifiche effettuate prima dell'aggiornamento non possono essere ricostruite retroattivamente.
 
 Sono previste funzioni di importazione per backup GnuCash e file QIF, CSV e XLSX supportati dall'interfaccia. La compatibilità dipende dalla struttura concreta del file: conserva sempre una copia originale e verifica i totali dopo l'importazione.
 
@@ -67,7 +73,9 @@ L'importazione GnuCash in modalità aggiunta associa i conti tramite percorso e 
 ## 7. Backup e ripristino
 
 ### Backup JSON
-Esporta lo stato applicativo in un file JSON, utile per migrazioni compatibili.
+Esporta lo stato applicativo, gli allegati e lo storico dettagliato in un file JSON, utile per migrazioni compatibili. Per archivi con allegati oltre 80 MB usa il backup SQLite.
+
+Il backup SQLite include automaticamente allegati e storico. Anche le copie locali e i backup facoltativi su Google Drive includono queste tabelle. Il ripristino di database precedenti alla versione 1.0.19 crea automaticamente le nuove tabelle senza cancellare i dati contabili.
 
 ### Backup SQLite
 Scarica una copia del database SQLite. Le copie automatiche vengono create prima delle scritture quando è trascorso l'intervallo previsto; vengono conservate fino a 30 copie in `/data/backups`.
@@ -199,7 +207,13 @@ The CA private key and TLS keys are stored in the App's persistent data director
 
 ## 6. Data and imports
 
-The central database is `/data/gestione_cc.sqlite3`. It contains the chart of accounts, transactions, learned rules and application settings.
+The central database is `/data/gestione_cc.sqlite3`. It contains the chart of accounts, transactions, learned rules, application settings, attachments and transaction history.
+
+### Transaction attachments and history
+
+Use **Attachments** on a transaction row to add, download or delete PDF, JPEG or PNG files. The limit is 10 MB per file and 80 MB total. Files are stored as BLOBs in SQLite, not in a public web-server directory, and are available only after authentication.
+
+Use **History** to inspect recorded changes for that transaction. The append-only log stores timestamps, event types and before/after field values. Changes made before this update cannot be reconstructed retroactively.
 
 Import functions support GnuCash backups and transaction files in formats exposed by the interface (QIF, CSV, XLSX). Compatibility depends on the actual file structure. Keep the original file and verify totals after import.
 
@@ -208,7 +222,9 @@ GnuCash merge mode maps accounts by account path and adds transactions/rules wit
 ## 7. Backup and restore
 
 ### JSON backup
-Exports the application state to JSON for compatible data migration or transfer.
+Exports the application state, attachments and detailed transaction history to JSON for compatible data migration or transfer. Use SQLite backup for archives with more than 80 MB of attachments.
+
+SQLite backups include attachments and transaction history. Local snapshots and optional Google Drive backups include these tables as well. Restoring a database created before version 1.0.19 automatically creates the new tables without deleting accounting data.
 
 ### SQLite backup
 Downloads a copy of the SQLite database. Automatic snapshots are created before writes when the configured interval has elapsed; up to 30 local copies are retained under `/data/backups`.

@@ -1,4 +1,27 @@
+## [1.0.19] - 2026-11-13
+
+### Italiano
+- Aggiunti allegati ai movimenti: caricamento, elenco, download ed eliminazione di file PDF, JPEG e PNG.
+- Limiti di sicurezza: 10 MB per file e 80 MB complessivi; verifica del tipo e della firma del file.
+- Aggiunto lo storico dettagliato append-only per creazione, modifica e cancellazione dei movimenti, con data/ora e valori prima/dopo.
+- Allegati e storico sono conservati nel database SQLite e inclusi nei backup SQLite e Google Drive.
+- Il backup JSON include allegati e storico dettagliato, con limite complessivo di 80 MB per gli allegati.
+- Aggiunta la migrazione delle nuove tabelle anche dopo il ripristino di database SQLite precedenti.
+- Corretta la formattazione monetaria del saldo iniziale nell'estratto conto Excel senza modificare il valore.
+- Aggiornata l'app inclusa alla versione 1.7.13.
+
+### English
+- Added transaction attachments: upload, list, download and deletion of PDF, JPEG and PNG files.
+- Security limits: 10 MB per file and 80 MB total; MIME type and file-signature validation.
+- Added append-only transaction history for creation, edits and deletion, including timestamps and before/after values.
+- Attachments and history are stored in SQLite and included in SQLite and Google Drive backups.
+- JSON backups now include attachments and detailed transaction history, with an 80 MB total attachment limit.
+- Added migration of the new tables after restoring older SQLite databases.
+- Fixed opening-balance currency formatting in Excel statements without changing the underlying value.
+- Updated the bundled application to version 1.7.13.
+
 ## [1.0.18] - 2026-11-11
+
 
 - Corrected report deviation consistency: when actual “Spese” and “Uscite” totals reconcile, expected average, deviation and percentage now use the same aggregated values.
 - Kept “Uscite” based on cash-flow totals whenever the actual scopes do not reconcile.
