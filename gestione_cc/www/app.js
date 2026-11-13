@@ -12,6 +12,8 @@
   let reportMode = 'monthly';
   let transactionPage = 0;
   let documentSearchOffset = 0;
+  let advancedSearchResults = [];
+  let attachmentCounts = {};
   let transactionSelection = new Set();
   let confirmCallback = null;
   let resizeTimer;
@@ -729,6 +731,9 @@
       return true;
     }).sort((a,b) => String(b.tx.date).localeCompare(String(a.tx.date)));
     $('#searchResultCount').textContent = results.length + ' movimenti trovati';
+    advancedSearchResults = results;
+    const totals = results.reduce((sum, row) => { if (row.allocation.amount >= 0) sum.income += row.allocation.amount; else sum.expense += Math.abs(row.allocation.amount); return sum; }, {income:0,expense:0});
+    $('#searchResultCount').textContent = results.length + ' movimenti trovati · Entrate ' + euro.format(totals.income) + ' · Uscite ' + euro.format(totals.expense) + ' · Netto ' + euro.format(totals.income-totals.expense);
     $('#advancedSearchBody').innerHTML = results.slice(0,1000).map(({tx,allocation}) => '<tr><td>' + safeText(formatDate(tx.date)) + '</td><td class="name-cell">' + safeText(transactionDescription(tx) || transactionCausale(tx) || 'Movimento') + (allocation.labels.length ? '<small class="name-secondary">Riparto: ' + safeText(allocation.labels.join(' · ')) + '</small>' : '') + '</td><td class="' + (allocation.amount>=0?'amount-in':'amount-out') + '">' + euro.format(allocation.amount) + '</td><td>' + safeText(accountLabel(tx.bankAccountId)) + '</td><td>' + safeText(allocation.labels.length ? allocation.labels.join(' · ') : accountLabel(tx.counterpartAccountId)) + '</td><td>' + (tx.status === 'confirmed' ? 'Confermato' : 'Da classificare') + '</td></tr>').join('') || '<tr><td colspan="6" class="empty-inline">Nessun movimento corrisponde ai filtri.</td></tr>';
     if (results.length > 1000) $('#searchResultCount').textContent += ' · mostrati i primi 1.000';
   }
@@ -777,6 +782,8 @@
       saveState();
     });
     $('#runAdvancedSearch')?.addEventListener('click',runAdvancedSearch);
+    $('#exportAdvancedPdf')?.addEventListener('click',exportAdvancedSearchPdf);
+    $('#exportAdvancedXlsx')?.addEventListener('click',exportAdvancedSearchXlsx);
     $('#clearAdvancedSearch')?.addEventListener('click',()=>{
       ['searchFrom','searchTo','searchText','searchMin','searchMax'].forEach(id=>$('#'+id).value='');
       $('#searchDirection').value='all';$('#searchStatus').value='all';$('#searchAccount').value='';runAdvancedSearch();
@@ -1700,6 +1707,22 @@
       }
     );
   }
+  async function refreshAttachmentCounts() {
+    try {
+      const result = await apiRequest('/api/attachments/counts');
+      attachmentCounts = result.counts || {};
+      const body = $('#transactionsBody');
+      if (!body) return;
+      body.querySelectorAll('[data-attachments-tx]').forEach(button => {
+        const count = Number(attachmentCounts[button.dataset.attachmentsTx] || 0);
+        let badge = button.parentElement.querySelector('.attachment-count-badge');
+        if (!badge) { badge = document.createElement('span'); badge.className = 'attachment-count-badge'; button.parentElement.appendChild(badge); }
+        badge.textContent = String(count);
+        badge.classList.toggle('hidden', count === 0);
+        badge.setAttribute('aria-label', count + ' allegati');
+      });
+    } catch (error) { /* Il registro resta utilizzabile anche se il conteggio non è disponibile. */ }
+  }
   function renderTransactions() {
     refreshAccountSearchOptions();
     populateTransactionCounterpartControls();
@@ -1737,7 +1760,8 @@
         : item.status === 'confirmed'
           ? `<button class="row-action row-action-review" data-edit-tx="${safeText(item.id)}">Rivedi</button> <button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Ripartisci</button>`
           : `<button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Dividi</button> <button class="row-action row-action-review" data-confirm-tx="${safeText(item.id)}">Conferma</button>`;
-      return `<tr><td class="tx-select-cell">${selectionCell}</td><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountPathAt(accountById(item.bankAccountId), item.date))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td>${actions} <button class="row-action" data-attachments-tx="${safeText(item.id)}">Allegati</button> <button class="row-action" data-history-tx="${safeText(item.id)}">Storico</button> <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
+      const attachmentCount = Number(attachmentCounts[item.id] || 0);
+      return `<tr><td class="tx-select-cell">${selectionCell}</td><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountPathAt(accountById(item.bankAccountId), item.date))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td class="transaction-actions">${actions} <span class="attachment-action-wrap"><button class="row-action" data-attachments-tx="${safeText(item.id)}">Allegati</button><span class="attachment-count-badge ${attachmentCount ? '' : 'hidden'}" aria-label="${attachmentCount} allegati">${attachmentCount}</span></span> <button class="row-action" data-history-tx="${safeText(item.id)}">Storico</button> <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
     }).join('');
     $$('[data-select-tx]', body).forEach(input => input.addEventListener('change', () => {
       if (input.checked) transactionSelection.add(input.dataset.selectTx);
@@ -1761,7 +1785,8 @@
       await saveState(); renderAll();
       showNotice('Movimento eliminato', 'È stato rimosso dall’archivio locale di Gestione C/C. Il file GnuCash o bancario originale non è stato modificato.');
     }));
-    $$('[data-attachments-tx]', body).forEach(btn => btn.addEventListener('click', () => manageTransactionAttachments(btn.dataset.attachmentsTx)));
+    $('[data-attachments-tx]', body).forEach(btn => btn.addEventListener('click', () => manageTransactionAttachments(btn.dataset.attachmentsTx)));
+    void refreshAttachmentCounts();
     $$('[data-history-tx]', body).forEach(btn => btn.addEventListener('click', () => showTransactionHistory(btn.dataset.historyTx)));
     updateTransactionBulkUi(tx);
   }
@@ -1807,8 +1832,9 @@
       $('#documentNext').disabled=documentSearchOffset+items.length>=Number(result.total_count||0);
       $('#documentStorageTotal').textContent=(Number(result.total_bytes||0)/1024/1024).toFixed(2)+' MB complessivi';
       $('#documentStorageWarning').classList.toggle('hidden',!result.warning);
-      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-state">Nessun documento trovato.</td></tr>';
+      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-state">Nessun documento trovato.</td></tr>';
       $('#documentsBody').querySelectorAll('[data-doc-download]').forEach(button=>button.addEventListener('click',async()=>{const item=items.find(x=>x.id===button.dataset.docDownload);if(!item)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(item.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),item.filename);}));
+      $('#documentsBody').querySelectorAll('[data-doc-open]').forEach(button=>button.addEventListener('click',()=>{const item=items.find(x=>x.id===button.dataset.docOpen);if(!item)return;const preview=window.open('/api/attachments/download?id='+encodeURIComponent(item.id)+'&inline=1','_blank','noopener');if(!preview)showNotice('Anteprima bloccata','Consenti le finestre a comparsa per aprire il documento.');}));
       $('#documentsBody').querySelectorAll('[data-document-category]').forEach(select=>select.addEventListener('change',async()=>{try{await apiRequest('/api/documents/update',{method:'POST',body:JSON.stringify({id:select.dataset.documentCategory,category:select.value})});}catch(error){showNotice('Categoria non aggiornata',error.message||String(error));}}));
       $('#documentsBody').querySelectorAll('[data-doc-transaction]').forEach(button=>button.addEventListener('click',()=>{
         const txId=button.dataset.docTransaction;
