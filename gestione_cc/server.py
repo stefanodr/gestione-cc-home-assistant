@@ -767,7 +767,9 @@ class Handler(BaseHTTPRequestHandler):
                 rows=connection.execute(sql,params+[offset]).fetchall()
                 count=connection.execute("SELECT COUNT(*)"+base_sql+where,params).fetchone()[0]
                 total=connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
-            self.send_json(200,{"items":[dict(row) for row in rows],"total_count":int(count),"offset":offset,"page_size":100,"total_bytes":int(total),"warning":int(total)>=100*1024*1024})
+                category_rows=connection.execute("SELECT COALESCE(d.category,'altro') AS category,COALESCE(SUM(a.size),0) AS bytes FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id GROUP BY COALESCE(d.category,'altro')").fetchall()
+                category_bytes={str(row["category"]):int(row["bytes"]) for row in category_rows}
+            self.send_json(200,{"items":[dict(row) for row in rows],"total_count":int(count),"offset":offset,"page_size":100,"total_bytes":int(total),"category_bytes":category_bytes,"warning":int(total)>=100*1024*1024})
             return
         if path == "/api/attachments/download":
             item = self.require_auth()
@@ -971,8 +973,8 @@ class Handler(BaseHTTPRequestHandler):
                     elif name:
                         fields[name] = data.decode("utf-8", "replace")
                 tx_id = str(fields.get("transaction_id", ""))[:160]
-                if not tx_id or not uploaded:
-                    raise ValueError("Movimento o file non specificato.")
+                if not uploaded:
+                    raise ValueError("File non specificato.")
                 filename, mime, content = uploaded
                 if len(content) < 1 or len(content) > 5 * 1024 * 1024:
                     raise ValueError("Ogni allegato deve avere dimensione massima di 5 MB.")
@@ -986,21 +988,25 @@ class Handler(BaseHTTPRequestHandler):
                 with db() as connection:
                     state_row = connection.execute("SELECT state_json FROM app_state WHERE id=1").fetchone()
                     tx_ids = {str(x.get("id")) for x in json.loads(state_row["state_json"]).get("transactions", [])} if state_row else set()
-                    if tx_id not in tx_ids:
-                        raise ValueError("Il movimento selezionato non esiste più.")
-                    per_transaction = connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments WHERE transaction_id=?", (tx_id,)).fetchone()[0]
-                    if int(per_transaction) + len(content) > 15 * 1024 * 1024:
-                        raise ValueError("Gli allegati di questa registrazione non possono superare complessivamente 15 MB.")
+                    if tx_id:
+                        if tx_id not in tx_ids:
+                            raise ValueError("Il movimento selezionato non esiste più.")
+                        per_transaction = connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments WHERE transaction_id=?", (tx_id,)).fetchone()[0]
+                        if int(per_transaction) + len(content) > 15 * 1024 * 1024:
+                            raise ValueError("Gli allegati di questa registrazione non possono superare complessivamente 15 MB.")
                     total = connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
                     attachment_id = secrets.token_urlsafe(18)
                     connection.execute(
                         "INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
                         (attachment_id, tx_id, filename, mime, len(content), sqlite3.Binary(content), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
                     connection.execute("INSERT INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',?)", (attachment_id,time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
-                    connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
-                        (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), tx_id, "attachment_added",
-                         json.dumps({"attachment": {"old": None, "new": {"id": attachment_id, "filename": filename, "size": len(content)}}}, ensure_ascii=False)))
-                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_added:" + tx_id,))
+                    if tx_id:
+                        connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                            (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), tx_id, "attachment_added",
+                             json.dumps({"attachment": {"old": None, "new": {"id": attachment_id, "filename": filename, "size": len(content)}}}, ensure_ascii=False)))
+                        connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_added:" + tx_id,))
+                    else:
+                        connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("standalone_document_added:" + attachment_id,))
                 enqueue_document_ocr(attachment_id)
                 total_after=int(total)+len(content)
                 self.send_json(201, {"ok":True,"id":attachment_id,"filename":filename,"size":len(content),"ocr_status":"queued","storage_warning":total_after>=100*1024*1024,"total_bytes":total_after})
@@ -1336,7 +1342,7 @@ class Handler(BaseHTTPRequestHandler):
                     valid_signature = valid_attachment_signature(mime, data)
                     if (mime not in ("application/pdf", "image/jpeg", "image/png") or
                         not valid_signature or len(data) < 1 or len(data) > 10 * 1024 * 1024 or
-                        not attachment_id or attachment_id in seen_attachment_ids or not tx_id):
+                        not attachment_id or attachment_id in seen_attachment_ids):
                         raise ValueError("Allegato nel backup non valido.")
                     seen_attachment_ids.add(attachment_id)
                     restored += len(data)
