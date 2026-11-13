@@ -89,6 +89,9 @@ try {
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(outputDir, 'movimenti.png'), fullPage: false });
 
+  // Alcune viste possono mostrare avvisi informativi: chiudili prima di proseguire.
+  const reportNotice = page.locator('#noticeModal:not(.hidden)');
+  if (await reportNotice.count()) await reportNotice.locator('[data-close-modal]').first().click();
   await page.locator('.nav-item[data-view="reports"]').click();
   await page.waitForFunction(() => document.querySelector('#view-reports')?.classList.contains('active'));
   await page.waitForTimeout(900);
