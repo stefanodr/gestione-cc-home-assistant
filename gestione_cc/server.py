@@ -348,6 +348,7 @@ def process_document_ocr(attachment_id):
             text=result.stdout if result.returncode==0 else ""
             if len(re.sub(r"\s","",text))<80:
                 page_count = 30
+                page_match = None
                 try:
                     info = subprocess.run(["pdfinfo",str(source)],capture_output=True,text=True,timeout=30,check=True).stdout
                     page_match = re.search(r"(?m)^Pages:\s+(\d+)",info)
