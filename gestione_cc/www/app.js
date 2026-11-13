@@ -778,15 +778,45 @@
     const annual=data.years.map(([key,v])=>'<tr><td>'+safeText(key)+'</td><td class="num">'+euro.format(v.income)+'</td><td class="num">'+euro.format(v.expense)+'</td><td class="num">'+euro.format(v.net)+'</td></tr>').join('');
     const counterpartRows=data.counterparts.map(v=>'<tr><td>'+safeText(labelMonth(v.month))+'</td><td>'+safeText(v.label)+'</td><td class="num">'+euro.format(v.income)+'</td><td class="num">'+euro.format(v.expense)+'</td><td class="num">'+euro.format(v.net)+'</td></tr>').join('');
     const counterpartYearRows=data.counterpartYears.map(v=>'<tr><td>'+safeText(v.year)+'</td><td>'+safeText(v.label)+'</td><td class="num">'+euro.format(v.income)+'</td><td class="num">'+euro.format(v.expense)+'</td><td class="num">'+euro.format(v.net)+'</td></tr>').join('');
-    const max=Math.max(1,...data.months.flatMap(([,v])=>[v.income,v.expense]));
-    const bars=data.months.map(([key,v])=>'<div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;align-items:center;margin:7px 0"><span>'+safeText(labelMonth(key))+'</span><span style="background:#4d9a7a;height:12px;width:'+Math.max(1,v.income/max*100)+'%"></span><span style="background:#c66c61;height:12px;width:'+Math.max(1,v.expense/max*100)+'%"></span></div>').join('');
     const topCounterparts=[...new Set(data.counterparts.map(v=>v.label))].map(label=>({label,total:data.counterparts.filter(v=>v.label===label).reduce((sum,v)=>sum+v.income+v.expense,0)})).sort((a,b)=>b.total-a.total).slice(0,6).map(v=>v.label);
-    const counterpartMax=Math.max(1,...data.counterparts.filter(v=>topCounterparts.includes(v.label)).map(v=>Math.abs(v.net)));
-    const counterpartBars=data.counterparts.filter(v=>topCounterparts.includes(v.label)).map(v=>'<div style="display:grid;grid-template-columns:130px 100px 1fr;gap:8px;align-items:center;margin:5px 0"><span>'+safeText(v.label)+'</span><span>'+safeText(labelMonth(v.month))+'</span><span style="display:block;height:10px;width:'+Math.max(1,Math.abs(v.net)/counterpartMax*100)+'%;background:'+(v.net>=0?'#4d9a7a':'#c66c61')+'"></span></div>').join('');
-    const counterpartAnnualMax=Math.max(1,...data.counterpartYears.filter(v=>topCounterparts.includes(v.label)).map(v=>Math.abs(v.net)));
-    const counterpartAnnualBars=data.counterpartYears.filter(v=>topCounterparts.includes(v.label)).map(v=>'<div style="display:grid;grid-template-columns:130px 100px 1fr;gap:8px;align-items:center;margin:5px 0"><span>'+safeText(v.label)+'</span><span>'+safeText(v.year)+'</span><span style="display:block;height:10px;width:'+Math.max(1,Math.abs(v.net)/counterpartAnnualMax*100)+'%;background:'+(v.net>=0?'#4d9a7a':'#c66c61')+'"></span></div>').join('');
+    const verticalChart=(rows,labelFn,series,options={})=>{
+      if(!rows.length||!series.length)return '<p>Nessun dato disponibile per il grafico.</p>';
+      const width=Math.max(760,rows.length*76),height=330,left=58,right=18,top=35,bottom=76,plotW=width-left-right,plotH=height-top-bottom;
+      const values=rows.flatMap(row=>series.map(item=>Number(item.value(row))||0));
+      const maxAbs=Math.max(1,...values.map(Math.abs)),minValue=options.negative?-maxAbs:0,maxValue=maxAbs;
+      const y=value=>top+(maxValue-value)/(maxValue-minValue)*plotH,zero=y(0),slot=plotW/rows.length;
+      const groupW=Math.min(slot*.78,series.length*18+10),barW=Math.max(5,Math.min(18,groupW/series.length-3));
+      const parts=['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+width+' '+height+'" role="img">'];
+      for(let tick=0;tick<=4;tick++){const value=maxValue-(maxValue-minValue)*tick/4,py=y(value);parts.push('<line x1="'+left+'" y1="'+py+'" x2="'+(width-right)+'" y2="'+py+'" stroke="#dce5e2"/><text x="'+(left-8)+'" y="'+(py+3)+'" text-anchor="end" font-size="9" fill="#657671">'+reportShortNumber.format(value)+'</text>');}
+      parts.push('<line x1="'+left+'" y1="'+zero+'" x2="'+(width-right)+'" y2="'+zero+'" stroke="#81908d" stroke-width="1.2"/>');
+      rows.forEach((row,index)=>{
+        const cx=left+slot*(index+.5),start=cx-groupW/2;
+        series.forEach((item,j)=>{
+          const value=Number(item.value(row))||0,py=y(value),barY=Math.min(py,zero),barH=Math.max(1,Math.abs(zero-py)),x=start+j*(groupW/series.length)+Math.max(0,(groupW/series.length-barW)/2);
+          parts.push('<rect x="'+x+'" y="'+barY+'" width="'+barW+'" height="'+barH+'" rx="2" fill="'+item.color+'"/>');
+          if(rows.length<=14){const label=reportShortNumber.format(value);parts.push('<text x="'+(x+barW/2)+'" y="'+(value>=0?Math.max(11,barY-4):Math.min(height-24,barY+barH+11))+'" text-anchor="middle" font-size="8" fill="#40534e">'+xmlEscape(label)+'</text>');}
+        });
+        parts.push('<text x="'+cx+'" y="'+(height-45)+'" text-anchor="end" transform="rotate(-35 '+cx+' '+(height-45)+')" font-size="9" fill="#40534e">'+xmlEscape(labelFn(row))+'</text>');
+      });
+      const legendWidth=series.length*130,startLegend=Math.max(left,(width-legendWidth)/2);
+      series.forEach((item,index)=>{const x=startLegend+index*130;parts.push('<rect x="'+x+'" y="10" width="10" height="10" rx="2" fill="'+item.color+'"/><text x="'+(x+15)+'" y="19" font-size="10" fill="#40534e">'+xmlEscape(item.label)+'</text>');});
+      parts.push('</svg>');
+      return '<div class="chart" style="overflow-x:auto">'+parts.join('')+'</div>';
+    };
+    const monthlyChart=verticalChart(data.months.map(([key,value])=>({key,...value})),row=>labelMonth(row.key),[
+      {label:'Entrate',color:'#4d9a7a',value:row=>row.income},
+      {label:'Uscite',color:'#c66c61',value:row=>row.expense}
+    ]);
+    const monthlyCounterpartChart=verticalChart(data.months.map(([key])=>({key})),row=>labelMonth(row.key),topCounterparts.map((label,index)=>({
+      label,color:['#4d9a7a','#c66c61','#6489b5','#b58b48','#8267a8','#6a9691'][index],
+      value:row=>data.counterparts.find(item=>item.month===row.key&&item.label===label)?.net||0
+    })),{negative:true});
+    const annualCounterpartChart=verticalChart(data.years.map(([year])=>({year})),row=>row.year,topCounterparts.map((label,index)=>({
+      label,color:['#4d9a7a','#c66c61','#6489b5','#b58b48','#8267a8','#6a9691'][index],
+      value:row=>data.counterpartYears.find(item=>item.year===row.year&&item.label===label)?.net||0
+    })),{negative:true});
     const txRows=data.rows.map(({tx,allocation})=>'<tr><td>'+safeText(formatDate(tx.date))+'</td><td>'+safeText(transactionDescription(tx)||transactionCausale(tx)||'Movimento')+'</td><td>'+safeText(allocation.labels.join(' · ')||accountLabel(tx.counterpartAccountId))+'</td><td class="num">'+euro.format(allocation.amount)+'</td><td>'+safeText(tx.status==='confirmed'?'Confermato':'Da classificare')+'</td></tr>').join('');
-    const content='<h1>Ricerca avanzata · Gestione C/C</h1><p>Periodo: '+safeText(filters.from||'inizio archivio')+' – '+safeText(filters.to||'oggi')+' · '+data.rows.length+' movimenti</p><div class="summary"><div><b>Entrate</b><strong>'+euro.format(data.income)+'</strong></div><div><b>Uscite</b><strong>'+euro.format(data.expense)+'</strong></div><div><b>Saldo netto</b><strong>'+euro.format(data.net)+'</strong></div></div><h2>Andamento mensile</h2><p>Entrate (verde) · Uscite (rosso)</p>'+bars+'<h2>Andamento mensile delle principali contropartite</h2><p>Saldo netto per mese (verde positivo, rosso negativo)</p>'+counterpartBars+'<h2>Andamento annuale delle principali contropartite</h2><p>Saldo netto per anno</p>'+counterpartAnnualBars+'<h2>Riepilogo mensile</h2><table><thead><tr><th>Mese</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+monthly+'</tbody></table><h2>Riepilogo annuale</h2><table><thead><tr><th>Anno</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+annual+'</tbody></table><h2>Andamento mensile per contropartita</h2><table><thead><tr><th>Mese</th><th>Contropartita</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+counterpartRows+'</tbody></table><h2>Andamento annuale per contropartita</h2><table><thead><tr><th>Anno</th><th>Contropartita</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+counterpartYearRows+'</tbody></table><h2>Movimenti trovati</h2><table><thead><tr><th>Data</th><th>Descrizione</th><th>Contropartita</th><th>Importo</th><th>Stato</th></tr></thead><tbody>'+txRows+'</tbody></table>';
+    const content='<h1>Ricerca avanzata · Gestione C/C</h1><p>Periodo: '+safeText(filters.from||'inizio archivio')+' – '+safeText(filters.to||'oggi')+' · '+data.rows.length+' movimenti</p><div class="summary"><div><b>Entrate</b><strong>'+euro.format(data.income)+'</strong></div><div><b>Uscite</b><strong>'+euro.format(data.expense)+'</strong></div><div><b>Saldo netto</b><strong>'+euro.format(data.net)+'</strong></div></div><h2>Andamento mensile</h2><p>Confronto tra entrate e uscite, con valori leggibili sopra le colonne.</p>'+monthlyChart+'<h2>Andamento mensile delle principali contropartite</h2><p>Saldo netto per mese delle sei contropartite con maggiore movimentazione; i valori negativi scendono sotto lo zero.</p>'+monthlyCounterpartChart+'<h2>Andamento annuale delle principali contropartite</h2><p>Saldo netto per anno delle stesse contropartite.</p>'+annualCounterpartChart+'<h2>Riepilogo mensile</h2><table><thead><tr><th>Mese</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+monthly+'</tbody></table><h2>Riepilogo annuale</h2><table><thead><tr><th>Anno</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+annual+'</tbody></table><h2>Andamento mensile per contropartita</h2><table><thead><tr><th>Mese</th><th>Contropartita</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+counterpartRows+'</tbody></table><h2>Andamento annuale per contropartita</h2><table><thead><tr><th>Anno</th><th>Contropartita</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+counterpartYearRows+'</tbody></table><h2>Movimenti trovati</h2><table><thead><tr><th>Data</th><th>Descrizione</th><th>Contropartita</th><th>Importo</th><th>Stato</th></tr></thead><tbody>'+txRows+'</tbody></table>';
     printHtml('Ricerca-avanzata',content);
   }
   function exportAdvancedSearchXlsx() {
