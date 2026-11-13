@@ -1263,9 +1263,9 @@
         const historic=budget||historyEstimate(account,key);
         if(historic.source==='sporadico')continue;
         sources.add(historic.source);
-        const recurring=recurringMonthly(account.id,key);
+        const scheduledRemaining=due.filter(rule=>rule.categoryId===account.id).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)||0),0);
         const already= i===0?categoryMonthly(account.id,key):0;
-        const residual=Math.max(0,historic.amount-recurring-already);
+        const residual=Math.max(0,historic.amount-scheduledRemaining-already);
         if(account.type==='INCOME')estimateIncome+=residual;else estimateExpense+=residual;
       }
       estimateIncome=Math.round(estimateIncome*100)/100;
