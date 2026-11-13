@@ -1200,55 +1200,85 @@
     const primaryAccountId=state.bankAccountId;
     const opening=ids.has(primaryAccountId)?(Number(state.openingBalance)||0):0;
     const openingBalanceUnknown=accounts.filter(account=>account.id!==primaryAccountId);
-    const currentBalance=opening+txs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
-    const historyKeys=Array.from({length:12},(_,i)=>shiftMonthKey(currentMonth,-12+i));
-    const completedCurrentYear=historyKeys.filter(key=>key.slice(0,4)===String(new Date().getFullYear())&&key<currentMonth);
-    const previousYearKeys=Array.from({length:12},(_,i)=>(new Date().getFullYear()-1)+'-'+String(i+1).padStart(2,'0'));
+    const lastClosedMonth=shiftMonthKey(currentMonth,-1);
+    const cutoff=lastClosedMonth+'-'+String(new Date(Number(lastClosedMonth.slice(0,4)),Number(lastClosedMonth.slice(5,7)),0).getDate()).padStart(2,'0');
+    const closedTxs=txs.filter(tx=>String(tx.date||'')<=cutoff);
+    const openingBalance=opening+closedTxs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
     const categories=state.accounts.filter(a=>a.hierarchyType!=='Mastro'&&
       (['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))));
-    const usedSources=new Set(),usedMonths=new Set();
-    const estimates={income:0,expense:0,source:'',months:0};
-    for(const cat of categories){
-      const hasCategoryMovement=key=>txs.some(tx=>String(tx.date).slice(0,7)===key&&
-        (tx.counterpartAccountId===cat.id||(tx.counterpartSplits||[]).some(split=>split.accountId===cat.id)));
-      const categoryCoverage=completedCurrentYear.filter(hasCategoryMovement).length;
-      const estimateKeys=categoryCoverage>=3?completedCurrentYear:previousYearKeys;
-      usedSources.add(categoryCoverage>=3?'anno_corrente':'anno_precedente');
-      estimateKeys.forEach(key=>usedMonths.add(key));
-      const monthly=estimateKeys.map(key=>{
-        let total=0;
-        for(const tx of txs){
-          if(String(tx.date).slice(0,7)!==key||transactionIsExplicitlyRecurring(tx,cat.id,key,ids))continue;
-          if(tx.counterpartSplits?.length){
-            for(const sp of tx.counterpartSplits)if(sp.accountId===cat.id)total+=Math.abs(Number(sp.value)||0);
-          }else if(tx.counterpartAccountId===cat.id)total+=Math.abs(Number(tx.amount)||0);
-        }
-        return total;
-      });
-      const nonZero=monthly.filter(value=>value>0);
-      if(nonZero.length<2)continue;
-      const estimate=median(nonZero);
-      if(cat.type==='INCOME')estimates.income+=estimate;else estimates.expense+=estimate;
-    }
-    estimates.income=Math.round(estimates.income*100)/100;
-    estimates.expense=Math.round(estimates.expense*100)/100;
-    estimates.source=usedSources.size>1?'periodi misti':usedSources.has('anno_corrente')?'anno corrente':'anno precedente';
-    estimates.months=usedMonths.size;
+    const historyMonths=Array.from({length:12},(_,i)=>shiftMonthKey(lastClosedMonth,-11+i));
+    const previousYearMonths=Array.from({length:12},(_,i)=>(Number(currentMonth.slice(0,4))-1)+'-'+String(i+1).padStart(2,'0'));
+    const categoryMonthly=(accountId,month)=>{
+      let total=0;
+      for(const tx of txs){
+        if(String(tx.date||'').slice(0,7)!==month)continue;
+        if(tx.counterpartSplits?.length){for(const split of tx.counterpartSplits)if(split.accountId===accountId)total+=Math.abs(Number(split.value)||0);}
+        else if(tx.counterpartAccountId===accountId)total+=Math.abs(Number(tx.amount)||0);
+      }
+      return total;
+    };
+    const recurringMonthly=(accountId,month)=>{
+      const due=state.recurringRules.filter(rule=>rule.active&&rule.categoryId===accountId&&recurringOccursInMonth(rule,month));
+      return due.reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)||0),0);
+    };
+    const budgetFor=(account,month)=>{
+      const exact=activeBudgetSnapshot(month);
+      const snapshots=state.budgetSnapshots.filter(snapshot=>snapshot&&snapshot.month&&snapshot.month<=month)
+        .sort((a,b)=>String(b.month).localeCompare(String(a.month))||Number(b.version||0)-Number(a.version||0));
+      const snapshot=exact||snapshots[0]||null;
+      const lines=account.type==='INCOME'?(snapshot?.incomeLines||[]):(snapshot?.lines||[]);
+      const line=lines.find(item=>item.accountId===account.id);
+      const value=Number(line?.budget);
+      return Number.isFinite(value)&&value>0?{amount:value,source:'budget'}:null;
+    };
+    const historyEstimate=(account,month)=>{
+      const currentYearMonths=historyMonths.filter(key=>key.slice(0,4)===currentMonth.slice(0,4)&&key<currentMonth);
+      const currentValues=currentYearMonths.map(key=>categoryMonthly(account.id,key));
+      const priorValues=previousYearMonths.map(key=>categoryMonthly(account.id,key));
+      const currentActive=currentValues.filter(value=>value>0).length;
+      const priorActive=priorValues.filter(value=>value>0).length;
+      const usePrior=currentActive<3&&priorActive>=3;
+      const values=usePrior?priorValues:currentValues;
+      const active=values.filter(value=>value>0);
+      if(active.length<3)return {amount:0,source:'sporadico'};
+      return {amount:median(active),source:usePrior?'anno_precedente':'anno_corrente'};
+    };
     const forecast=[];
-    let balance=currentBalance;
+    let balance=openingBalance;
+    const sources=new Set();
     for(let i=0;i<12;i++){
-      const key=shiftMonthKey(currentMonth,i),rules=forecastRecurringItems(key,ids);
-      const due=rules.filter(rule=>i!==0||rule.occurrenceDate>=today);
+      const key=shiftMonthKey(currentMonth,i);
+      const due=forecastRecurringItems(key,ids).filter(rule=>i!==0||rule.occurrenceDate>=today);
       const programmedIncome=due.filter(rule=>Number(rule.amount)>0).reduce((sum,rule)=>sum+Number(rule.amount),0);
       const programmedExpense=due.filter(rule=>Number(rule.amount)<0).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)),0);
-      const estimateIncome=i===0?0:estimates.income;
-      const estimateExpense=i===0?0:estimates.expense;
-      const openingBalance=balance;
-      balance=Math.round((balance+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
-      forecast.push({key,openingBalance,programmedIncome,programmedExpense,estimateIncome,estimateExpense,programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
+      let actualIncome=0,actualExpense=0;
+      if(i===0){
+        for(const tx of txs.filter(tx=>String(tx.date||'')>cutoff&&String(tx.date||'')<=today)){
+          const flow=forecastTransactionFlow(tx,ids);if(flow>=0)actualIncome+=flow;else actualExpense+=Math.abs(flow);
+        }
+      }
+      let estimateIncome=0,estimateExpense=0;
+      for(const account of categories){
+        const budget=budgetFor(account,key);
+        const historic=budget||historyEstimate(account,key);
+        if(historic.source==='sporadico')continue;
+        sources.add(historic.source);
+        const recurring=recurringMonthly(account.id,key);
+        const already= i===0?categoryMonthly(account.id,key):0;
+        const residual=Math.max(0,historic.amount-recurring-already);
+        if(account.type==='INCOME')estimateIncome+=residual;else estimateExpense+=residual;
+      }
+      estimateIncome=Math.round(estimateIncome*100)/100;
+      estimateExpense=Math.round(estimateExpense*100)/100;
+      const opening=balance;
+      balance=Math.round((balance+actualIncome-actualExpense+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
+      forecast.push({key,openingBalance:opening,actualIncome,actualExpense,programmedIncome,programmedExpense,estimateIncome,estimateExpense,
+        programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
     }
-    const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:currentBalance,key:currentMonth});
-    return {accounts,currentBalance,forecast,minimum,historyCount:[...usedMonths].filter(key=>txs.some(tx=>String(tx.date).slice(0,7)===key)).length,estimatedNet:estimates.income-estimates.expense,estimates,openingBalanceUnknown};
+    const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:openingBalance,key:currentMonth});
+    const source=sources.size>1?'budget e storico misti':sources.has('budget')?'budget':sources.has('anno_precedente')?'anno precedente':'anno corrente';
+    const historyCount=historyMonths.filter(key=>txs.some(tx=>String(tx.date||'').slice(0,7)===key)).length;
+    return {accounts,currentBalance:openingBalance,forecast,minimum,historyCount,estimatedNet:forecast.reduce((sum,row)=>sum+row.estimateIncome-row.estimateExpense,0),estimates:{source},openingBalanceUnknown,lastClosedMonth};
   }
   function renderForecastSelection() {
     const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
@@ -1264,9 +1294,9 @@
     $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
     $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
     $('#forecastEnding').textContent=euro.format(result.forecast.at(-1)?.balance??result.currentBalance);
-    $('#forecastReliability').textContent='Storico: '+result.historyCount+' mesi · base '+(result.estimates.source==='anno_corrente'?'anno corrente':'anno precedente')+' · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
+    $('#forecastReliability').textContent='Saldo al '+monthLabel(result.lastClosedMonth)+' · base '+result.estimates.source+' · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
     if(status&&result.openingBalanceUnknown.length)status.textContent+=' ATTENZIONE: il saldo iniziale è disponibile solo per '+(accountById(state.bankAccountId)?.path||'il conto principale')+'. Per gli altri conti selezionati il saldo storico potrebbe essere incompleto.';
-    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
+    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.actualIncome)+'</td><td>'+euro.format(row.actualExpense)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
   }
 
   function navigate(view) {
