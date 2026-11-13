@@ -347,9 +347,17 @@ def process_document_ocr(attachment_id):
             result=subprocess.run(["pdftotext","-layout",str(source),"-"],capture_output=True,text=True,timeout=60)
             text=result.stdout if result.returncode==0 else ""
             if len(re.sub(r"\s","",text))<80:
+                page_count = 30
+                try:
+                    info = subprocess.run(["pdfinfo",str(source)],capture_output=True,text=True,timeout=30,check=True).stdout
+                    page_match = re.search(r"(?m)^Pages:\s+(\d+)",info)
+                    if page_match: page_count = min(30,max(1,int(page_match.group(1))))
+                except Exception:
+                    pass
                 prefix=str(Path(folder)/"pagina")
-                subprocess.run(["pdftoppm","-f","1","-l","8","-r","160","-png",str(source),prefix],capture_output=True,timeout=120,check=True)
+                subprocess.run(["pdftoppm","-f","1","-l",str(page_count),"-r","160","-png",str(source),prefix],capture_output=True,timeout=180,check=True)
                 text="\n".join(subprocess.run(["tesseract",str(page),"stdout","-l","ita","--psm","3"],capture_output=True,text=True,timeout=120,check=True).stdout for page in sorted(Path(folder).glob("pagina-*.png")))
+                if page_match and int(page_match.group(1))>30: text += "\n[OCR interrotto dopo le prime 30 pagine]";
         else:
             text=subprocess.run(["tesseract",str(source),"stdout","-l","ita","--psm","3"],capture_output=True,text=True,timeout=120,check=True).stdout
     text=text[:1000000]
@@ -463,6 +471,7 @@ def background_job_worker():
             time.sleep(1)
             continue
         job_id = job["id"]
+        payload = {}
         try:
             payload = json.loads(job["result_json"] or "{}") if job["kind"] == "document_ocr" else {}
             result = process_document_ocr(str(payload.get("attachment_id", ""))) if job["kind"] == "document_ocr" else drive_session_backup()
