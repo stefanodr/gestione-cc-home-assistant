@@ -984,20 +984,32 @@ class Handler(BaseHTTPRequestHandler):
                 old_state = json.loads(old_row["state_json"]) if old_row else None
                 record_transaction_changes(c, old_state, state, "imported")
                 c.execute("INSERT INTO app_state(id,state_json,updated_at,revision) VALUES(1,?,datetime('now'),?) ON CONFLICT(id) DO UPDATE SET state_json=excluded.state_json, updated_at=excluded.updated_at, revision=excluded.revision", (json.dumps(state,ensure_ascii=False), revision))
-                if isinstance(payload.get("attachments"), list):
-                    if len(payload["attachments"]) > 10000: raise ValueError("Numero allegati non valido.")
-                    c.execute("DELETE FROM attachments")
-                    restored = 0
-                    for attachment in payload["attachments"]:
-                        if not isinstance(attachment, dict): raise ValueError("Allegato nel backup non valido.")
-                        data = base64.b64decode(str(attachment.get("content", "")), validate=True)
-                        mime = str(attachment.get("mime", ""))
-                        if mime not in ("application/pdf", "image/jpeg", "image/png") or len(data) > 10 * 1024 * 1024:
-                            raise ValueError("Allegato nel backup non valido.")
-                        restored += len(data)
-                        if restored > 80 * 1024 * 1024: raise ValueError("Dimensione allegati nel backup eccessiva.")
-                        c.execute("INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
-                            (str(attachment["id"]),str(attachment["transaction_id"]),Path(str(attachment["filename"])).name,mime,len(data),sqlite3.Binary(data),str(attachment.get("created_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))))
+                attachment_payload = payload.get("attachments", [])
+                if not isinstance(attachment_payload, list) or len(attachment_payload) > 10000:
+                    raise ValueError("Elenco allegati nel backup non valido.")
+                c.execute("DELETE FROM attachments")
+                restored = 0
+                valid_tx_ids = {str(tx["id"]) for tx in state["transactions"]}
+                seen_attachment_ids = set()
+                for attachment in attachment_payload:
+                    if not isinstance(attachment, dict): raise ValueError("Allegato nel backup non valido.")
+                    data = base64.b64decode(str(attachment.get("content", "")), validate=True)
+                    mime = str(attachment.get("mime", ""))
+                    attachment_id = str(attachment.get("id", ""))
+                    tx_id = str(attachment.get("transaction_id", ""))
+                    filename = Path(str(attachment.get("filename", "allegato"))).name[:180]
+                    valid_signature = ((mime == "application/pdf" and data.startswith(b"%PDF-")) or
+                                       (mime == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
+                                       (mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")))
+                    if (mime not in ("application/pdf", "image/jpeg", "image/png") or
+                        not valid_signature or len(data) < 1 or len(data) > 10 * 1024 * 1024 or
+                        not attachment_id or attachment_id in seen_attachment_ids or tx_id not in valid_tx_ids):
+                        raise ValueError("Allegato nel backup non valido.")
+                    seen_attachment_ids.add(attachment_id)
+                    restored += len(data)
+                    if restored > 80 * 1024 * 1024: raise ValueError("Dimensione allegati nel backup eccessiva.")
+                    c.execute("INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
+                        (attachment_id,tx_id,filename,mime,len(data),sqlite3.Binary(data),str(attachment.get("created_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))))
                 c.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("state_imported",))
             self.send_json(200, {"ok":True,"revision":revision,"accounts":len(state["accounts"]),"transactions":len(state["transactions"])})
             return
