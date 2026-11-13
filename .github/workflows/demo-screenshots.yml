@@ -79,15 +79,21 @@ jobs:
             echo "Screenshots are already up to date."
           fi
 
-      - name: Publish GitHub Release 1.0.0
+      - name: Publish GitHub Release for the current App version
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v1.0.0 >/dev/null 2>&1; then
-            echo "Release v1.0.0 already exists; leaving it unchanged."
+          VERSION="$(sed -n 's/^version: \"\\([^\"]*\\)\"/\\1/p' gestione_cc/config.yaml)"
+          if [ -z "$VERSION" ]; then
+            echo "Cannot determine the Home Assistant App version."
+            exit 1
+          fi
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; leaving it unchanged."
           else
-            gh release create v1.0.0 \
+            gh release create "$TAG" \
               --target main \
-              --title "Gestione C/C 1.0.0" \
-              --notes-file gestione_cc/CHANGELOG.md
+              --title "Gestione C/C $VERSION" \
+              --notes-file CHANGELOG.md
           fi
