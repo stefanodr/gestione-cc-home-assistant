@@ -366,6 +366,8 @@ def process_document_ocr(attachment_id):
     metadata=extract_document_metadata(text)
     now=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())
     with db() as connection:
+        if not connection.execute("SELECT 1 FROM attachments WHERE id=?", (attachment_id,)).fetchone():
+            return {"skipped": True, "reason": "attachment_deleted"}
         connection.execute("""INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code,updated_at,error)
             VALUES(?,?,?,?,?,?,?,?,?,?,NULL) ON CONFLICT(attachment_id) DO UPDATE SET status=excluded.status,category=excluded.category,
             extracted_text=excluded.extracted_text,supplier=excluded.supplier,document_date=excluded.document_date,amount=excluded.amount,
@@ -1195,7 +1197,7 @@ class Handler(BaseHTTPRequestHandler):
                                        (mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")))
                     if (mime not in ("application/pdf", "image/jpeg", "image/png") or
                         not valid_signature or len(data) < 1 or len(data) > 10 * 1024 * 1024 or
-                        not attachment_id or attachment_id in seen_attachment_ids or tx_id not in valid_tx_ids):
+                        not attachment_id or attachment_id in seen_attachment_ids or not tx_id):
                         raise ValueError("Allegato nel backup non valido.")
                     seen_attachment_ids.add(attachment_id)
                     restored += len(data)
