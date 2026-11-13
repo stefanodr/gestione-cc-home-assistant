@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/analisi-budget-previsioni
+      - feature/prossima-versione-migliorie
   pull_request:
     branches:
       - main
@@ -24,6 +25,8 @@ jobs:
           python-version: '3.x'
       - name: Check JavaScript syntax
         run: node --check gestione_cc/www/app.js
+      - name: Check Python syntax
+        run: python -m py_compile gestione_cc/server.py
       - name: Check Python syntax
         run: python -m py_compile gestione_cc/server.py
       - name: Test OFX parser
