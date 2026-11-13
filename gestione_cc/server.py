@@ -314,6 +314,15 @@ def ensure_transaction_feature_tables():
 
 
 
+def valid_attachment_signature(mime, content):
+    data = bytes(content or b"")
+    return (
+        (mime == "application/pdf" and data.startswith(b"%PDF-")) or
+        (mime == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
+        (mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n"))
+    )
+
+
 def classify_document(text, filename=""):
     sample = (str(filename) + "\n" + str(text or "")[:12000]).lower()
     if re.search(r"\b(modello\s+)?f24\b|codice tributo|erario|inps|inail", sample): return "f24"
@@ -880,9 +889,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Ogni allegato deve avere dimensione massima di 5 MB.")
                 allowed = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}
                 suffix = Path(filename).suffix.lower()
-                valid_signature = ((mime == "application/pdf" and content.startswith(b"%PDF-")) or
-                                   (mime == "image/jpeg" and content.startswith(b"\\xff\\xd8\\xff")) or
-                                   (mime == "image/png" and content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")))
+                valid_signature = valid_attachment_signature(mime, content)
                 if (mime not in allowed or suffix not in {allowed[mime], ".jpeg" if mime == "image/jpeg" else allowed[mime]}
                     or not valid_signature):
                     raise ValueError("Sono consentiti soltanto file PDF, JPEG e PNG validi.")
@@ -1191,9 +1198,7 @@ class Handler(BaseHTTPRequestHandler):
                     attachment_id = str(attachment.get("id", ""))
                     tx_id = str(attachment.get("transaction_id", ""))
                     filename = Path(str(attachment.get("filename", "allegato"))).name[:180]
-                    valid_signature = ((mime == "application/pdf" and data.startswith(b"%PDF-")) or
-                                       (mime == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
-                                       (mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")))
+                    valid_signature = valid_attachment_signature(mime, data)
                     if (mime not in ("application/pdf", "image/jpeg", "image/png") or
                         not valid_signature or len(data) < 1 or len(data) > 10 * 1024 * 1024 or
                         not attachment_id or attachment_id in seen_attachment_ids or not tx_id):
