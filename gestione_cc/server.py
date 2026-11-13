@@ -1030,23 +1030,34 @@ class Handler(BaseHTTPRequestHandler):
                 "document_date": (str(payload.get("document_date", "")).strip()[:32] or None, "document_date_manual"),
                 "document_number": (str(payload.get("document_number", "")).strip()[:80] or None, "document_number_manual"),
             }
+            manual_fields = payload.get("manual_fields", list(fields.keys()))
+            if not isinstance(manual_fields, list) or not manual_fields or any(name not in fields for name in manual_fields):
+                self.send_json(400, {"error":"Elenco dei campi da correggere non valido."}); return
+            manual_fields = list(dict.fromkeys(manual_fields))
             date_value = fields["document_date"][0]
             amount_value = fields["amount"][0]
-            if date_value and not re.fullmatch(r"(?:\d{4}-\d{2}-\d{2}|\d{1,2}[./-]\d{1,2}[./-]\d{2,4})", date_value):
+            if "document_date" in manual_fields and date_value and not re.fullmatch(r"(?:\d{4}-\d{2}-\d{2}|\d{1,2}[./-]\d{1,2}[./-]\d{2,4})", date_value):
                 self.send_json(400, {"error":"Formato data non valido. Usa GG/MM/AAAA oppure AAAA-MM-GG."}); return
-            if amount_value and not re.fullmatch(r"-?(?:\d+|\d{1,3}(?:\.\d{3})+)(?:[,.]\d{1,2})?", amount_value):
+            if "amount" in manual_fields and amount_value and not re.fullmatch(r"-?(?:\d+|\d{1,3}(?:\.\d{3})+)(?:[,.]\d{1,2})?", amount_value):
                 self.send_json(400, {"error":"Importo non valido. Usa ad esempio 1.234,56."}); return
             with db() as connection:
                 row = connection.execute("SELECT transaction_id,filename FROM attachments WHERE id=?", (attachment_id,)).fetchone()
                 if not row:
                     self.send_json(404, {"error":"Documento non trovato."}); return
-                assignments = ["supplier=?", "amount=?", "document_date=?", "document_number=?",
-                    "supplier_manual=1", "amount_manual=1", "document_date_manual=1", "document_number_manual=1", "updated_at=?"]
-                values = [fields["supplier"][0], fields["amount"][0], fields["document_date"][0], fields["document_number"][0], time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), attachment_id]
+                assignments = []
+                values = []
+                audit_fields = {}
+                for name in manual_fields:
+                    value, flag = fields[name]
+                    assignments.extend([name + "=?", flag + "=1"])
+                    values.append(value)
+                    audit_fields[name] = value
+                assignments.append("updated_at=?")
+                values.extend([time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), attachment_id])
                 connection.execute("UPDATE document_index SET " + ",".join(assignments) + " WHERE attachment_id=?", values)
                 connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
                     (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_metadata_corrected",
-                     json.dumps({"attachment_id":attachment_id,"filename":row["filename"],"fields":{k:v[0] for k,v in fields.items()}}, ensure_ascii=False)))
+                     json.dumps({"attachment_id":attachment_id,"filename":row["filename"],"fields":audit_fields}, ensure_ascii=False)))
             self.send_json(200, {"ok":True})
             return
         if path == "/api/attachments/delete":
