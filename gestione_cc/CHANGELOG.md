@@ -1,3 +1,19 @@
+## [1.0.30] - 2026-11-13
+
+### Corretto
+- Aggiornata la versione dell'add-on mostrata nel piè di pagina: ora corrisponde alla 1.0.30.
+- Corretto il grafico dello spazio allegati: i settori colorati rappresentano la quota effettiva dei 100 MB disponibili; la parte restante mostra lo spazio libero.
+- La legenda mostra sempre tutte le categorie documentali con il rispettivo colore, anche quando il relativo spazio occupato è zero.
+- Oltre il limite di 100 MB, l'anello mostra la ripartizione percentuale delle categorie senza rappresentare spazio libero.
+
+## [1.0.30] - 2026-11-13
+
+### Fixed
+- Updated the add-on version displayed in the footer to 1.0.30.
+- Fixed the attachment storage chart: colored segments now represent the actual share of the 100 MB capacity, while the remaining arc represents free space.
+- The legend always displays every document category with its color, including categories with zero stored data.
+- Above the 100 MB limit, the ring displays the percentage distribution by category and no free-space segment.
+
 ## [1.0.29] - 2026-11-13
 
 ### Aggiunto
