@@ -99,6 +99,17 @@
     const [y, m, d] = value.split('-').map(Number);
     return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(y, m - 1, d));
   }
+  function formatDocumentDate(value) {
+    const raw=String(value||'').trim();
+    if(!raw)return '—';
+    let match=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if(match)return String(match[3]).padStart(2,'0')+'/'+String(match[2]).padStart(2,'0')+'/'+match[1];
+    match=raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if(match){const year=match[3].length===2?(Number(match[3])<70?'20':'19')+match[3]:match[3];return String(match[1]).padStart(2,'0')+'/'+String(match[2]).padStart(2,'0')+'/'+year;}
+    const parsed=parseDate(raw);
+    if(parsed){const parts=parsed.split('-');return parts[2]+'/'+parts[1]+'/'+parts[0];}
+    return raw;
+  }
   function transactionDescription(tx) { return String(tx?.description ?? tx?.payee ?? '').trim(); }
   function transactionCausale(tx) {
     const value = String(tx?.causale ?? tx?.memo ?? '').trim();
@@ -1290,8 +1301,9 @@
     const openingBalance=opening+closedTxs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
     const categories=state.accounts.filter(a=>a.hierarchyType!=='Mastro'&&
       (['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))));
-    const historyMonths=Array.from({length:12},(_,i)=>shiftMonthKey(lastClosedMonth,-11+i));
-    const previousYearMonths=Array.from({length:12},(_,i)=>(Number(currentMonth.slice(0,4))-1)+'-'+String(i+1).padStart(2,'0'));
+    // Use up to 24 closed months so each projected month can follow its own
+    // calendar-month profile instead of repeating one annual median.
+    const historyMonths=Array.from({length:24},(_,i)=>shiftMonthKey(lastClosedMonth,-23+i));
     const categoryMonthly=(accountId,month)=>{
       let total=0;
       for(const tx of txs){
@@ -1306,31 +1318,31 @@
       return due.reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)||0),0);
     };
     const budgetFor=(account,month)=>{
-      const exact=activeBudgetSnapshot(month);
-      const snapshots=state.budgetSnapshots.filter(snapshot=>snapshot&&snapshot.month&&snapshot.month<=month)
-        .sort((a,b)=>String(b.month).localeCompare(String(a.month))||Number(b.version||0)-Number(a.version||0));
-      const snapshot=exact||snapshots[0]||null;
+      // A budget is applied only to the month for which it was saved.
+      // Carrying the latest snapshot into every future month creates a flat
+      // forecast and masks the month-by-month historical profile.
+      const snapshot=activeBudgetSnapshot(month);
       const lines=account.type==='INCOME'?(snapshot?.incomeLines||[]):(snapshot?.lines||[]);
       const line=lines.find(item=>item.accountId===account.id);
       const value=Number(line?.budget);
       return Number.isFinite(value)&&value>0?{amount:value,source:'budget'}:null;
     };
     const historyEstimate=(account,month)=>{
-      const currentYearMonths=historyMonths.filter(key=>key.slice(0,4)===currentMonth.slice(0,4)&&key<currentMonth);
-      const currentValues=currentYearMonths.map(key=>categoryMonthly(account.id,key));
-      const priorValues=previousYearMonths.map(key=>categoryMonthly(account.id,key));
-      const currentActive=currentValues.filter(value=>value>0).length;
-      const priorActive=priorValues.filter(value=>value>0).length;
-      const usePrior=currentActive<3&&priorActive>=3;
-      const values=usePrior?priorValues:currentValues;
+      const values=historyMonths.map(key=>categoryMonthly(account.id,key));
       const active=values.filter(value=>value>0);
-      // Historical projections require a recurring pattern across at least
-      // 40% of the observed months (minimum three). Irregular expenses stay
-      // excluded; explicit recurring rules, including annual ones, are added
-      // separately above and are not subject to this historical threshold.
+      // Keep the existing anti-sporadic rule across the full observation
+      // window, then estimate the target calendar month from the same month
+      // in previous years. This preserves seasonality (e.g. annual bills,
+      // summer/winter spending) instead of repeating one median 12 times.
       const minimumActiveMonths=Math.max(3,Math.ceil(values.length*0.4));
       if(active.length<minimumActiveMonths)return {amount:0,source:'sporadico'};
-      return {amount:median(active),source:usePrior?'anno_precedente':'anno_corrente'};
+      const targetMonth=String(month).slice(5,7);
+      const seasonal=historyMonths
+        .filter(key=>key.slice(5,7)===targetMonth)
+        .map(key=>categoryMonthly(account.id,key));
+      const seasonalActive=seasonal.filter(value=>value>0);
+      if(!seasonalActive.length)return {amount:0,source:'storico stagionale'};
+      return {amount:median(seasonalActive),source:'storico stagionale'};
     };
     const forecast=[];
     let balance=openingBalance;
@@ -2039,7 +2051,7 @@
       $('#documentNext').disabled=documentSearchOffset+items.length>=Number(result.total_count||0);
       $('#documentStorageTotal').textContent=(Number(result.total_bytes||0)/1024/1024).toFixed(2)+' MB complessivi';
       $('#documentStorageWarning').classList.toggle('hidden',!result.warning);
-      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-edit="'+safeText(item.id)+'">Modifica</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="8" class="empty-state">Nessun documento trovato.</td></tr>';
+      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(formatDocumentDate(item.document_date))+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-edit="'+safeText(item.id)+'">Modifica</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="8" class="empty-state">Nessun documento trovato.</td></tr>';
       $('#documentsBody').querySelectorAll('[data-doc-edit]').forEach(button=>button.addEventListener('click',()=>{
         const item=items.find(x=>x.id===button.dataset.docEdit);if(item)openDocumentMetadataEditor(item,'archive');
       }));
