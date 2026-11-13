@@ -881,6 +881,25 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as error:
                 self.send_json(400, {"error":str(error)})
             return
+        if path == "/api/documents/update":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            attachment_id = str(payload.get("id", ""))[:160]
+            category = str(payload.get("category", "altro"))
+            if category not in ("fattura", "f24", "bollettino", "altro"):
+                self.send_json(400, {"error":"Categoria documento non valida."}); return
+            with db() as connection:
+                row = connection.execute("SELECT a.transaction_id,a.filename,d.extracted_text,d.supplier,d.document_date,d.amount,d.fiscal_code,d.tax_code FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id WHERE a.id=?", (attachment_id,)).fetchone()
+                if not row:
+                    self.send_json(404, {"error":"Documento non trovato."}); return
+                connection.execute("UPDATE document_index SET category=?,updated_at=? WHERE attachment_id=?", (category,time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),attachment_id))
+                try:
+                    connection.execute("DELETE FROM document_fts WHERE attachment_id=?", (attachment_id,))
+                    connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)", (attachment_id,row["filename"],category,row["extracted_text"] or "",row["supplier"] or "",row["document_date"] or "",row["amount"] or "",row["fiscal_code"] or "",row["tax_code"] or ""))
+                except sqlite3.OperationalError: pass
+                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)", (time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),row["transaction_id"],"attachment_category_changed",json.dumps({"attachment":{"id":attachment_id,"filename":row["filename"],"category":category}},ensure_ascii=False)))
+            self.send_json(200, {"ok":True})
+            return
         if path == "/api/attachments/delete":
             item = self.require_auth(csrf=True)
             if not item: return
