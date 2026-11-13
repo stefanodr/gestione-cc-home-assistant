@@ -1984,7 +1984,7 @@
         $('#editDocumentSupplier').value=item.supplier||'';
         $('#editDocumentAmount').value=item.amount||'';
         const rawDate=String(item.document_date||'');
-        const dmy=rawDate.match(/^(\\d{1,2})[./-](\\d{1,2})[./-](\\d{2,4})$/);
+        const dmy=rawDate.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
         $('#editDocumentDate').value=dmy?(String(dmy[3].length===2?(Number(dmy[3])<70?'20':'19')+dmy[3]:dmy[3])+'-'+String(dmy[2]).padStart(2,'0')+'-'+String(dmy[1]).padStart(2,'0')):parseDate(rawDate);
         $('#editDocumentNumber').value=item.document_number||'';
         $('#documentMetadataModal').classList.remove('hidden');
