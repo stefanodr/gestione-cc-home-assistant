@@ -6,6 +6,7 @@ on:
       - feature/analisi-budget-previsioni
       - feature/prossima-versione-migliorie
       - feature/document-archive-ocr
+      - feature/document-exports-forecast
   pull_request:
     branches:
       - main
