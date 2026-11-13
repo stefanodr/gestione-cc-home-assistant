@@ -29,5 +29,7 @@ jobs:
         run: python -m py_compile gestione_cc/server.py
       - name: Check Python syntax
         run: python -m py_compile gestione_cc/server.py
+      - name: Test transaction audit history
+        run: python tests/test_transaction_audit.py
       - name: Test OFX parser
         run: node tests/finance-import.test.js
