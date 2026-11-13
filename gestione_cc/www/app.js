@@ -539,14 +539,22 @@
       const payload={id:editingDocumentId,supplier:$('#editDocumentSupplier').value,amount:$('#editDocumentAmount').value,
         document_date:$('#editDocumentDate').value,document_number:$('#editDocumentNumber').value};
       payload.manual_fields=Object.keys(editingDocumentOriginal||{}).filter(key=>payload[key]!==editingDocumentOriginal[key]);
-      if(!payload.manual_fields.length){$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;return;}
+      const origin=editingDocumentOrigin;
+      if(!payload.manual_fields.length){
+        $('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;editingDocumentOrigin='archive';
+        if(origin==='movement'){await refreshTransactionAttachments();void refreshAttachmentCounts();}
+        return;
+      }
       try{await apiRequest('/api/documents/metadata',{method:'POST',body:JSON.stringify(payload)});
-        $('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;await searchDocuments();
+        $('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;editingDocumentOrigin='archive';
+        if(origin==='movement'){await refreshTransactionAttachments();void refreshAttachmentCounts();}
+        else await searchDocuments();
         showNotice('Documento aggiornato','Le correzioni manuali sono state salvate e saranno mantenute anche dopo una nuova scansione OCR.');
       }catch(error){showNotice('Modifica non salvata',error.message||String(error));}
     });
-    $('#cancelDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;});
-    $('#closeDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;});
+    const closeDocumentEditor=()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;editingDocumentOrigin='archive';};
+    $('#cancelDocumentMetadata')?.addEventListener('click',closeDocumentEditor);
+    $('#closeDocumentMetadata')?.addEventListener('click',closeDocumentEditor);
     $('#runDocumentSearch')?.addEventListener('click',()=>searchDocuments(true));
     $('#clearDocumentSearch')?.addEventListener('click',()=>{$('#documentSearchText').value='';$('#documentSearchCategory').value='';searchDocuments(true);});
     $('#documentSearchText')?.addEventListener('keydown',event=>{if(event.key==='Enter')searchDocuments(true);});
@@ -1969,6 +1977,40 @@
     $('#attachmentList').querySelectorAll('[data-download-attachment]').forEach(button=>button.addEventListener('click',async()=>{const file=files.find(item=>item.id===button.dataset.downloadAttachment);if(!file)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(file.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),file.filename);}));
     $('#attachmentList').querySelectorAll('[data-delete-attachment]').forEach(button=>button.addEventListener('click',async()=>{const file=files.find(item=>item.id===button.dataset.deleteAttachment);if(!file||!window.confirm('Eliminare definitivamente "'+file.filename+'"?'))return;try{await apiRequest('/api/attachments/delete',{method:'POST',body:JSON.stringify({id:file.id})});await refreshTransactionAttachments();void refreshAttachmentCounts();}catch(error){showNotice('Eliminazione non riuscita',error.message||String(error));}}));
   }
+  function openDocumentMetadataEditor(item,origin='archive',pending=false) {
+    if(!item?.id)return;
+    editingDocumentId=item.id;
+    editingDocumentOrigin=origin;
+    $('#editDocumentSupplier').value=item.supplier||'';
+    $('#editDocumentAmount').value=item.amount||'';
+    const rawDate=String(item.document_date||'');
+    const dmy=rawDate.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    $('#editDocumentDate').value=dmy?(String(dmy[3].length===2?(Number(dmy[3])<70?'20':'19')+dmy[3]:dmy[3])+'-'+String(dmy[2]).padStart(2,'0')+'-'+String(dmy[1]).padStart(2,'0')):parseDate(rawDate);
+    $('#editDocumentNumber').value=item.document_number||'';
+    editingDocumentOriginal={supplier:$('#editDocumentSupplier').value,amount:$('#editDocumentAmount').value,
+      document_date:$('#editDocumentDate').value,document_number:$('#editDocumentNumber').value};
+    $('#documentMetadataTitle').textContent=origin==='movement'?'Controlla i dati dell’allegato':'Correggi dati documento';
+    $('#documentMetadataIntro').textContent=pending
+      ?'Il riconoscimento è ancora in corso o non è riuscito. Puoi inserire o correggere i dati qui; le modifiche manuali saranno conservate.'
+      :origin==='movement'
+        ?'Il riconoscimento OCR è terminato. Controlla i dati dell’allegato e correggi quelli non corretti prima di chiudere.'
+        :'I campi e le descrizioni corrispondono a quelli dell’Archivio documenti. Le correzioni manuali saranno mantenute anche dopo successive scansioni.';
+    $('#saveDocumentMetadata').textContent=origin==='movement'?'Conferma dati':'Salva correzioni';
+    $('#documentMetadataModal').classList.remove('hidden');
+    $('#editDocumentSupplier').focus();
+  }
+  async function waitForDocumentOcr(attachmentId,filename) {
+    const deadline=Date.now()+120000;
+    let latest=null;
+    while(Date.now()<deadline){
+      const result=await apiRequest('/api/documents/search?id='+encodeURIComponent(attachmentId));
+      latest=(result.items||[]).find(item=>item.id===attachmentId)||latest;
+      if(latest&&['done','failed'].includes(latest.ocr_status))return {item:latest,pending:false};
+      $('#attachmentLimitHint').textContent='Allegato caricato. Riconoscimento OCR in corso…';
+      await new Promise(resolve=>setTimeout(resolve,800));
+    }
+    return {item:latest||{id:attachmentId,filename},pending:true};
+  }
   async function uploadTransactionAttachment(file) {
     if(!file||!activeAttachmentTransactionId)return;
     if(file.size>5*1024*1024){showNotice('File troppo grande','Il singolo allegato non può superare 5 MB.');return;}
@@ -1978,10 +2020,14 @@
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Caricamento non riuscito.');
       await refreshTransactionAttachments();
       void refreshAttachmentCounts();
+      $('#attachmentLimitHint').textContent='Allegato caricato. Attendo il riconoscimento dei dati…';
+      const result=await waitForDocumentOcr(data.id,data.filename);
+      await refreshTransactionAttachments();
+      openDocumentMetadataEditor(result.item,'movement',result.pending||result.item?.ocr_status==='failed');
       if(data.storage_warning)showNotice('Archivio documenti oltre 100 MB','È stato raggiunto il livello di avviso. Puoi continuare a caricare documenti.');
     }catch(error){showNotice('Caricamento non riuscito',error.message||String(error));}
   }
-  async function searchDocuments(resetPage = false) {
+    async function searchDocuments(resetPage = false) {
     if(resetPage)documentSearchOffset=0;
     const term=$('#documentSearchText').value.trim(),category=$('#documentSearchCategory').value;
     const params=new URLSearchParams();if(term)params.set('q',term);if(category)params.set('category',category);params.set('offset',String(documentSearchOffset));
@@ -1996,18 +2042,7 @@
       $('#documentStorageWarning').classList.toggle('hidden',!result.warning);
       $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-edit="'+safeText(item.id)+'">Modifica</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="8" class="empty-state">Nessun documento trovato.</td></tr>';
       $('#documentsBody').querySelectorAll('[data-doc-edit]').forEach(button=>button.addEventListener('click',()=>{
-        const item=items.find(x=>x.id===button.dataset.docEdit);if(!item)return;
-        editingDocumentId=item.id;
-        $('#editDocumentSupplier').value=item.supplier||'';
-        $('#editDocumentAmount').value=item.amount||'';
-        const rawDate=String(item.document_date||'');
-        const dmy=rawDate.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
-        $('#editDocumentDate').value=dmy?(String(dmy[3].length===2?(Number(dmy[3])<70?'20':'19')+dmy[3]:dmy[3])+'-'+String(dmy[2]).padStart(2,'0')+'-'+String(dmy[1]).padStart(2,'0')):parseDate(rawDate);
-        $('#editDocumentNumber').value=item.document_number||'';
-        editingDocumentOriginal={supplier:$('#editDocumentSupplier').value,amount:$('#editDocumentAmount').value,
-          document_date:$('#editDocumentDate').value,document_number:$('#editDocumentNumber').value};
-        $('#documentMetadataModal').classList.remove('hidden');
-        $('#editDocumentSupplier').focus();
+        const item=items.find(x=>x.id===button.dataset.docEdit);if(item)openDocumentMetadataEditor(item,'archive');
       }));
       $('#documentsBody').querySelectorAll('[data-doc-download]').forEach(button=>button.addEventListener('click',async()=>{const item=items.find(x=>x.id===button.dataset.docDownload);if(!item)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(item.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),item.filename);}));
       $('#documentsBody').querySelectorAll('[data-doc-open]').forEach(button=>button.addEventListener('click',()=>{const item=items.find(x=>x.id===button.dataset.docOpen);if(!item)return;const preview=window.open('/api/attachments/download?id='+encodeURIComponent(item.id)+'&inline=1','_blank');if(preview)preview.opener=null;else showNotice('Anteprima bloccata','Consenti le finestre a comparsa per aprire il documento.');}));
