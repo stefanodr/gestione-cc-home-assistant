@@ -67,6 +67,9 @@ def init_db():
         reindex_documents = "document_number" not in document_columns
         if reindex_documents:
             c.execute("ALTER TABLE document_index ADD COLUMN document_number TEXT")
+        for column in ("supplier_manual", "document_date_manual", "document_number_manual", "amount_manual"):
+            if column not in document_columns:
+                c.execute(f"ALTER TABLE document_index ADD COLUMN {column} INTEGER NOT NULL DEFAULT 0")
         c.execute("CREATE INDEX IF NOT EXISTS idx_document_category ON document_index(category,document_date)")
         try: c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(attachment_id UNINDEXED, filename, category, extracted_text, supplier, document_date, amount, fiscal_code, tax_code)")
         except sqlite3.OperationalError: pass
@@ -431,7 +434,11 @@ def process_document_ocr(attachment_id):
             return {"skipped": True, "reason": "attachment_deleted"}
         connection.execute("""INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,document_number,amount,fiscal_code,tax_code,updated_at,error)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL) ON CONFLICT(attachment_id) DO UPDATE SET status=excluded.status,category=excluded.category,
-            extracted_text=excluded.extracted_text,supplier=excluded.supplier,document_date=excluded.document_date,document_number=excluded.document_number,amount=excluded.amount,
+            extracted_text=excluded.extracted_text,
+            supplier=CASE WHEN document_index.supplier_manual=1 THEN document_index.supplier ELSE excluded.supplier END,
+            document_date=CASE WHEN document_index.document_date_manual=1 THEN document_index.document_date ELSE excluded.document_date END,
+            document_number=CASE WHEN document_index.document_number_manual=1 THEN document_index.document_number ELSE excluded.document_number END,
+            amount=CASE WHEN document_index.amount_manual=1 THEN document_index.amount ELSE excluded.amount END,
             fiscal_code=excluded.fiscal_code,tax_code=excluded.tax_code,updated_at=excluded.updated_at,error=NULL""",
             (attachment_id,"done",category,text,metadata["supplier"],metadata["document_date"],metadata["document_number"],metadata["amount"],metadata["fiscal_code"],metadata["tax_code"],now))
         try:
@@ -996,6 +1003,32 @@ class Handler(BaseHTTPRequestHandler):
                     connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)", (attachment_id,row["filename"],category,row["extracted_text"] or "",row["supplier"] or "",row["document_date"] or "",row["amount"] or "",row["fiscal_code"] or "",row["tax_code"] or ""))
                 except sqlite3.OperationalError: pass
                 connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)", (time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),row["transaction_id"],"attachment_category_changed",json.dumps({"attachment":{"id":attachment_id,"filename":row["filename"],"category":category}},ensure_ascii=False)))
+            self.send_json(200, {"ok":True})
+            return
+        if path == "/api/documents/metadata":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            attachment_id = str(payload.get("id", ""))[:160]
+            fields = {
+                "supplier": (str(payload.get("supplier", "")).strip()[:160] or None, "supplier_manual"),
+                "amount": (str(payload.get("amount", "")).strip()[:40] or None, "amount_manual"),
+                "document_date": (str(payload.get("document_date", "")).strip()[:32] or None, "document_date_manual"),
+                "document_number": (str(payload.get("document_number", "")).strip()[:80] or None, "document_number_manual"),
+            }
+            date_value = fields["document_date"][0]
+            if date_value and not re.fullmatch(r"(?:\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4})", date_value):
+                self.send_json(400, {"error":"Formato data non valido. Usa GG/MM/AAAA oppure AAAA-MM-GG."}); return
+            with db() as connection:
+                row = connection.execute("SELECT transaction_id,filename FROM attachments WHERE id=?", (attachment_id,)).fetchone()
+                if not row:
+                    self.send_json(404, {"error":"Documento non trovato."}); return
+                assignments = ["supplier=?", "amount=?", "document_date=?", "document_number=?",
+                    "supplier_manual=1", "amount_manual=1", "document_date_manual=1", "document_number_manual=1", "updated_at=?"]
+                values = [fields["supplier"][0], fields["amount"][0], fields["document_date"][0], fields["document_number"][0], time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), attachment_id]
+                connection.execute("UPDATE document_index SET " + ",".join(assignments) + " WHERE attachment_id=?", values)
+                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                    (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_metadata_corrected",
+                     json.dumps({"attachment_id":attachment_id,"filename":row["filename"],"fields":{k:v[0] for k,v in fields.items()}}, ensure_ascii=False)))
             self.send_json(200, {"ok":True})
             return
         if path == "/api/attachments/delete":
