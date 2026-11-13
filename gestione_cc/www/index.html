@@ -115,12 +115,19 @@
       </section>
       <section class="content-view" id="view-documents">
         <div class="page-heading"><div><p class="eyebrow">DOCUMENTI E ALLEGATI</p><h1>Archivio documenti</h1><p class="subtitle">Cerca nei nomi dei file e nel testo estratto da PDF e immagini. I dati riconosciuti automaticamente possono richiedere una verifica.</p></div></div>
-        <article class="panel" style="padding:18px;margin-bottom:15px">
-          <div class="manual-fields">
-            <label>Testo, fornitore, CF o codice tributo<input id="documentSearchText" type="search" placeholder="Es. Enel, F24, codice fiscale…"></label>
-            <label>Categoria<select id="documentSearchCategory"><option value="">Tutte le categorie</option><option value="fattura">Fattura</option><option value="f24">F24</option><option value="bollettino">Bollettino</option><option value="contabile">Contabile</option><option value="estratto_conto">Estratto conto</option><option value="documento">Documento</option><option value="altro">Altro</option></select></label>
+        <article class="panel documents-tools-panel">
+          <div class="documents-filter-layout">
+            <div class="documents-filter-fields">
+              <label>Testo, fornitore, CF o codice tributo<input id="documentSearchText" type="search" placeholder="Es. Enel, F24, codice fiscale…"></label>
+              <label>Categoria<select id="documentSearchCategory"><option value="">Tutte</option><option value="fattura">Fattura</option><option value="f24">F24</option><option value="bollettino">Bollettino</option><option value="contabile">Contabile</option><option value="estratto_conto">Estratto conto</option><option value="documento">Documento</option><option value="altro">Altro</option></select></label>
+              <div class="documents-filter-actions"><button class="button button-primary" id="runDocumentSearch">Cerca documenti</button><button class="button button-outline" id="clearDocumentSearch">Azzera</button></div>
+            </div>
+            <aside class="document-storage-card" aria-label="Spazio occupato dall'archivio documenti">
+              <div class="document-storage-heading"><strong>Spazio allegati</strong><span id="documentStorageCapacity">0 / 100 MB</span></div>
+              <div class="document-storage-visual"><div id="documentStorageDonut" class="document-storage-donut" role="img" aria-label="Utilizzo dello spazio documenti"></div><div id="documentStorageLegend" class="document-storage-legend"><span class="document-storage-empty">Caricamento…</span></div></div>
+            </aside>
           </div>
-          <div class="heading-actions" style="margin-top:12px"><button class="button button-primary" id="runDocumentSearch">Cerca documenti</button><button class="button button-outline" id="clearDocumentSearch">Azzera</button></div>
+          <div class="documents-upload-row"><div><strong>Documento non collegato a un movimento</strong><small>Carica qui fatture, estratti conto, contabili o altri documenti autonomi.</small></div><button class="button button-primary" id="uploadStandaloneDocument" type="button">＋ Carica documento</button><input id="standaloneDocumentPicker" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" hidden></div>
         </article>
         <p id="documentStorageWarning" class="inline-note hidden">ⓘ L'archivio documenti ha raggiunto 100 MB. È un avviso: puoi continuare a caricare allegati.</p>
         <article class="panel table-panel"><div class="panel-heading" style="padding:16px 18px"><h2 id="documentResultCount">Caricamento archivio…</h2><span class="panel-subtitle" id="documentStorageTotal"></span></div><div class="table-scroll"><table class="data-table"><thead><tr><th>Documento</th><th>Categoria</th><th>Fornitore / ente</th><th>Importo rilevato</th><th>Data documento</th><th>Numero documento</th><th>Stato OCR</th><th></th></tr></thead><tbody id="documentsBody"></tbody></table></div></article>
