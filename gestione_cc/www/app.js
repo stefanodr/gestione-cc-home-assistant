@@ -797,7 +797,7 @@
         series.forEach((item,j)=>{
           const value=Number(item.value(row))||0,py=y(value),barY=Math.min(py,zero),barH=Math.max(1,Math.abs(zero-py)),x=start+j*(groupW/series.length)+Math.max(0,(groupW/series.length-barW)/2);
           parts.push('<rect x="'+x+'" y="'+barY+'" width="'+barW+'" height="'+barH+'" rx="2" fill="'+item.color+'"/>');
-          if(rows.length<=14){const label=reportShortNumber.format(value);parts.push('<text x="'+(x+barW/2)+'" y="'+(value>=0?Math.max(11,barY-4):Math.min(height-24,barY+barH+11))+'" text-anchor="middle" font-size="8" fill="#40534e">'+xmlEscape(label)+'</text>');}
+          if(rows.length<=14&&series.length<=3){const label=reportShortNumber.format(value);parts.push('<text x="'+(x+barW/2)+'" y="'+(value>=0?Math.max(11,barY-4):Math.min(height-24,barY+barH+11))+'" text-anchor="middle" font-size="8" fill="#40534e">'+xmlEscape(label)+'</text>');}
         });
         parts.push('<text x="'+cx+'" y="'+(height-45)+'" text-anchor="end" transform="rotate(-35 '+cx+' '+(height-45)+')" font-size="9" fill="#40534e">'+xmlEscape(labelFn(row))+'</text>');
       });
