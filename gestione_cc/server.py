@@ -64,13 +64,23 @@ def init_db():
         c.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
         c.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, document_number TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
         document_columns = {row["name"] for row in c.execute("PRAGMA table_info(document_index)")}
-        if "document_number" not in document_columns:
+        reindex_documents = "document_number" not in document_columns
+        if reindex_documents:
             c.execute("ALTER TABLE document_index ADD COLUMN document_number TEXT")
         c.execute("CREATE INDEX IF NOT EXISTS idx_document_category ON document_index(category,document_date)")
         try: c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(attachment_id UNINDEXED, filename, category, extracted_text, supplier, document_date, amount, fiscal_code, tax_code)")
         except sqlite3.OperationalError: pass
         c.execute("CREATE TABLE IF NOT EXISTS background_jobs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result_json TEXT, error TEXT)")
         c.execute("UPDATE background_jobs SET status='queued', updated_at=datetime('now') WHERE status='running'")
+        if reindex_documents:
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            for attachment in c.execute("SELECT id FROM attachments").fetchall():
+                attachment_id = str(attachment["id"])
+                c.execute("INSERT OR IGNORE INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',?)", (attachment_id, now))
+                c.execute("UPDATE document_index SET status='queued',error=NULL,updated_at=? WHERE attachment_id=?", (now, attachment_id))
+                job_id = secrets.token_urlsafe(24)
+                c.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at,result_json) VALUES(?, 'document_ocr', 'queued', ?, ?, ?)",
+                          (job_id, now, now, json.dumps({"attachment_id": attachment_id})))
         # Backfill attachments created by versions before the OCR index existed.
         for attachment in c.execute("SELECT a.id FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id WHERE d.attachment_id IS NULL").fetchall():
             attachment_id = str(attachment["id"])
@@ -312,9 +322,20 @@ def ensure_transaction_feature_tables():
         connection.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
         connection.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, document_number TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
         document_columns = {row["name"] for row in connection.execute("PRAGMA table_info(document_index)")}
-        if "document_number" not in document_columns:
+        reindex_documents = "document_number" not in document_columns
+        if reindex_documents:
             connection.execute("ALTER TABLE document_index ADD COLUMN document_number TEXT")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_document_category ON document_index(category,document_date)")
+        connection.execute("CREATE TABLE IF NOT EXISTS background_jobs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result_json TEXT, error TEXT)")
+        if reindex_documents:
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            for attachment in connection.execute("SELECT id FROM attachments").fetchall():
+                attachment_id = str(attachment["id"])
+                connection.execute("INSERT OR IGNORE INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',?)", (attachment_id, now))
+                connection.execute("UPDATE document_index SET status='queued',error=NULL,updated_at=? WHERE attachment_id=?", (now, attachment_id))
+                job_id = secrets.token_urlsafe(24)
+                connection.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at,result_json) VALUES(?, 'document_ocr', 'queued', ?, ?, ?)",
+                                   (job_id, now, now, json.dumps({"attachment_id": attachment_id})))
         try: connection.execute("CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(attachment_id UNINDEXED, filename, category, extracted_text, supplier, document_date, amount, fiscal_code, tax_code)")
         except sqlite3.OperationalError: pass
 
