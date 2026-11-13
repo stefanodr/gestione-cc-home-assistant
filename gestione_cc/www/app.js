@@ -524,7 +524,7 @@
       catch (error) { console.error('Operazione di conferma non completata', error); closeModals(); showNotice('Operazione non completata', error?.message || String(error) || 'Errore inatteso dopo la conferma.'); }
     });
     $('#confirmExclude')?.addEventListener('click', async () => { const fn=confirmCallback; closeModals(); if(!fn)return; showNotice('Operazione in corso','Attendi il completamento.'); try{await fn(false);}catch(error){showNotice('Operazione non completata',error.message||String(error));} });
-    $('.nav-item').forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
+    $$('.nav-item').forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
     $('#closeAttachmentsModal')?.addEventListener('click',()=>$('#attachmentsModal').classList.add('hidden'));
     $('#doneAttachmentsModal')?.addEventListener('click',()=>$('#attachmentsModal').classList.add('hidden'));
     $('#uploadAttachmentButton')?.addEventListener('click',()=>$('#attachmentFilePicker').click());
