@@ -1,3 +1,7 @@
+## [1.0.22] - 2026-11-13
+
+- Corretto l'editor di suddivisione dei movimenti: i selettori multipli ora restituiscono correttamente una raccolta di elementi, evitando l'errore JavaScript `forEach is not a function` quando si apre la finestra.
+
 ## [1.0.21] - 2026-11-13
 
 - Aggiunta l'anteprima inline dei PDF e delle immagini nell'Archivio documenti, senza passare dal download.
