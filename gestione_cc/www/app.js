@@ -1802,7 +1802,16 @@
       $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.ocr_status||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-state">Nessun documento trovato.</td></tr>';
       $('#documentsBody').querySelectorAll('[data-doc-download]').forEach(button=>button.addEventListener('click',async()=>{const item=items.find(x=>x.id===button.dataset.docDownload);if(!item)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(item.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),item.filename);}));
       $('#documentsBody').querySelectorAll('[data-document-category]').forEach(select=>select.addEventListener('change',async()=>{try{await apiRequest('/api/documents/update',{method:'POST',body:JSON.stringify({id:select.dataset.documentCategory,category:select.value})});}catch(error){showNotice('Categoria non aggiornata',error.message||String(error));}}));
-      $('#documentsBody').querySelectorAll('[data-doc-transaction]').forEach(button=>button.addEventListener('click',()=>{navigate('transactions');const target=$('[data-attachments-tx="'+CSS.escape(button.dataset.docTransaction)+'"]');target?.closest('tr')?.scrollIntoView({behavior:'smooth',block:'center'});target?.closest('tr')?.classList.add('document-row-highlight');}));
+      $('#documentsBody').querySelectorAll('[data-doc-transaction]').forEach(button=>button.addEventListener('click',()=>{
+        const txId=button.dataset.docTransaction;
+        const ordered=filteredTransactions();
+        const index=ordered.findIndex(tx=>tx.id===txId);
+        if(index>=0)transactionPage=Math.floor(index/100);
+        navigate('transactions');
+        const target=$('[data-attachments-tx="'+CSS.escape(txId)+'"]');
+        target?.closest('tr')?.scrollIntoView({behavior:'smooth',block:'center'});
+        target?.closest('tr')?.classList.add('document-row-highlight');
+      }));
     }catch(error){$('#documentResultCount').textContent='Archivio non disponibile';showNotice('Ricerca documenti non riuscita',error.message||String(error));}
   }
   async function showTransactionHistory(id) {
