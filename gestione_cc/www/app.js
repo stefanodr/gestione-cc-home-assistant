@@ -2943,7 +2943,7 @@
     downloadXlsx('Estratto-conto-' + ctx.monthKey + '.xlsx', [{
       name: 'Estratto conto', rows, titleRow: 0, headerRow: 5,
       summaryRows: [summaryStart, summaryStart + 1, summaryStart + 2, summaryStart + 3],
-      currencyColumns: [3, 4, 5], dateColumns: [0],
+      currencyColumns: [1, 3, 4, 5], dateColumns: [0],
       widths: [15, 42, 38, 18, 18, 21, 42, 16],
       autoFilter: true, autoFilterEndRow: 6 + ctx.rows.length,
       rowHeights: { 0: 26, 5: 30 }
