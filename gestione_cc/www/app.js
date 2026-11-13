@@ -19,6 +19,7 @@
   let resizeTimer;
   let editingRecurringId = null;
   let editingDocumentId = null;
+  let editingDocumentOriginal = null;
 
   const $ = (selector, parent = document) => parent.querySelector(selector);
   const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
@@ -536,12 +537,14 @@
       if(!editingDocumentId)return;
       const payload={id:editingDocumentId,supplier:$('#editDocumentSupplier').value,amount:$('#editDocumentAmount').value,
         document_date:$('#editDocumentDate').value,document_number:$('#editDocumentNumber').value};
+      payload.manual_fields=Object.keys(editingDocumentOriginal||{}).filter(key=>payload[key]!==editingDocumentOriginal[key]);
+      if(!payload.manual_fields.length){$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;return;}
       try{await apiRequest('/api/documents/metadata',{method:'POST',body:JSON.stringify(payload)});
-        $('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;await searchDocuments();
+        $('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;await searchDocuments();
         showNotice('Documento aggiornato','Le correzioni manuali sono state salvate e saranno mantenute anche dopo una nuova scansione OCR.');
       }catch(error){showNotice('Modifica non salvata',error.message||String(error));}
     });
-    $('#cancelDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;});
+    $('#cancelDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;});
     $('#closeDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;});
     $('#runDocumentSearch')?.addEventListener('click',()=>searchDocuments(true));
     $('#clearDocumentSearch')?.addEventListener('click',()=>{$('#documentSearchText').value='';$('#documentSearchCategory').value='';searchDocuments(true);});
@@ -1987,6 +1990,8 @@
         const dmy=rawDate.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
         $('#editDocumentDate').value=dmy?(String(dmy[3].length===2?(Number(dmy[3])<70?'20':'19')+dmy[3]:dmy[3])+'-'+String(dmy[2]).padStart(2,'0')+'-'+String(dmy[1]).padStart(2,'0')):parseDate(rawDate);
         $('#editDocumentNumber').value=item.document_number||'';
+        editingDocumentOriginal={supplier:$('#editDocumentSupplier').value,amount:$('#editDocumentAmount').value,
+          document_date:$('#editDocumentDate').value,document_number:$('#editDocumentNumber').value};
         $('#documentMetadataModal').classList.remove('hidden');
         $('#editDocumentSupplier').focus();
       }));
