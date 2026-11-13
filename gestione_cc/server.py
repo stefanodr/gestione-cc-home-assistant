@@ -1032,7 +1032,7 @@ class Handler(BaseHTTPRequestHandler):
                 "document_number": (str(payload.get("document_number", "")).strip()[:80] or None, "document_number_manual"),
             }
             manual_fields = payload.get("manual_fields", list(fields.keys()))
-            if not isinstance(manual_fields, list) or not manual_fields or any(name not in fields for name in manual_fields):
+            if not isinstance(manual_fields, list) or not manual_fields or any(not isinstance(name, str) or name not in fields for name in manual_fields):
                 self.send_json(400, {"error":"Elenco dei campi da correggere non valido."}); return
             manual_fields = list(dict.fromkeys(manual_fields))
             date_value = fields["document_date"][0]
@@ -1056,6 +1056,12 @@ class Handler(BaseHTTPRequestHandler):
                 assignments.append("updated_at=?")
                 values.extend([time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), attachment_id])
                 connection.execute("UPDATE document_index SET " + ",".join(assignments) + " WHERE attachment_id=?", values)
+                try:
+                    indexed = connection.execute("SELECT category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code FROM document_index WHERE attachment_id=?", (attachment_id,)).fetchone()
+                    connection.execute("DELETE FROM document_fts WHERE attachment_id=?", (attachment_id,))
+                    connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",
+                        (attachment_id,row["filename"],indexed["category"],indexed["extracted_text"] or "",indexed["supplier"] or "",indexed["document_date"] or "",indexed["amount"] or "",indexed["fiscal_code"] or "",indexed["tax_code"] or ""))
+                except sqlite3.OperationalError: pass
                 connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
                     (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_metadata_corrected",
                      json.dumps({"attachment_id":attachment_id,"filename":row["filename"],"fields":audit_fields}, ensure_ascii=False)))
