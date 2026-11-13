@@ -781,15 +781,24 @@
     const counterpartYearRows=[['Anno','Contropartita','Entrate','Uscite','Saldo netto'],...data.counterpartYears.map(v=>[v.year,v.label,v.income,v.expense,v.net])];
     const transactions=[['Data','Descrizione','Conto corrente','Contropartita','Importo','Stato'],...data.rows.map(({tx,allocation})=>[tx.date,transactionDescription(tx)||transactionCausale(tx)||'Movimento',accountLabel(tx.bankAccountId),allocation.labels.join(' · ')||accountLabel(tx.counterpartAccountId),allocation.amount,tx.status==='confirmed'?'Confermato':'Da classificare'])];
     const summary=[['GESTIONE C/C · RICERCA AVANZATA'],['Dal',filters.from||'—'],['Al',filters.to||'—'],['Movimenti',data.rows.length],['Entrate',data.income],['Uscite',data.expense],['Saldo netto',data.net]];
+    const topCounterparts=[...new Set(data.counterparts.map(v=>v.label))].map(label=>({label,total:data.counterparts.filter(v=>v.label===label).reduce((sum,v)=>sum+v.income+v.expense,0)})).sort((a,b)=>b.total-a.total).slice(0,6).map(v=>v.label);
+    const monthlyPivot=[['Mese',...topCounterparts],...data.months.map(([month])=>[month,...topCounterparts.map(label=>data.counterparts.find(v=>v.month===month&&v.label===label)?.net||0)])];
+    const annualPivot=[['Anno',...topCounterparts],...data.years.map(([year])=>[year,...topCounterparts.map(label=>data.counterpartYears.find(v=>v.year===year&&v.label===label)?.net||0)])];
+    const counterpartSeries=topCounterparts.map((label,index)=>({sheet:'Trend contropartite',col:index+1,nameCol:index+1}));
+    const counterpartAnnualSeries=topCounterparts.map((label,index)=>({sheet:'Trend contropartite anno',col:index+1,nameCol:index+1}));
     const charts=[{title:'Entrate e uscite per mese',categorySheet:'Andamento mensile',categoryCol:0,firstDataRow:2,lastDataRow:months.length,series:[{sheet:'Andamento mensile',col:1,nameCol:1},{sheet:'Andamento mensile',col:2,nameCol:2}],startCol:0,startRow:1,endCol:14,endRow:18}];
+    if(topCounterparts.length) charts.push({title:'Andamento mensile per contropartita · saldo netto',categorySheet:'Trend contropartite',categoryCol:0,firstDataRow:2,lastDataRow:monthlyPivot.length,series:counterpartSeries,startCol:16,startRow:1,endCol:31,endRow:18});
     if(years.length>2) charts.push({title:'Entrate e uscite per anno',categorySheet:'Andamento annuale',categoryCol:0,firstDataRow:2,lastDataRow:years.length,series:[{sheet:'Andamento annuale',col:1,nameCol:1},{sheet:'Andamento annuale',col:2,nameCol:2}],startCol:0,startRow:20,endCol:14,endRow:37});
+    const annualCharts=topCounterparts.length?[{title:'Andamento annuale per contropartita · saldo netto',categorySheet:'Trend contropartite anno',categoryCol:0,firstDataRow:2,lastDataRow:annualPivot.length,series:counterpartAnnualSeries,startCol:16,startRow:1,endCol:31,endRow:18}]:[];
     downloadXlsx('Ricerca-avanzata.xlsx',[
       {name:'Riepilogo',rows:summary,titleRow:0,headerRow:0,currencyColumns:[1]},
       {name:'Movimenti',rows:transactions,dateColumns:[0],currencyColumns:[4]},
       {name:'Andamento mensile',rows:months,currencyColumns:[1,2,3],charts},
-      {name:'Andamento annuale',rows:years,currencyColumns:[1,2,3]},
+      {name:'Andamento annuale',rows:years,currencyColumns:[1,2,3],charts:annualCharts},
       {name:'Contropartite',rows:counterpartRows,dateColumns:[0],currencyColumns:[2,3,4]},
-      {name:'Contropartite anno',rows:counterpartYearRows,currencyColumns:[2,3,4]}
+      {name:'Contropartite anno',rows:counterpartYearRows,currencyColumns:[2,3,4]},
+      {name:'Trend contropartite',rows:monthlyPivot,currencyColumns:topCounterparts.map((_,i)=>i+1)},
+      {name:'Trend contropartite anno',rows:annualPivot,currencyColumns:topCounterparts.map((_,i)=>i+1)}
     ]);
   }
   function setupFinanceViews() {
