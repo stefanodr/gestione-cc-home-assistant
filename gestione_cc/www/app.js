@@ -1818,7 +1818,8 @@
         $('#transactionCounterpartFilter').value='all';
         const ordered=filteredTransactions();
         const index=ordered.findIndex(tx=>tx.id===txId);
-        if(index>=0)transactionPage=Math.floor(index/100);
+        if(index<0){showNotice('Movimento non disponibile','Il documento è conservato nell’Archivio documenti, ma il movimento originale non è più presente nel registro.');return;}
+        transactionPage=Math.floor(index/100);
         navigate('transactions');
         const target=$('[data-attachments-tx="'+CSS.escape(txId)+'"]');
         target?.closest('tr')?.scrollIntoView({behavior:'smooth',block:'center'});
