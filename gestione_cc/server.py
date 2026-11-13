@@ -67,6 +67,9 @@ def init_db():
         reindex_documents = "document_number" not in document_columns
         if reindex_documents:
             c.execute("ALTER TABLE document_index ADD COLUMN document_number TEXT")
+        for column in ("supplier_manual", "document_date_manual", "document_number_manual", "amount_manual"):
+            if column not in document_columns:
+                c.execute(f"ALTER TABLE document_index ADD COLUMN {column} INTEGER NOT NULL DEFAULT 0")
         c.execute("CREATE INDEX IF NOT EXISTS idx_document_category ON document_index(category,document_date)")
         try: c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(attachment_id UNINDEXED, filename, category, extracted_text, supplier, document_date, amount, fiscal_code, tax_code)")
         except sqlite3.OperationalError: pass
@@ -325,6 +328,9 @@ def ensure_transaction_feature_tables():
         reindex_documents = "document_number" not in document_columns
         if reindex_documents:
             connection.execute("ALTER TABLE document_index ADD COLUMN document_number TEXT")
+        for column in ("supplier_manual", "document_date_manual", "document_number_manual", "amount_manual"):
+            if column not in document_columns:
+                connection.execute(f"ALTER TABLE document_index ADD COLUMN {column} INTEGER NOT NULL DEFAULT 0")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_document_category ON document_index(category,document_date)")
         connection.execute("CREATE TABLE IF NOT EXISTS background_jobs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result_json TEXT, error TEXT)")
         if reindex_documents:
@@ -361,38 +367,50 @@ def classify_document(text, filename=""):
 def extract_document_metadata(text):
     value = str(text or "")
     lines = [re.sub(r"\s+", " ", line).strip(" |\t") for line in value.splitlines() if line.strip()]
-    date_match = re.search(r"(?i)(?:data\s+(?:documento|fattura|emissione)|emesso\s+il)\s*[:\-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})", value)
+    date_match = re.search(r"(?i)(?:data\s+(?:documento|fattura|emissione)|emesso\s+il|data\s+di\s+emissione)\s*[:\-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})", value)
     if not date_match:
         date_match = re.search(r"\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b", value)
-    number_match = re.search(r"(?i)(?:fattura|nota\s+di\s+credito|documento)\s*(?:n(?:umero)?\.?|nr\.?|#)\s*[:\-]?\s*([A-Z0-9][A-Z0-9./_-]{0,29})", value)
-    if not number_match:
-        number_match = re.search(r"(?i)(?:numero\s+documento|n\.\s*documento)\s*[:\-]?\s*([A-Z0-9][A-Z0-9./_-]{0,29})", value)
+    number_pattern = r"(?i)(?:numero\s+fattura|n(?:umero)?\.?\s*fattura|fattura\s*(?:n(?:umero)?\.?|nr\.?|n[°º]|#)|nota\s+di\s+credito\s*(?:n(?:umero)?\.?|nr\.?|#)|numero\s+documento|n\.?\s*documento|documento\s*(?:n(?:umero)?\.?|nr\.?|#))\s*[:\-]?\s*([A-Z0-9][A-Z0-9./_-]{0,39})"
+    number_match = re.search(number_pattern, value)
     fiscal_match = re.search(r"\b[A-Z]{6}[A-Z0-9]{2}[A-Z][A-Z0-9]{2}[A-Z][A-Z0-9]{3}[A-Z]\b", value.upper())
     tax_match = re.search(r"(?i)cod(?:ice)?\s*tributo\s*[:\-]?\s*([A-Z0-9]{3,6})", value)
-    amount_match = re.search(r"(?i)(?:totale\s+(?:da\s+)?pagare|importo\s+totale|totale\s+documento|importo)\s*[:€ ]{0,8}([0-9.]{1,12},[0-9]{2})", value)
-    excluded = re.compile(r"fattura|codice fiscale|partita iva|pagina|cliente|cod\.?\s*cliente|numero cliente|destinatario|intestatario|documento|data |numero |iban|telefono|email|\b(?:p\.iva|c\.f\.)\b", re.I)
-    candidates = []
-    for index, line in enumerate(lines[:25]):
-        if len(line) < 4 or excluded.search(line) or re.fullmatch(r"[\d\s./:-]+", line):
-            continue
-        digits = sum(ch.isdigit() for ch in line)
-        if digits / max(1, len(line)) > 0.25:
-            continue
-        score = 0
-        if re.search(r"(?i)\b(s\.r\.l\.?|srl|s\.p\.a\.?|spa|s\.a\.s\.?|sas|s\.n\.c\.?|snc|societ[aà]|energia|servizi|assicurazioni|telecom|bank|banca)\b", line):
-            score += 5
-        if re.search(r"[A-ZÀ-Ü][a-zà-ÿ]{2,}", line):
-            score += 2
-        if index < 6:
-            score += 2
-        if len(line) <= 120:
-            score += 1
-        candidates.append((score, index, line))
-    supplier = max(candidates, default=(0, 0, None), key=lambda item: (item[0], -item[1]))[2]
+    amount_pattern = r"(?i)(?:totale\s+(?:da\s+)?pagare|importo\s+totale|totale\s+(?:del\s+)?documento|totale\s+fattura|da\s+pagare)\s*[:\-]?\s*(?:€\s*)?([0-9][0-9. ]{0,14}(?:,[0-9]{2}|\.[0-9]{2}))"
+    amount_match = re.search(amount_pattern, value)
+    supplier = None
+    supplier_labels = re.compile(r"(?i)^(?:cedente\s*/?\s*prestatore(?:\s*\([^)]*\))?|fornitore|emittente|ragione\s+sociale|mittente)\s*[:\-]?\s*(.*)$")
+    for index, line in enumerate(lines[:35]):
+        match = supplier_labels.match(line)
+        if match:
+            candidate = match.group(1).strip(" :-")
+            if len(candidate) < 3 and index + 1 < len(lines):
+                candidate = lines[index + 1]
+            if candidate and not re.search(r"(?i)partita\s+iva|codice\s+fiscale|indirizzo|cap\b|telefono|email", candidate):
+                supplier = candidate[:160]
+                break
+    if not supplier:
+        excluded = re.compile(r"fattura|codice fiscale|partita iva|pagina|cliente|cod\.?\s*cliente|numero cliente|destinatario|intestatario|documento|data |numero |iban|telefono|email|\b(?:p\.?iva|c\.?f\.?)\b|totale|importo|indirizzo|cap\b", re.I)
+        candidates = []
+        for index, line in enumerate(lines[:25]):
+            if len(line) < 4 or excluded.search(line) or re.fullmatch(r"[\d\s./:-]+", line):
+                continue
+            digits = sum(ch.isdigit() for ch in line)
+            if digits / max(1, len(line)) > 0.25:
+                continue
+            score = 0
+            if re.search(r"(?i)\b(s\.?r\.?l\.?|srl|s\.?p\.?a\.?|spa|s\.?a\.?s\.?|sas|s\.?n\.?c\.?|snc|societ[aà]|energia|servizi|assicurazioni|telecom|bank|banca)\b", line):
+                score += 5
+            if re.search(r"[A-ZÀ-Ü][a-zà-ÿ]{2,}", line):
+                score += 2
+            if index < 6:
+                score += 2
+            if len(line) <= 120:
+                score += 1
+            candidates.append((score, index, line))
+        supplier = max(candidates, default=(0, 0, None), key=lambda item: (item[0], -item[1]))[2]
     return {"supplier":supplier[:160] if supplier else None,
             "document_date":date_match.group(1) if date_match else None,
             "document_number":number_match.group(1) if number_match else None,
-            "amount":amount_match.group(1) if amount_match else None,
+            "amount":amount_match.group(1).strip() if amount_match else None,
             "fiscal_code":fiscal_match.group(0) if fiscal_match else None,
             "tax_code":tax_match.group(1).upper() if tax_match else None}
 
@@ -431,13 +449,18 @@ def process_document_ocr(attachment_id):
             return {"skipped": True, "reason": "attachment_deleted"}
         connection.execute("""INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,document_number,amount,fiscal_code,tax_code,updated_at,error)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL) ON CONFLICT(attachment_id) DO UPDATE SET status=excluded.status,category=excluded.category,
-            extracted_text=excluded.extracted_text,supplier=excluded.supplier,document_date=excluded.document_date,document_number=excluded.document_number,amount=excluded.amount,
+            extracted_text=excluded.extracted_text,
+            supplier=CASE WHEN document_index.supplier_manual=1 THEN document_index.supplier ELSE excluded.supplier END,
+            document_date=CASE WHEN document_index.document_date_manual=1 THEN document_index.document_date ELSE excluded.document_date END,
+            document_number=CASE WHEN document_index.document_number_manual=1 THEN document_index.document_number ELSE excluded.document_number END,
+            amount=CASE WHEN document_index.amount_manual=1 THEN document_index.amount ELSE excluded.amount END,
             fiscal_code=excluded.fiscal_code,tax_code=excluded.tax_code,updated_at=excluded.updated_at,error=NULL""",
             (attachment_id,"done",category,text,metadata["supplier"],metadata["document_date"],metadata["document_number"],metadata["amount"],metadata["fiscal_code"],metadata["tax_code"],now))
         try:
+            indexed = connection.execute("SELECT supplier,document_date,amount,fiscal_code,tax_code FROM document_index WHERE attachment_id=?", (attachment_id,)).fetchone()
             connection.execute("DELETE FROM document_fts WHERE attachment_id=?",(attachment_id,))
             connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",
-                (attachment_id,row["filename"],category,text,metadata["supplier"] or "",metadata["document_date"] or "",metadata["amount"] or "",metadata["fiscal_code"] or "",metadata["tax_code"] or ""))
+                (attachment_id,row["filename"],category,text,indexed["supplier"] or "",indexed["document_date"] or "",indexed["amount"] or "",indexed["fiscal_code"] or "",indexed["tax_code"] or ""))
         except sqlite3.OperationalError: pass
     return {"status":"done","category":category}
 
@@ -870,7 +893,7 @@ class Handler(BaseHTTPRequestHandler):
             attachments = [{"id":r["id"],"transaction_id":r["transaction_id"],"filename":r["filename"],"mime":r["mime"],"size":r["size"],"created_at":r["created_at"],"content":base64.b64encode(r["content"]).decode("ascii")} for r in attachment_rows]
             with db() as c:
                 history_rows = c.execute("SELECT id,at,transaction_id,event,changes_json FROM transaction_audit ORDER BY id").fetchall()
-                document_rows = c.execute("SELECT attachment_id,status,category,extracted_text,supplier,document_date,document_number,amount,fiscal_code,tax_code,updated_at,error FROM document_index").fetchall()
+                document_rows = c.execute("SELECT attachment_id,status,category,extracted_text,supplier,document_date,document_number,amount,fiscal_code,tax_code,updated_at,error,supplier_manual,document_date_manual,document_number_manual,amount_manual FROM document_index").fetchall()
             history = [{"id":r["id"],"at":r["at"],"transaction_id":r["transaction_id"],"event":r["event"],"changes":json.loads(r["changes_json"])} for r in history_rows]
             documents = [dict(r) for r in document_rows]
             payload = {"format":"conti-chiari-local-backup","version":4,"exportedAt":time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),"state":state,"attachments":attachments,"history":history,"documents":documents}
@@ -996,6 +1019,52 @@ class Handler(BaseHTTPRequestHandler):
                     connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)", (attachment_id,row["filename"],category,row["extracted_text"] or "",row["supplier"] or "",row["document_date"] or "",row["amount"] or "",row["fiscal_code"] or "",row["tax_code"] or ""))
                 except sqlite3.OperationalError: pass
                 connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)", (time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),row["transaction_id"],"attachment_category_changed",json.dumps({"attachment":{"id":attachment_id,"filename":row["filename"],"category":category}},ensure_ascii=False)))
+            self.send_json(200, {"ok":True})
+            return
+        if path == "/api/documents/metadata":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            attachment_id = str(payload.get("id", ""))[:160]
+            fields = {
+                "supplier": (str(payload.get("supplier", "")).strip()[:160] or None, "supplier_manual"),
+                "amount": (str(payload.get("amount", "")).strip()[:40] or None, "amount_manual"),
+                "document_date": (str(payload.get("document_date", "")).strip()[:32] or None, "document_date_manual"),
+                "document_number": (str(payload.get("document_number", "")).strip()[:80] or None, "document_number_manual"),
+            }
+            manual_fields = payload.get("manual_fields", list(fields.keys()))
+            if not isinstance(manual_fields, list) or not manual_fields or any(not isinstance(name, str) or name not in fields for name in manual_fields):
+                self.send_json(400, {"error":"Elenco dei campi da correggere non valido."}); return
+            manual_fields = list(dict.fromkeys(manual_fields))
+            date_value = fields["document_date"][0]
+            amount_value = fields["amount"][0]
+            if "document_date" in manual_fields and date_value and not re.fullmatch(r"(?:\d{4}-\d{2}-\d{2}|\d{1,2}[./-]\d{1,2}[./-]\d{2,4})", date_value):
+                self.send_json(400, {"error":"Formato data non valido. Usa GG/MM/AAAA oppure AAAA-MM-GG."}); return
+            if "amount" in manual_fields and amount_value and not re.fullmatch(r"-?(?:\d+|\d{1,3}(?:\.\d{3})+)(?:[,.]\d{1,2})?", amount_value):
+                self.send_json(400, {"error":"Importo non valido. Usa ad esempio 1.234,56."}); return
+            with db() as connection:
+                row = connection.execute("SELECT transaction_id,filename FROM attachments WHERE id=?", (attachment_id,)).fetchone()
+                if not row:
+                    self.send_json(404, {"error":"Documento non trovato."}); return
+                assignments = []
+                values = []
+                audit_fields = {}
+                for name in manual_fields:
+                    value, flag = fields[name]
+                    assignments.extend([name + "=?", flag + "=1"])
+                    values.append(value)
+                    audit_fields[name] = value
+                assignments.append("updated_at=?")
+                values.extend([time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), attachment_id])
+                connection.execute("UPDATE document_index SET " + ",".join(assignments) + " WHERE attachment_id=?", values)
+                try:
+                    indexed = connection.execute("SELECT category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code FROM document_index WHERE attachment_id=?", (attachment_id,)).fetchone()
+                    connection.execute("DELETE FROM document_fts WHERE attachment_id=?", (attachment_id,))
+                    connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",
+                        (attachment_id,row["filename"],indexed["category"],indexed["extracted_text"] or "",indexed["supplier"] or "",indexed["document_date"] or "",indexed["amount"] or "",indexed["fiscal_code"] or "",indexed["tax_code"] or ""))
+                except sqlite3.OperationalError: pass
+                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                    (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_metadata_corrected",
+                     json.dumps({"attachment_id":attachment_id,"filename":row["filename"],"fields":audit_fields}, ensure_ascii=False)))
             self.send_json(200, {"ok":True})
             return
         if path == "/api/attachments/delete":
@@ -1273,8 +1342,8 @@ class Handler(BaseHTTPRequestHandler):
                     attachment_id=str(document["attachment_id"]); category=str(document.get("category","altro"))
                     if category not in ("fattura","f24","bollettino","altro"): category="altro"
                     extracted=str(document.get("extracted_text",""))[:1000000]
-                    c.execute("INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,document_number,amount,fiscal_code,tax_code,updated_at,error) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                        (attachment_id,str(document.get("status","done")),category,extracted,document.get("supplier"),document.get("document_date"),document.get("document_number"),document.get("amount"),document.get("fiscal_code"),document.get("tax_code"),str(document.get("updated_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),document.get("error")))
+                    c.execute("INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,document_number,amount,fiscal_code,tax_code,updated_at,error,supplier_manual,document_date_manual,document_number_manual,amount_manual) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (attachment_id,str(document.get("status","done")),category,extracted,document.get("supplier"),document.get("document_date"),document.get("document_number"),document.get("amount"),document.get("fiscal_code"),document.get("tax_code"),str(document.get("updated_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),document.get("error"),int(bool(document.get("supplier_manual",0))),int(bool(document.get("document_date_manual",0))),int(bool(document.get("document_number_manual",0))),int(bool(document.get("amount_manual",0)))))
                     arow=c.execute("SELECT filename FROM attachments WHERE id=?",(attachment_id,)).fetchone()
                     try: c.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",(attachment_id,arow["filename"],category,extracted,document.get("supplier") or "",document.get("document_date") or "",document.get("amount") or "",document.get("fiscal_code") or "",document.get("tax_code") or ""))
                     except sqlite3.OperationalError: pass

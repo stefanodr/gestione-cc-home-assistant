@@ -1,3 +1,27 @@
+## [1.0.25] - 2026-11-13
+
+### Italiano
+- Corretto il footer: ora riporta la versione add-on 1.0.25 invece del valore statico 1.0.20.
+- Allineato verticalmente il pulsante Allegati con il relativo contatore nella tabella Movimenti.
+- Ridisegnati i grafici della Ricerca avanzata in PDF con colonne verticali, legenda, scala e valori più leggibili; riorganizzati anche gli andamenti delle contropartite.
+- Migliorata l'estrazione OCR di fornitore/ente, numero fattura/documento e importo totale, dando priorità alle etichette esplicite del documento.
+- Aggiunta la modifica manuale di fornitore/ente, importo, data e numero documento nell'Archivio documenti. Le correzioni sono persistenti e protette dalle successive scansioni OCR; viene bloccato soltanto il singolo campo effettivamente modificato.
+- Rafforzata la previsione storica: una categoria entra nella stima soltanto se presenta movimenti in almeno il 40% dei mesi osservati (minimo tre). Le spese sporadiche restano escluse, mentre gli impegni espliciti, comprese le ricorrenze annuali, continuano a essere conteggiati. Chiarita nell'interfaccia la voce del saldo riferito all'ultimo mese chiuso.
+- Aggiunta una migrazione SQLite esclusivamente additiva per i quattro indicatori di correzione manuale; mantenuta la compatibilità con i database precedenti.
+- Inclusi gli indicatori di correzione manuale nei backup JSON e nel relativo ripristino.
+- Conservati PIN, HTTPS, accesso LAN, dati contabili, allegati, certificati e configurazione di rete.
+
+### English
+- Fixed the footer so it displays add-on version 1.0.25 instead of the stale hard-coded 1.0.20 value.
+- Vertically aligned the Attachments button and its count badge in the Transactions table.
+- Redesigned Advanced Search PDF charts as vertical column charts with clearer legends, scales and value labels; reorganized counterpart trends as well.
+- Improved OCR extraction of supplier/entity, invoice/document number and total amount, prioritizing explicit document labels.
+- Added manual editing of supplier/entity, detected amount, document date and document number in the Document Archive. Manual corrections are persisted and protected from subsequent OCR scans; only fields actually changed by the user are locked.
+- Tightened historical forecasting: a category is estimated only when it has activity in at least 40% of observed months (minimum three). Sporadic expenses remain excluded, while explicitly scheduled commitments, including annual recurrences, continue to be forecast. Clarified that the opening balance refers to the latest closed month.
+- Added an additive SQLite migration for the four manual-override flags, preserving compatibility with existing databases.
+- Included manual-override flags in JSON backups and restores.
+- Preserved PIN, HTTPS, LAN-only access, accounting data, attachments, certificates and network configuration.
+
 ## [1.0.24] - 2026-11-13
 
 - Corretta anche la registrazione del pulsante Allegati nella tabella Movimenti: il codice usava il selettore singolo con `forEach`. Ora utilizza una raccolta esplicita di elementi.
