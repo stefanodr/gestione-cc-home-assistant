@@ -18,6 +18,7 @@
   let confirmCallback = null;
   let resizeTimer;
   let editingRecurringId = null;
+  let editingDocumentId = null;
 
   const $ = (selector, parent = document) => parent.querySelector(selector);
   const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
@@ -414,7 +415,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.20</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.25</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -531,6 +532,17 @@
     $('#doneAttachmentsModal')?.addEventListener('click',()=>$('#attachmentsModal').classList.add('hidden'));
     $('#uploadAttachmentButton')?.addEventListener('click',()=>$('#attachmentFilePicker').click());
     $('#attachmentFilePicker')?.addEventListener('change',async event=>{const file=event.target.files?.[0];event.target.value='';if(file)await uploadTransactionAttachment(file);});
+    $('#saveDocumentMetadata')?.addEventListener('click',async()=>{
+      if(!editingDocumentId)return;
+      const payload={id:editingDocumentId,supplier:$('#editDocumentSupplier').value,amount:$('#editDocumentAmount').value,
+        document_date:$('#editDocumentDate').value,document_number:$('#editDocumentNumber').value};
+      try{await apiRequest('/api/documents/metadata',{method:'POST',body:JSON.stringify(payload)});
+        $('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;await searchDocuments();
+        showNotice('Documento aggiornato','Le correzioni manuali sono state salvate e saranno mantenute anche dopo una nuova scansione OCR.');
+      }catch(error){showNotice('Modifica non salvata',error.message||String(error));}
+    });
+    $('#cancelDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;});
+    $('#closeDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;});
     $('#runDocumentSearch')?.addEventListener('click',()=>searchDocuments(true));
     $('#clearDocumentSearch')?.addEventListener('click',()=>{$('#documentSearchText').value='';$('#documentSearchCategory').value='';searchDocuments(true);});
     $('#documentSearchText')?.addEventListener('keydown',event=>{if(event.key==='Enter')searchDocuments(true);});
@@ -1935,7 +1947,19 @@
       $('#documentNext').disabled=documentSearchOffset+items.length>=Number(result.total_count||0);
       $('#documentStorageTotal').textContent=(Number(result.total_bytes||0)/1024/1024).toFixed(2)+' MB complessivi';
       $('#documentStorageWarning').classList.toggle('hidden',!result.warning);
-      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="8" class="empty-state">Nessun documento trovato.</td></tr>';
+      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-edit="'+safeText(item.id)+'">Modifica</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="8" class="empty-state">Nessun documento trovato.</td></tr>';
+      $('#documentsBody').querySelectorAll('[data-doc-edit]').forEach(button=>button.addEventListener('click',()=>{
+        const item=items.find(x=>x.id===button.dataset.docEdit);if(!item)return;
+        editingDocumentId=item.id;
+        $('#editDocumentSupplier').value=item.supplier||'';
+        $('#editDocumentAmount').value=item.amount||'';
+        const rawDate=String(item.document_date||'');
+        const dmy=rawDate.match(/^(\\d{1,2})[./-](\\d{1,2})[./-](\\d{2,4})$/);
+        $('#editDocumentDate').value=dmy?(String(dmy[3].length===2?(Number(dmy[3])<70?'20':'19')+dmy[3]:dmy[3])+'-'+String(dmy[2]).padStart(2,'0')+'-'+String(dmy[1]).padStart(2,'0')):parseDate(rawDate);
+        $('#editDocumentNumber').value=item.document_number||'';
+        $('#documentMetadataModal').classList.remove('hidden');
+        $('#editDocumentSupplier').focus();
+      }));
       $('#documentsBody').querySelectorAll('[data-doc-download]').forEach(button=>button.addEventListener('click',async()=>{const item=items.find(x=>x.id===button.dataset.docDownload);if(!item)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(item.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),item.filename);}));
       $('#documentsBody').querySelectorAll('[data-doc-open]').forEach(button=>button.addEventListener('click',()=>{const item=items.find(x=>x.id===button.dataset.docOpen);if(!item)return;const preview=window.open('/api/attachments/download?id='+encodeURIComponent(item.id)+'&inline=1','_blank');if(preview)preview.opener=null;else showNotice('Anteprima bloccata','Consenti le finestre a comparsa per aprire il documento.');}));
       $('#documentsBody').querySelectorAll('[data-document-category]').forEach(select=>select.addEventListener('change',async()=>{try{await apiRequest('/api/documents/update',{method:'POST',body:JSON.stringify({id:select.dataset.documentCategory,category:select.value})});}catch(error){showNotice('Categoria non aggiornata',error.message||String(error));}}));
