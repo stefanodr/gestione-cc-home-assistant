@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.12';
+  const APP_VERSION = '1.7.13';
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -411,7 +411,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.18</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.19</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -1724,7 +1724,7 @@
         : item.status === 'confirmed'
           ? `<button class="row-action row-action-review" data-edit-tx="${safeText(item.id)}">Rivedi</button> <button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Ripartisci</button>`
           : `<button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Dividi</button> <button class="row-action row-action-review" data-confirm-tx="${safeText(item.id)}">Conferma</button>`;
-      return `<tr><td class="tx-select-cell">${selectionCell}</td><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountPathAt(accountById(item.bankAccountId), item.date))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td>${actions} <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
+      return `<tr><td class="tx-select-cell">${selectionCell}</td><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountPathAt(accountById(item.bankAccountId), item.date))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td>${actions} <button class="row-action" data-attachments-tx="${safeText(item.id)}">Allegati</button> <button class="row-action" data-history-tx="${safeText(item.id)}">Storico</button> <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
     }).join('');
     $$('[data-select-tx]', body).forEach(input => input.addEventListener('change', () => {
       if (input.checked) transactionSelection.add(input.dataset.selectTx);
@@ -1748,7 +1748,32 @@
       await saveState(); renderAll();
       showNotice('Movimento eliminato', 'È stato rimosso dall’archivio locale di Gestione C/C. Il file GnuCash o bancario originale non è stato modificato.');
     }));
+    $('[data-attachments-tx]', body).forEach(btn => btn.addEventListener('click', () => manageTransactionAttachments(btn.dataset.attachmentsTx)));
+    $('[data-history-tx]', body).forEach(btn => btn.addEventListener('click', () => showTransactionHistory(btn.dataset.historyTx)));
     updateTransactionBulkUi(tx);
+  }
+  async function manageTransactionAttachments(id) {
+    const tx=state.transactions.find(item=>item.id===id);if(!tx)return;
+    try {
+      const result=await apiRequest('/api/attachments?transaction_id='+encodeURIComponent(id));
+      const files=result.items||[];const listing=files.length?files.map((f,i)=>(i+1)+'. '+f.filename+' ('+Math.round(f.size/1024)+' KB)').join('\n'):'Nessun allegato.';
+      const choice=window.prompt('Allegati · '+(tx.payee||tx.memo||'movimento')+'\n'+listing+'\n\nDigita A per aggiungere un file oppure il numero per scaricarlo.');
+      if(choice===null)return;
+      if(choice.toUpperCase()==='A'){
+        const picker=document.createElement('input');picker.type='file';picker.accept='.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';
+        picker.onchange=async()=>{const file=picker.files&&picker.files[0];if(!file)return;if(file.size>10*1024*1024){showNotice('File troppo grande','Massimo 10 MB per allegato.');return;}
+          const form=new FormData();form.append('transaction_id',id);form.append('file',file);
+          try{const response=await fetch('/api/attachments/upload',{method:'POST',body:form,headers:{'X-CSRF-Token':csrfToken},credentials:'same-origin',cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Caricamento non riuscito.');showNotice('Allegato caricato',file.name+' è stato associato al movimento.');}catch(error){showNotice('Caricamento non riuscito',error.message||String(error));}
+        };picker.click();return;
+      }
+      const index=Number(choice)-1;if(Number.isInteger(index)&&index>=0&&index<files.length){const response=await fetch('/api/attachments/download?id='+encodeURIComponent(files[index].id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),files[index].filename);}
+    }catch(error){showNotice('Allegati non disponibili',error.message||String(error));}
+  }
+  async function showTransactionHistory(id) {
+    try{const result=await apiRequest('/api/transactions/audit?transaction_id='+encodeURIComponent(id));const items=result.items||[];
+      const summary=items.map(entry=>{const changes=Object.entries(entry.changes||{}).map(([field,value])=>field+': '+JSON.stringify(value.old)+' → '+JSON.stringify(value.new)).join('\n');return new Date(entry.at).toLocaleString('it-IT')+' · '+entry.event+'\n'+changes;}).join('\n\n');
+      window.alert(items.length?summary:'Nessuna modifica storica registrata per questo movimento.');
+    }catch(error){showNotice('Storico non disponibile',error.message||String(error));}
   }
   function refreshAccountSearchOptions() {
     const list = $('#accountSearchOptions'); if (!list || !state) return;
@@ -3064,7 +3089,7 @@
       if (!Array.isArray(loaded.accounts) || !Array.isArray(loaded.transactions)) throw new Error('Il file selezionato non è un backup compatibile.');
       if (loaded.accounts.length > 10000 || loaded.transactions.length > 250000) throw new Error('Il backup supera i limiti consentiti.');
       showConfirm('Ripristinare questo backup?', `Saranno caricati ${loaded.accounts.length} conti e ${loaded.transactions.length} movimenti, sostituendo l’archivio centralizzato. Prima di continuare, assicurati di avere esportato una copia dei dati correnti.`, async () => {
-        const result = await apiRequest('/api/import', { method: 'POST', body: JSON.stringify({ format: 'conti-chiari-local-backup', state: loaded, revision: stateRevision }) });
+        const result = await apiRequest('/api/import', { method: 'POST', body: JSON.stringify({ format: 'conti-chiari-local-backup', state: loaded, attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [], revision: stateRevision }) });
         stateRevision = result.revision;
         state = loaded; normalizeState(); renderAll();
         showNotice('Backup ripristinato', `Importati ${result.accounts} conti e ${result.transactions} movimenti nel database centrale.`);
