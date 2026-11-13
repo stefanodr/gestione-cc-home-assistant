@@ -238,3 +238,11 @@ body.app-ready .app-shell{visibility:visible}
 .document-row-highlight{outline:2px solid #6bb6a8;outline-offset:-2px}
 #documentStorageWarning{color:#936b2e;background:#fff8e9;border-radius:8px;padding:10px 14px}
 @media(max-width:700px){.attachment-row{align-items:flex-start;flex-direction:column}.attachment-modal-actions{align-items:flex-start;flex-direction:column}.attachment-row-actions{width:100%}}
+
+/* Indicatore sintetico degli allegati nel registro movimenti. */
+.attachment-action-wrap{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;vertical-align:middle;gap:3px;min-width:48px}
+.attachment-count-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#e6f2ee;color:#246e60;border:1px solid #b9d8ce;font-size:9px;font-weight:750;line-height:1}
+.attachment-count-badge.hidden{display:none}
+#view-search .heading-actions{flex-wrap:wrap}
+#view-search .heading-actions .button{white-space:nowrap}
+@media print{.attachment-count-badge{print-color-adjust:exact}}
