@@ -739,8 +739,12 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Ogni allegato deve avere dimensione massima di 10 MB.")
                 allowed = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}
                 suffix = Path(filename).suffix.lower()
-                if mime not in allowed or suffix not in {allowed[mime], ".jpeg" if mime == "image/jpeg" else allowed[mime]}:
-                    raise ValueError("Sono consentiti soltanto file PDF, JPEG e PNG.")
+                valid_signature = ((mime == "application/pdf" and content.startswith(b"%PDF-")) or
+                                   (mime == "image/jpeg" and content.startswith(b"\\xff\\xd8\\xff")) or
+                                   (mime == "image/png" and content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")))
+                if (mime not in allowed or suffix not in {allowed[mime], ".jpeg" if mime == "image/jpeg" else allowed[mime]}
+                    or not valid_signature):
+                    raise ValueError("Sono consentiti soltanto file PDF, JPEG e PNG validi.")
                 filename = Path(filename).name.replace("\\", "_").replace("\r", "").replace("\n", "")[:180]
                 with db() as connection:
                     state_row = connection.execute("SELECT state_json FROM app_state WHERE id=1").fetchone()
