@@ -17,7 +17,3 @@ Add `https://github.com/stefanodr/gestione-cc-home-assistant` to **Settings → 
 ## Support
 
 Please use the [GitHub issue tracker](https://github.com/stefanodr/gestione-cc-home-assistant/issues). Never post real financial records, backups, PINs, cookies or private keys.
-
-## Version
-
-1.0.20
