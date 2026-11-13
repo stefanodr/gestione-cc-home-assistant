@@ -1757,7 +1757,7 @@
     try {
       const result=await apiRequest('/api/attachments?transaction_id='+encodeURIComponent(id));
       const files=result.items||[];const listing=files.length?files.map((f,i)=>(i+1)+'. '+f.filename+' ('+Math.round(f.size/1024)+' KB)').join('\n'):'Nessun allegato.';
-      const choice=window.prompt('Allegati · '+(tx.payee||tx.memo||'movimento')+'\n'+listing+'\n\nDigita A per aggiungere un file oppure il numero per scaricarlo.');
+      const choice=window.prompt('Allegati · '+(tx.payee||tx.memo||'movimento')+'\n'+listing+'\n\nDigita A per aggiungere, D1 per eliminare il primo allegato oppure il numero per scaricarlo.');
       if(choice===null)return;
       if(choice.toUpperCase().startsWith('D')) {
         const n=Number(choice.slice(1))-1;
