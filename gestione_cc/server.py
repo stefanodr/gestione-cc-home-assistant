@@ -363,7 +363,7 @@ def classify_document(text, filename=""):
     if re.search(r"fattura|documento commerciale|imponibile|iva\s+(?:22|10|4)\s*%", sample): return "fattura"
     if re.search(r"estratto\s+conto|lista\s+movimenti|movimenti\s+del\s+conto|saldo\s+(?:contabile|disponibile)", sample): return "estratto_conto"
     if re.search(r"contabile\s+(?:di\s+)?(?:bonifico|pagamento)|ricevuta\s+(?:di\s+)?pagamento|quietanza|disposizione\s+di\s+bonifico|bonifico\s+eseguito|pagamento\s+eseguito", sample): return "contabile"
-    if re.search(r"\bdocumento\b|documentazione|attestazione|certificato|comunicazione", sample): return "documento"
+    if re.search(r"documentazione|attestazione|certificato|comunicazione|carta\s+d'identita|documento\s+di\s+trasporto", sample): return "documento"
     return "altro"
 
 
