@@ -144,6 +144,7 @@ const forecastBuildContext = {
     bankAccountId: 'bank',
     openingBalance: 1000,
     forecastSettings: { accountIds: [] },
+    budgetSnapshots: [],
     transactions: [
       { id: 'income', status: 'confirmed', date: '2026-11-01', bankAccountId: 'bank', counterpartAccountId: 'salary', amount: 200 },
       { id: 'transfer', status: 'confirmed', date: '2026-11-02', bankAccountId: 'bank', counterpartAccountId: 'savings', amount: -100, counterpartSplits: [{ accountId: 'savings', value: 100 }] },
@@ -171,19 +172,44 @@ const buildHelpers = [
   extract('transactionIsExplicitlyRecurring', 'forecastTransactionFlow'),
   extract('forecastTransactionFlow', 'median'),
   extract('median', 'renderRecurringRules'),
+  extract('activeBudgetSnapshot', 'budgetEligibleAccounts'),
   extract('buildForecast', 'renderForecastSelection')
 ].join('\n');
 vm.runInContext(buildHelpers + '\nthis.buildForecast = buildForecast;', forecastBuildContext);
 const allForecast = forecastBuildContext.buildForecast();
-assert.equal(allForecast.currentBalance, 1150);
+assert.equal(allForecast.currentBalance, 1000);
 assert.equal(allForecast.openingBalanceUnknown.length, 1);
 forecastBuildContext.state.forecastSettings.accountIds = ['bank'];
 const bankForecast = forecastBuildContext.buildForecast();
-assert.equal(bankForecast.currentBalance, 1100);
+assert.equal(bankForecast.currentBalance, 1000);
 assert.equal(bankForecast.openingBalanceUnknown.length, 0);
 forecastBuildContext.state.forecastSettings.accountIds = ['savings'];
 const savingsForecast = forecastBuildContext.buildForecast();
-assert.equal(savingsForecast.currentBalance, 50);
+assert.equal(savingsForecast.currentBalance, 0);
 assert.equal(savingsForecast.openingBalanceUnknown.length, 1);
+
+const annualRecurrenceContext = {
+  state: {
+    transactions: [
+      { status: 'confirmed', date: '2024-10-15', bankAccountId: 'bank', counterpartAccountId: 'insurance', amount: -350, description: 'Assicurazione auto' },
+      { status: 'confirmed', date: '2025-10-15', bankAccountId: 'bank', counterpartAccountId: 'insurance', amount: -360, description: 'Assicurazione auto' }
+    ],
+    recurringRules: [],
+    recurringProposals: []
+  },
+  normalize: value => String(value || '').toLowerCase().trim(),
+  transactionDescription: tx => tx.description || '',
+  transactionCausale: tx => tx.memo || '',
+  localDateKey: date => date.toISOString().slice(0,10),
+  uid: prefix => prefix + '-test',
+  renderRecurringProposals: () => {},
+  saveState: () => {}
+};
+vm.createContext(annualRecurrenceContext);
+vm.runInContext(extract('detectRecurringProposals', 'renderRecurringProposals') + '\nthis.detect = detectRecurringProposals;', annualRecurrenceContext);
+annualRecurrenceContext.detect();
+assert.equal(annualRecurrenceContext.state.recurringProposals.length, 1);
+assert.equal(annualRecurrenceContext.state.recurringProposals[0].frequency, 'yearly');
+assert.equal(annualRecurrenceContext.state.recurringProposals[0].occurrences, 2);
 
 console.log('OK: OFX, ricorrenze, trasferimenti, budget e saldi previsionali su più conti.');

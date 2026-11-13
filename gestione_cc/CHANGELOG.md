@@ -1,3 +1,12 @@
+## [1.0.21] - 2026-11-13
+
+- Aggiunta l'anteprima inline dei PDF e delle immagini nell'Archivio documenti, senza passare dal download.
+- Migliorata l'estrazione OCR del fornitore/ente, escludendo riferimenti come numero cliente e codice cliente; aggiunti data e numero documento. La migrazione SQLite è additiva e mantiene i documenti già archiviati.
+- Aggiunto nei Movimenti un indicatore circolare con il numero degli allegati associati.
+- Aggiunte alla Ricerca avanzata le esportazioni PDF ed Excel con totali, grafici del periodo e andamento mensile e annuale delle contropartite.
+- Rivista la previsione di liquidità: saldo iniziale alla chiusura dell'ultimo mese completo, entrate e uscite effettive del mese corrente, impegni ricorrenti programmati, budget come fonte prioritaria e storico precedente solo per categorie effettivamente ricorrenti. Le categorie sporadiche senza ricorrenze programmate sono escluse.
+- Mantenuti invariati PIN, HTTPS, accesso LAN, database esistente, backup e funzioni contabili già presenti.
+
 ## 1.0.20 — 13 novembre 2026
 
 - Sostituita la gestione testuale degli allegati con una finestra dedicata per ogni movimento: il pulsante UPLOAD apre direttamente il selettore file; ogni allegato può essere scaricato o eliminato dall'elenco.

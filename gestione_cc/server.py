@@ -62,12 +62,25 @@ def init_db():
         c.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
         c.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
-        c.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, document_number TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
+        document_columns = {row["name"] for row in c.execute("PRAGMA table_info(document_index)")}
+        reindex_documents = "document_number" not in document_columns
+        if reindex_documents:
+            c.execute("ALTER TABLE document_index ADD COLUMN document_number TEXT")
         c.execute("CREATE INDEX IF NOT EXISTS idx_document_category ON document_index(category,document_date)")
         try: c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(attachment_id UNINDEXED, filename, category, extracted_text, supplier, document_date, amount, fiscal_code, tax_code)")
         except sqlite3.OperationalError: pass
         c.execute("CREATE TABLE IF NOT EXISTS background_jobs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result_json TEXT, error TEXT)")
         c.execute("UPDATE background_jobs SET status='queued', updated_at=datetime('now') WHERE status='running'")
+        if reindex_documents:
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            for attachment in c.execute("SELECT id FROM attachments").fetchall():
+                attachment_id = str(attachment["id"])
+                c.execute("INSERT OR IGNORE INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',?)", (attachment_id, now))
+                c.execute("UPDATE document_index SET status='queued',error=NULL,updated_at=? WHERE attachment_id=?", (now, attachment_id))
+                job_id = secrets.token_urlsafe(24)
+                c.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at,result_json) VALUES(?, 'document_ocr', 'queued', ?, ?, ?)",
+                          (job_id, now, now, json.dumps({"attachment_id": attachment_id})))
         # Backfill attachments created by versions before the OCR index existed.
         for attachment in c.execute("SELECT a.id FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id WHERE d.attachment_id IS NULL").fetchall():
             attachment_id = str(attachment["id"])
@@ -307,8 +320,22 @@ def ensure_transaction_feature_tables():
         connection.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
         connection.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
-        connection.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
+        connection.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, document_number TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
+        document_columns = {row["name"] for row in connection.execute("PRAGMA table_info(document_index)")}
+        reindex_documents = "document_number" not in document_columns
+        if reindex_documents:
+            connection.execute("ALTER TABLE document_index ADD COLUMN document_number TEXT")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_document_category ON document_index(category,document_date)")
+        connection.execute("CREATE TABLE IF NOT EXISTS background_jobs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result_json TEXT, error TEXT)")
+        if reindex_documents:
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            for attachment in connection.execute("SELECT id FROM attachments").fetchall():
+                attachment_id = str(attachment["id"])
+                connection.execute("INSERT OR IGNORE INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',?)", (attachment_id, now))
+                connection.execute("UPDATE document_index SET status='queued',error=NULL,updated_at=? WHERE attachment_id=?", (now, attachment_id))
+                job_id = secrets.token_urlsafe(24)
+                connection.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at,result_json) VALUES(?, 'document_ocr', 'queued', ?, ?, ?)",
+                                   (job_id, now, now, json.dumps({"attachment_id": attachment_id})))
         try: connection.execute("CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(attachment_id UNINDEXED, filename, category, extracted_text, supplier, document_date, amount, fiscal_code, tax_code)")
         except sqlite3.OperationalError: pass
 
@@ -333,16 +360,41 @@ def classify_document(text, filename=""):
 
 def extract_document_metadata(text):
     value = str(text or "")
-    date_match = re.search(r"\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b", value)
+    lines = [re.sub(r"\s+", " ", line).strip(" |\t") for line in value.splitlines() if line.strip()]
+    date_match = re.search(r"(?i)(?:data\s+(?:documento|fattura|emissione)|emesso\s+il)\s*[:\-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})", value)
+    if not date_match:
+        date_match = re.search(r"\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b", value)
+    number_match = re.search(r"(?i)(?:fattura|nota\s+di\s+credito|documento)\s*(?:n(?:umero)?\.?|nr\.?|#)\s*[:\-]?\s*([A-Z0-9][A-Z0-9./_-]{0,29})", value)
+    if not number_match:
+        number_match = re.search(r"(?i)(?:numero\s+documento|n\.\s*documento)\s*[:\-]?\s*([A-Z0-9][A-Z0-9./_-]{0,29})", value)
     fiscal_match = re.search(r"\b[A-Z]{6}[A-Z0-9]{2}[A-Z][A-Z0-9]{2}[A-Z][A-Z0-9]{3}[A-Z]\b", value.upper())
     tax_match = re.search(r"(?i)cod(?:ice)?\s*tributo\s*[:\-]?\s*([A-Z0-9]{3,6})", value)
     amount_match = re.search(r"(?i)(?:totale\s+(?:da\s+)?pagare|importo\s+totale|totale\s+documento|importo)\s*[:€ ]{0,8}([0-9.]{1,12},[0-9]{2})", value)
-    lines = [re.sub(r"\s+", " ", line).strip() for line in value.splitlines() if line.strip()]
-    supplier = next((line[:160] for line in lines[:12] if len(line)>3 and not re.search(r"fattura|codice fiscale|partita iva|pagina",line,re.I)),None)
-    return {"supplier":supplier,"document_date":date_match.group(1) if date_match else None,
-            "amount":amount_match.group(1) if amount_match else None,"fiscal_code":fiscal_match.group(0) if fiscal_match else None,
+    excluded = re.compile(r"fattura|codice fiscale|partita iva|pagina|cliente|cod\.?\s*cliente|numero cliente|destinatario|intestatario|documento|data |numero |iban|telefono|email|\b(?:p\.iva|c\.f\.)\b", re.I)
+    candidates = []
+    for index, line in enumerate(lines[:25]):
+        if len(line) < 4 or excluded.search(line) or re.fullmatch(r"[\d\s./:-]+", line):
+            continue
+        digits = sum(ch.isdigit() for ch in line)
+        if digits / max(1, len(line)) > 0.25:
+            continue
+        score = 0
+        if re.search(r"(?i)\b(s\.r\.l\.?|srl|s\.p\.a\.?|spa|s\.a\.s\.?|sas|s\.n\.c\.?|snc|societ[aà]|energia|servizi|assicurazioni|telecom|bank|banca)\b", line):
+            score += 5
+        if re.search(r"[A-ZÀ-Ü][a-zà-ÿ]{2,}", line):
+            score += 2
+        if index < 6:
+            score += 2
+        if len(line) <= 120:
+            score += 1
+        candidates.append((score, index, line))
+    supplier = max(candidates, default=(0, 0, None), key=lambda item: (item[0], -item[1]))[2]
+    return {"supplier":supplier[:160] if supplier else None,
+            "document_date":date_match.group(1) if date_match else None,
+            "document_number":number_match.group(1) if number_match else None,
+            "amount":amount_match.group(1) if amount_match else None,
+            "fiscal_code":fiscal_match.group(0) if fiscal_match else None,
             "tax_code":tax_match.group(1).upper() if tax_match else None}
-
 
 def process_document_ocr(attachment_id):
     with db() as connection:
@@ -377,11 +429,11 @@ def process_document_ocr(attachment_id):
     with db() as connection:
         if not connection.execute("SELECT 1 FROM attachments WHERE id=?", (attachment_id,)).fetchone():
             return {"skipped": True, "reason": "attachment_deleted"}
-        connection.execute("""INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code,updated_at,error)
-            VALUES(?,?,?,?,?,?,?,?,?,?,NULL) ON CONFLICT(attachment_id) DO UPDATE SET status=excluded.status,category=excluded.category,
-            extracted_text=excluded.extracted_text,supplier=excluded.supplier,document_date=excluded.document_date,amount=excluded.amount,
+        connection.execute("""INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,document_number,amount,fiscal_code,tax_code,updated_at,error)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL) ON CONFLICT(attachment_id) DO UPDATE SET status=excluded.status,category=excluded.category,
+            extracted_text=excluded.extracted_text,supplier=excluded.supplier,document_date=excluded.document_date,document_number=excluded.document_number,amount=excluded.amount,
             fiscal_code=excluded.fiscal_code,tax_code=excluded.tax_code,updated_at=excluded.updated_at,error=NULL""",
-            (attachment_id,"done",category,text,metadata["supplier"],metadata["document_date"],metadata["amount"],metadata["fiscal_code"],metadata["tax_code"],now))
+            (attachment_id,"done",category,text,metadata["supplier"],metadata["document_date"],metadata["document_number"],metadata["amount"],metadata["fiscal_code"],metadata["tax_code"],now))
         try:
             connection.execute("DELETE FROM document_fts WHERE attachment_id=?",(attachment_id,))
             connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",
@@ -648,6 +700,13 @@ class Handler(BaseHTTPRequestHandler):
                     (tx_id,)).fetchall()
             self.send_json(200, {"items":[{"id":r["id"],"at":r["at"],"event":r["event"],"changes":json.loads(r["changes_json"])} for r in rows]})
             return
+        if path == "/api/attachments/counts":
+            item = self.require_auth()
+            if not item: return
+            with db() as connection:
+                rows = connection.execute("SELECT transaction_id,COUNT(*) AS count FROM attachments GROUP BY transaction_id").fetchall()
+            self.send_json(200, {"counts": {str(row["transaction_id"]): int(row["count"]) for row in rows}})
+            return
         if path == "/api/attachments":
             item = self.require_auth()
             if not item: return
@@ -673,10 +732,10 @@ class Handler(BaseHTTPRequestHandler):
                 clauses=[]; params=[]
                 if category in ("fattura","f24","bollettino","altro"): clauses.append("d.category=?"); params.append(category)
                 if term:
-                    clauses.append("(a.filename LIKE ? OR d.extracted_text LIKE ? OR d.supplier LIKE ? OR d.document_date LIKE ? OR d.amount LIKE ? OR d.fiscal_code LIKE ? OR d.tax_code LIKE ?)")
-                    params.extend(["%"+term+"%"]*7)
+                    clauses.append("(a.filename LIKE ? OR d.extracted_text LIKE ? OR d.supplier LIKE ? OR d.document_date LIKE ? OR d.document_number LIKE ? OR d.amount LIKE ? OR d.fiscal_code LIKE ? OR d.tax_code LIKE ?)")
+                    params.extend(["%"+term+"%"]*8)
                 where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
-                sql="""SELECT a.id,a.transaction_id,a.filename,a.mime,a.size,a.created_at,COALESCE(d.status,'queued') AS ocr_status,COALESCE(d.category,'altro') AS category,d.supplier,d.document_date,d.amount,d.fiscal_code,d.tax_code,substr(COALESCE(d.extracted_text,''),1,400) AS excerpt""" + base_sql + where + " ORDER BY a.created_at DESC LIMIT 100 OFFSET ?"
+                sql="""SELECT a.id,a.transaction_id,a.filename,a.mime,a.size,a.created_at,COALESCE(d.status,'queued') AS ocr_status,COALESCE(d.category,'altro') AS category,d.supplier,d.document_date,d.document_number,d.amount,d.fiscal_code,d.tax_code,substr(COALESCE(d.extracted_text,''),1,400) AS excerpt""" + base_sql + where + " ORDER BY a.created_at DESC LIMIT 100 OFFSET ?"
                 rows=connection.execute(sql,params+[offset]).fetchall()
                 count=connection.execute("SELECT COUNT(*)"+base_sql+where,params).fetchone()[0]
                 total=connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
@@ -694,7 +753,9 @@ class Handler(BaseHTTPRequestHandler):
             filename = row["filename"].replace('"', '').replace("\\", "_").replace("\r", "").replace("\n", "")[:180]
             self.send_response(200)
             self.send_header("Content-Type", row["mime"])
-            self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + __import__("urllib.parse", fromlist=["quote"]).quote(filename))
+            inline = parse_qs(urlparse(self.path).query).get("inline", ["0"])[0] == "1"
+            disposition = "inline" if inline and row["mime"] in ("application/pdf", "image/jpeg", "image/png") else "attachment"
+            self.send_header("Content-Disposition", disposition + "; filename*=UTF-8''" + __import__("urllib.parse", fromlist=["quote"]).quote(filename))
             self.send_header("Content-Length", str(row["size"]))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
@@ -809,7 +870,7 @@ class Handler(BaseHTTPRequestHandler):
             attachments = [{"id":r["id"],"transaction_id":r["transaction_id"],"filename":r["filename"],"mime":r["mime"],"size":r["size"],"created_at":r["created_at"],"content":base64.b64encode(r["content"]).decode("ascii")} for r in attachment_rows]
             with db() as c:
                 history_rows = c.execute("SELECT id,at,transaction_id,event,changes_json FROM transaction_audit ORDER BY id").fetchall()
-                document_rows = c.execute("SELECT attachment_id,status,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code,updated_at,error FROM document_index").fetchall()
+                document_rows = c.execute("SELECT attachment_id,status,category,extracted_text,supplier,document_date,document_number,amount,fiscal_code,tax_code,updated_at,error FROM document_index").fetchall()
             history = [{"id":r["id"],"at":r["at"],"transaction_id":r["transaction_id"],"event":r["event"],"changes":json.loads(r["changes_json"])} for r in history_rows]
             documents = [dict(r) for r in document_rows]
             payload = {"format":"conti-chiari-local-backup","version":4,"exportedAt":time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),"state":state,"attachments":attachments,"history":history,"documents":documents}
@@ -1212,8 +1273,8 @@ class Handler(BaseHTTPRequestHandler):
                     attachment_id=str(document["attachment_id"]); category=str(document.get("category","altro"))
                     if category not in ("fattura","f24","bollettino","altro"): category="altro"
                     extracted=str(document.get("extracted_text",""))[:1000000]
-                    c.execute("INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code,updated_at,error) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                        (attachment_id,str(document.get("status","done")),category,extracted,document.get("supplier"),document.get("document_date"),document.get("amount"),document.get("fiscal_code"),document.get("tax_code"),str(document.get("updated_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),document.get("error")))
+                    c.execute("INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,document_number,amount,fiscal_code,tax_code,updated_at,error) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (attachment_id,str(document.get("status","done")),category,extracted,document.get("supplier"),document.get("document_date"),document.get("document_number"),document.get("amount"),document.get("fiscal_code"),document.get("tax_code"),str(document.get("updated_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),document.get("error")))
                     arow=c.execute("SELECT filename FROM attachments WHERE id=?",(attachment_id,)).fetchone()
                     try: c.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",(attachment_id,arow["filename"],category,extracted,document.get("supplier") or "",document.get("document_date") or "",document.get("amount") or "",document.get("fiscal_code") or "",document.get("tax_code") or ""))
                     except sqlite3.OperationalError: pass

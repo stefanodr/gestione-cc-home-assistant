@@ -12,6 +12,8 @@
   let reportMode = 'monthly';
   let transactionPage = 0;
   let documentSearchOffset = 0;
+  let advancedSearchResults = [];
+  let attachmentCounts = {};
   let transactionSelection = new Set();
   let confirmCallback = null;
   let resizeTimer;
@@ -729,8 +731,80 @@
       return true;
     }).sort((a,b) => String(b.tx.date).localeCompare(String(a.tx.date)));
     $('#searchResultCount').textContent = results.length + ' movimenti trovati';
+    advancedSearchResults = results;
+    const totals = results.reduce((sum, row) => { if (row.allocation.amount >= 0) sum.income += row.allocation.amount; else sum.expense += Math.abs(row.allocation.amount); return sum; }, {income:0,expense:0});
+    $('#searchResultCount').textContent = results.length + ' movimenti trovati · Entrate ' + euro.format(totals.income) + ' · Uscite ' + euro.format(totals.expense) + ' · Netto ' + euro.format(totals.income-totals.expense);
     $('#advancedSearchBody').innerHTML = results.slice(0,1000).map(({tx,allocation}) => '<tr><td>' + safeText(formatDate(tx.date)) + '</td><td class="name-cell">' + safeText(transactionDescription(tx) || transactionCausale(tx) || 'Movimento') + (allocation.labels.length ? '<small class="name-secondary">Riparto: ' + safeText(allocation.labels.join(' · ')) + '</small>' : '') + '</td><td class="' + (allocation.amount>=0?'amount-in':'amount-out') + '">' + euro.format(allocation.amount) + '</td><td>' + safeText(accountLabel(tx.bankAccountId)) + '</td><td>' + safeText(allocation.labels.length ? allocation.labels.join(' · ') : accountLabel(tx.counterpartAccountId)) + '</td><td>' + (tx.status === 'confirmed' ? 'Confermato' : 'Da classificare') + '</td></tr>').join('') || '<tr><td colspan="6" class="empty-inline">Nessun movimento corrisponde ai filtri.</td></tr>';
     if (results.length > 1000) $('#searchResultCount').textContent += ' · mostrati i primi 1.000';
+  }
+  function advancedSearchSummaryRows() {
+    const rows = advancedSearchResults || [];
+    const months = new Map(), years = new Map(), counterparts = new Map(), counterpartYears = new Map();
+    let income = 0, expense = 0;
+    for (const {tx, allocation} of rows) {
+      const amount = Number(allocation.amount) || 0, date = String(tx.date || '');
+      if (amount >= 0) income += amount; else expense += Math.abs(amount);
+      const month = date.slice(0,7), year = date.slice(0,4);
+      if (month) { const item=months.get(month)||{income:0,expense:0,net:0}; if(amount>=0)item.income+=amount;else item.expense+=Math.abs(amount);item.net+=amount;months.set(month,item); }
+      if (year) { const item=years.get(year)||{income:0,expense:0,net:0}; if(amount>=0)item.income+=amount;else item.expense+=Math.abs(amount);item.net+=amount;years.set(year,item); }
+      const labels = allocation.labels.length ? allocation.labels : [accountLabel(tx.counterpartAccountId)];
+      for (const label of labels) {
+        if (!label || label === '—') continue;
+        const key = month + '|' + label, item=counterparts.get(key)||{month,label,income:0,expense:0,net:0};
+        if(amount>=0)item.income+=amount;else item.expense+=Math.abs(amount);item.net+=amount;counterparts.set(key,item);
+        const yearKey=year+'|'+label, annual=counterpartYears.get(yearKey)||{year,label,income:0,expense:0,net:0};
+        if(amount>=0)annual.income+=amount;else annual.expense+=Math.abs(amount);annual.net+=amount;counterpartYears.set(yearKey,annual);
+      }
+    }
+    return {rows,income,expense,net:income-expense,months:[...months].sort((a,b)=>a[0].localeCompare(b[0])),years:[...years].sort((a,b)=>a[0].localeCompare(b[0])),counterparts:[...counterparts.values()].sort((a,b)=>a.month.localeCompare(b.month)||a.label.localeCompare(b.label,'it')),counterpartYears:[...counterpartYears.values()].sort((a,b)=>a.year.localeCompare(b.year)||a.label.localeCompare(b.label,'it'))};
+  }
+  function exportAdvancedSearchPdf() {
+    if (!advancedSearchResults.length) { showNotice('Nessun risultato','Esegui prima una ricerca avanzata.'); return; }
+    const data=advancedSearchSummaryRows(), filters=searchControls();
+    const labelMonth=key=>{const [y,m]=key.split('-').map(Number);return new Intl.DateTimeFormat('it-IT',{month:'long',year:'numeric'}).format(new Date(y,m-1,1));};
+    const monthly=data.months.map(([key,v])=>'<tr><td>'+safeText(labelMonth(key))+'</td><td class="num">'+euro.format(v.income)+'</td><td class="num">'+euro.format(v.expense)+'</td><td class="num">'+euro.format(v.net)+'</td></tr>').join('');
+    const annual=data.years.map(([key,v])=>'<tr><td>'+safeText(key)+'</td><td class="num">'+euro.format(v.income)+'</td><td class="num">'+euro.format(v.expense)+'</td><td class="num">'+euro.format(v.net)+'</td></tr>').join('');
+    const counterpartRows=data.counterparts.map(v=>'<tr><td>'+safeText(labelMonth(v.month))+'</td><td>'+safeText(v.label)+'</td><td class="num">'+euro.format(v.income)+'</td><td class="num">'+euro.format(v.expense)+'</td><td class="num">'+euro.format(v.net)+'</td></tr>').join('');
+    const counterpartYearRows=data.counterpartYears.map(v=>'<tr><td>'+safeText(v.year)+'</td><td>'+safeText(v.label)+'</td><td class="num">'+euro.format(v.income)+'</td><td class="num">'+euro.format(v.expense)+'</td><td class="num">'+euro.format(v.net)+'</td></tr>').join('');
+    const max=Math.max(1,...data.months.flatMap(([,v])=>[v.income,v.expense]));
+    const bars=data.months.map(([key,v])=>'<div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;align-items:center;margin:7px 0"><span>'+safeText(labelMonth(key))+'</span><span style="background:#4d9a7a;height:12px;width:'+Math.max(1,v.income/max*100)+'%"></span><span style="background:#c66c61;height:12px;width:'+Math.max(1,v.expense/max*100)+'%"></span></div>').join('');
+    const topCounterparts=[...new Set(data.counterparts.map(v=>v.label))].map(label=>({label,total:data.counterparts.filter(v=>v.label===label).reduce((sum,v)=>sum+v.income+v.expense,0)})).sort((a,b)=>b.total-a.total).slice(0,6).map(v=>v.label);
+    const counterpartMax=Math.max(1,...data.counterparts.filter(v=>topCounterparts.includes(v.label)).map(v=>Math.abs(v.net)));
+    const counterpartBars=data.counterparts.filter(v=>topCounterparts.includes(v.label)).map(v=>'<div style="display:grid;grid-template-columns:130px 100px 1fr;gap:8px;align-items:center;margin:5px 0"><span>'+safeText(v.label)+'</span><span>'+safeText(labelMonth(v.month))+'</span><span style="display:block;height:10px;width:'+Math.max(1,Math.abs(v.net)/counterpartMax*100)+'%;background:'+(v.net>=0?'#4d9a7a':'#c66c61')+'"></span></div>').join('');
+    const counterpartAnnualMax=Math.max(1,...data.counterpartYears.filter(v=>topCounterparts.includes(v.label)).map(v=>Math.abs(v.net)));
+    const counterpartAnnualBars=data.counterpartYears.filter(v=>topCounterparts.includes(v.label)).map(v=>'<div style="display:grid;grid-template-columns:130px 100px 1fr;gap:8px;align-items:center;margin:5px 0"><span>'+safeText(v.label)+'</span><span>'+safeText(v.year)+'</span><span style="display:block;height:10px;width:'+Math.max(1,Math.abs(v.net)/counterpartAnnualMax*100)+'%;background:'+(v.net>=0?'#4d9a7a':'#c66c61')+'"></span></div>').join('');
+    const txRows=data.rows.map(({tx,allocation})=>'<tr><td>'+safeText(formatDate(tx.date))+'</td><td>'+safeText(transactionDescription(tx)||transactionCausale(tx)||'Movimento')+'</td><td>'+safeText(allocation.labels.join(' · ')||accountLabel(tx.counterpartAccountId))+'</td><td class="num">'+euro.format(allocation.amount)+'</td><td>'+safeText(tx.status==='confirmed'?'Confermato':'Da classificare')+'</td></tr>').join('');
+    const content='<h1>Ricerca avanzata · Gestione C/C</h1><p>Periodo: '+safeText(filters.from||'inizio archivio')+' – '+safeText(filters.to||'oggi')+' · '+data.rows.length+' movimenti</p><div class="summary"><div><b>Entrate</b><strong>'+euro.format(data.income)+'</strong></div><div><b>Uscite</b><strong>'+euro.format(data.expense)+'</strong></div><div><b>Saldo netto</b><strong>'+euro.format(data.net)+'</strong></div></div><h2>Andamento mensile</h2><p>Entrate (verde) · Uscite (rosso)</p>'+bars+'<h2>Andamento mensile delle principali contropartite</h2><p>Saldo netto per mese (verde positivo, rosso negativo)</p>'+counterpartBars+'<h2>Andamento annuale delle principali contropartite</h2><p>Saldo netto per anno</p>'+counterpartAnnualBars+'<h2>Riepilogo mensile</h2><table><thead><tr><th>Mese</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+monthly+'</tbody></table><h2>Riepilogo annuale</h2><table><thead><tr><th>Anno</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+annual+'</tbody></table><h2>Andamento mensile per contropartita</h2><table><thead><tr><th>Mese</th><th>Contropartita</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+counterpartRows+'</tbody></table><h2>Andamento annuale per contropartita</h2><table><thead><tr><th>Anno</th><th>Contropartita</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+counterpartYearRows+'</tbody></table><h2>Movimenti trovati</h2><table><thead><tr><th>Data</th><th>Descrizione</th><th>Contropartita</th><th>Importo</th><th>Stato</th></tr></thead><tbody>'+txRows+'</tbody></table>';
+    printHtml('Ricerca-avanzata',content);
+  }
+  function exportAdvancedSearchXlsx() {
+    if (!advancedSearchResults.length) { showNotice('Nessun risultato','Esegui prima una ricerca avanzata.'); return; }
+    const data=advancedSearchSummaryRows(), filters=searchControls();
+    const months=[['Mese','Entrate','Uscite','Saldo netto'],...data.months.map(([key,v])=>[key,v.income,v.expense,v.net])];
+    const years=[['Anno','Entrate','Uscite','Saldo netto'],...data.years.map(([key,v])=>[key,v.income,v.expense,v.net])];
+    const counterpartRows=[['Mese','Contropartita','Entrate','Uscite','Saldo netto'],...data.counterparts.map(v=>[v.month,v.label,v.income,v.expense,v.net])];
+    const counterpartYearRows=[['Anno','Contropartita','Entrate','Uscite','Saldo netto'],...data.counterpartYears.map(v=>[v.year,v.label,v.income,v.expense,v.net])];
+    const transactions=[['Data','Descrizione','Conto corrente','Contropartita','Importo','Stato'],...data.rows.map(({tx,allocation})=>[tx.date,transactionDescription(tx)||transactionCausale(tx)||'Movimento',accountLabel(tx.bankAccountId),allocation.labels.join(' · ')||accountLabel(tx.counterpartAccountId),allocation.amount,tx.status==='confirmed'?'Confermato':'Da classificare'])];
+    const summary=[['GESTIONE C/C · RICERCA AVANZATA'],['Dal',filters.from||'—'],['Al',filters.to||'—'],['Movimenti',data.rows.length],['Entrate',data.income],['Uscite',data.expense],['Saldo netto',data.net]];
+    const topCounterparts=[...new Set(data.counterparts.map(v=>v.label))].map(label=>({label,total:data.counterparts.filter(v=>v.label===label).reduce((sum,v)=>sum+v.income+v.expense,0)})).sort((a,b)=>b.total-a.total).slice(0,6).map(v=>v.label);
+    const monthlyPivot=[['Mese',...topCounterparts],...data.months.map(([month])=>[month,...topCounterparts.map(label=>data.counterparts.find(v=>v.month===month&&v.label===label)?.net||0)])];
+    const annualPivot=[['Anno',...topCounterparts],...data.years.map(([year])=>[year,...topCounterparts.map(label=>data.counterpartYears.find(v=>v.year===year&&v.label===label)?.net||0)])];
+    const counterpartSeries=topCounterparts.map((label,index)=>({sheet:'Trend contropartite',col:index+1,nameCol:index+1}));
+    const counterpartAnnualSeries=topCounterparts.map((label,index)=>({sheet:'Trend contropartite anno',col:index+1,nameCol:index+1}));
+    const charts=[{title:'Entrate e uscite per mese',categorySheet:'Andamento mensile',categoryCol:0,firstDataRow:2,lastDataRow:months.length,series:[{sheet:'Andamento mensile',col:1,nameCol:1},{sheet:'Andamento mensile',col:2,nameCol:2}],startCol:0,startRow:1,endCol:14,endRow:18}];
+    if(topCounterparts.length) charts.push({title:'Andamento mensile per contropartita · saldo netto',categorySheet:'Trend contropartite',categoryCol:0,firstDataRow:2,lastDataRow:monthlyPivot.length,series:counterpartSeries,startCol:16,startRow:1,endCol:31,endRow:18});
+    if(years.length>2) charts.push({title:'Entrate e uscite per anno',categorySheet:'Andamento annuale',categoryCol:0,firstDataRow:2,lastDataRow:years.length,series:[{sheet:'Andamento annuale',col:1,nameCol:1},{sheet:'Andamento annuale',col:2,nameCol:2}],startCol:0,startRow:20,endCol:14,endRow:37});
+    const annualCharts=topCounterparts.length?[{title:'Andamento annuale per contropartita · saldo netto',categorySheet:'Trend contropartite anno',categoryCol:0,firstDataRow:2,lastDataRow:annualPivot.length,series:counterpartAnnualSeries,startCol:16,startRow:1,endCol:31,endRow:18}]:[];
+    downloadXlsx('Ricerca-avanzata.xlsx',[
+      {name:'Riepilogo',rows:summary,titleRow:0,headerRow:0,currencyColumns:[1]},
+      {name:'Movimenti',rows:transactions,dateColumns:[0],currencyColumns:[4]},
+      {name:'Andamento mensile',rows:months,currencyColumns:[1,2,3],charts},
+      {name:'Andamento annuale',rows:years,currencyColumns:[1,2,3],charts:annualCharts},
+      {name:'Contropartite',rows:counterpartRows,dateColumns:[0],currencyColumns:[2,3,4]},
+      {name:'Contropartite anno',rows:counterpartYearRows,currencyColumns:[2,3,4]},
+      {name:'Trend contropartite',rows:monthlyPivot,currencyColumns:topCounterparts.map((_,i)=>i+1)},
+      {name:'Trend contropartite anno',rows:annualPivot,currencyColumns:topCounterparts.map((_,i)=>i+1)}
+    ]);
   }
   function setupFinanceViews() {
     if (setupFinanceViews.listenersBound) { if(state.transactions.length&&state.recurringDetectionLastTransactionCount!==state.transactions.length)detectRecurringProposals(); renderBudgetView(); renderForecastSelection(); return; }
@@ -777,6 +851,8 @@
       saveState();
     });
     $('#runAdvancedSearch')?.addEventListener('click',runAdvancedSearch);
+    $('#exportAdvancedPdf')?.addEventListener('click',exportAdvancedSearchPdf);
+    $('#exportAdvancedXlsx')?.addEventListener('click',exportAdvancedSearchXlsx);
     $('#clearAdvancedSearch')?.addEventListener('click',()=>{
       ['searchFrom','searchTo','searchText','searchMin','searchMax'].forEach(id=>$('#'+id).value='');
       $('#searchDirection').value='all';$('#searchStatus').value='all';$('#searchAccount').value='';runAdvancedSearch();
@@ -1099,12 +1175,15 @@
     const proposals=[];
     for(const items of groups.values()){
       const sorted=items.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-      if(sorted.length<3)continue;
+      if(sorted.length<2)continue;
       const gaps=[];for(let i=1;i<sorted.length;i++){const days=(Date.parse(sorted[i].date+'T12:00:00Z')-Date.parse(sorted[i-1].date+'T12:00:00Z'))/86400000;if(days>0)gaps.push(days);}
-      if(gaps.length<2)continue;
+      if(gaps.length<1)continue;
       const ordered=[...gaps].sort((a,b)=>a-b),mid=Math.floor(ordered.length/2),typical=ordered.length%2?ordered[mid]:(ordered[mid-1]+ordered[mid])/2;
       const candidate=labels.map(([frequency,days])=>({frequency,days,error:Math.abs(typical-days)/days})).sort((a,b)=>a.error-b.error)[0];
-      if(candidate.error>.22)continue;
+      // Due annualità consecutive sono sufficienti per proporre una ricorrenza annuale;
+      // per frequenze più ravvicinate restano necessarie almeno tre occorrenze.
+      if(candidate.frequency!=='yearly'&&sorted.length<3)continue;
+      if(candidate.error > (candidate.frequency === 'yearly' && sorted.length === 2 ? 0.15 : 0.22))continue;
       const amounts=sorted.map(tx=>Math.abs(Number(tx.amount)||0)).sort((a,b)=>a-b),am= Math.floor(amounts.length/2);
       const amountMagnitude=amounts.length%2?amounts[am]:(amounts[am-1]+amounts[am])/2;
       if(!amountMagnitude)continue;
@@ -1143,55 +1222,85 @@
     const primaryAccountId=state.bankAccountId;
     const opening=ids.has(primaryAccountId)?(Number(state.openingBalance)||0):0;
     const openingBalanceUnknown=accounts.filter(account=>account.id!==primaryAccountId);
-    const currentBalance=opening+txs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
-    const historyKeys=Array.from({length:12},(_,i)=>shiftMonthKey(currentMonth,-12+i));
-    const completedCurrentYear=historyKeys.filter(key=>key.slice(0,4)===String(new Date().getFullYear())&&key<currentMonth);
-    const previousYearKeys=Array.from({length:12},(_,i)=>(new Date().getFullYear()-1)+'-'+String(i+1).padStart(2,'0'));
+    const lastClosedMonth=shiftMonthKey(currentMonth,-1);
+    const cutoff=lastClosedMonth+'-'+String(new Date(Number(lastClosedMonth.slice(0,4)),Number(lastClosedMonth.slice(5,7)),0).getDate()).padStart(2,'0');
+    const closedTxs=txs.filter(tx=>String(tx.date||'')<=cutoff);
+    const openingBalance=opening+closedTxs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
     const categories=state.accounts.filter(a=>a.hierarchyType!=='Mastro'&&
       (['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))));
-    const usedSources=new Set(),usedMonths=new Set();
-    const estimates={income:0,expense:0,source:'',months:0};
-    for(const cat of categories){
-      const hasCategoryMovement=key=>txs.some(tx=>String(tx.date).slice(0,7)===key&&
-        (tx.counterpartAccountId===cat.id||(tx.counterpartSplits||[]).some(split=>split.accountId===cat.id)));
-      const categoryCoverage=completedCurrentYear.filter(hasCategoryMovement).length;
-      const estimateKeys=categoryCoverage>=3?completedCurrentYear:previousYearKeys;
-      usedSources.add(categoryCoverage>=3?'anno_corrente':'anno_precedente');
-      estimateKeys.forEach(key=>usedMonths.add(key));
-      const monthly=estimateKeys.map(key=>{
-        let total=0;
-        for(const tx of txs){
-          if(String(tx.date).slice(0,7)!==key||transactionIsExplicitlyRecurring(tx,cat.id,key,ids))continue;
-          if(tx.counterpartSplits?.length){
-            for(const sp of tx.counterpartSplits)if(sp.accountId===cat.id)total+=Math.abs(Number(sp.value)||0);
-          }else if(tx.counterpartAccountId===cat.id)total+=Math.abs(Number(tx.amount)||0);
-        }
-        return total;
-      });
-      const nonZero=monthly.filter(value=>value>0);
-      if(nonZero.length<2)continue;
-      const estimate=median(nonZero);
-      if(cat.type==='INCOME')estimates.income+=estimate;else estimates.expense+=estimate;
-    }
-    estimates.income=Math.round(estimates.income*100)/100;
-    estimates.expense=Math.round(estimates.expense*100)/100;
-    estimates.source=usedSources.size>1?'periodi misti':usedSources.has('anno_corrente')?'anno corrente':'anno precedente';
-    estimates.months=usedMonths.size;
+    const historyMonths=Array.from({length:12},(_,i)=>shiftMonthKey(lastClosedMonth,-11+i));
+    const previousYearMonths=Array.from({length:12},(_,i)=>(Number(currentMonth.slice(0,4))-1)+'-'+String(i+1).padStart(2,'0'));
+    const categoryMonthly=(accountId,month)=>{
+      let total=0;
+      for(const tx of txs){
+        if(String(tx.date||'').slice(0,7)!==month)continue;
+        if(tx.counterpartSplits?.length){for(const split of tx.counterpartSplits)if(split.accountId===accountId)total+=Math.abs(Number(split.value)||0);}
+        else if(tx.counterpartAccountId===accountId)total+=Math.abs(Number(tx.amount)||0);
+      }
+      return total;
+    };
+    const recurringMonthly=(accountId,month)=>{
+      const due=state.recurringRules.filter(rule=>rule.active&&rule.categoryId===accountId&&recurringOccursInMonth(rule,month));
+      return due.reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)||0),0);
+    };
+    const budgetFor=(account,month)=>{
+      const exact=activeBudgetSnapshot(month);
+      const snapshots=state.budgetSnapshots.filter(snapshot=>snapshot&&snapshot.month&&snapshot.month<=month)
+        .sort((a,b)=>String(b.month).localeCompare(String(a.month))||Number(b.version||0)-Number(a.version||0));
+      const snapshot=exact||snapshots[0]||null;
+      const lines=account.type==='INCOME'?(snapshot?.incomeLines||[]):(snapshot?.lines||[]);
+      const line=lines.find(item=>item.accountId===account.id);
+      const value=Number(line?.budget);
+      return Number.isFinite(value)&&value>0?{amount:value,source:'budget'}:null;
+    };
+    const historyEstimate=(account,month)=>{
+      const currentYearMonths=historyMonths.filter(key=>key.slice(0,4)===currentMonth.slice(0,4)&&key<currentMonth);
+      const currentValues=currentYearMonths.map(key=>categoryMonthly(account.id,key));
+      const priorValues=previousYearMonths.map(key=>categoryMonthly(account.id,key));
+      const currentActive=currentValues.filter(value=>value>0).length;
+      const priorActive=priorValues.filter(value=>value>0).length;
+      const usePrior=currentActive<3&&priorActive>=3;
+      const values=usePrior?priorValues:currentValues;
+      const active=values.filter(value=>value>0);
+      if(active.length<3)return {amount:0,source:'sporadico'};
+      return {amount:median(active),source:usePrior?'anno_precedente':'anno_corrente'};
+    };
     const forecast=[];
-    let balance=currentBalance;
+    let balance=openingBalance;
+    const sources=new Set();
     for(let i=0;i<12;i++){
-      const key=shiftMonthKey(currentMonth,i),rules=forecastRecurringItems(key,ids);
-      const due=rules.filter(rule=>i!==0||rule.occurrenceDate>=today);
+      const key=shiftMonthKey(currentMonth,i);
+      const due=forecastRecurringItems(key,ids).filter(rule=>i!==0||rule.occurrenceDate>=today);
       const programmedIncome=due.filter(rule=>Number(rule.amount)>0).reduce((sum,rule)=>sum+Number(rule.amount),0);
       const programmedExpense=due.filter(rule=>Number(rule.amount)<0).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)),0);
-      const estimateIncome=i===0?0:estimates.income;
-      const estimateExpense=i===0?0:estimates.expense;
-      const openingBalance=balance;
-      balance=Math.round((balance+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
-      forecast.push({key,openingBalance,programmedIncome,programmedExpense,estimateIncome,estimateExpense,programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
+      let actualIncome=0,actualExpense=0;
+      if(i===0){
+        for(const tx of txs.filter(tx=>String(tx.date||'')>cutoff&&String(tx.date||'')<=today)){
+          const flow=forecastTransactionFlow(tx,ids);if(flow>=0)actualIncome+=flow;else actualExpense+=Math.abs(flow);
+        }
+      }
+      let estimateIncome=0,estimateExpense=0;
+      for(const account of categories){
+        const budget=budgetFor(account,key);
+        const historic=budget||historyEstimate(account,key);
+        if(historic.source==='sporadico')continue;
+        sources.add(historic.source);
+        const scheduledRemaining=due.filter(rule=>rule.categoryId===account.id).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)||0),0);
+        const already= i===0?categoryMonthly(account.id,key):0;
+        const residual=Math.max(0,historic.amount-scheduledRemaining-already);
+        if(account.type==='INCOME')estimateIncome+=residual;else estimateExpense+=residual;
+      }
+      estimateIncome=Math.round(estimateIncome*100)/100;
+      estimateExpense=Math.round(estimateExpense*100)/100;
+      const opening=balance;
+      balance=Math.round((balance+actualIncome-actualExpense+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
+      forecast.push({key,openingBalance:opening,actualIncome,actualExpense,programmedIncome,programmedExpense,estimateIncome,estimateExpense,
+        programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
     }
-    const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:currentBalance,key:currentMonth});
-    return {accounts,currentBalance,forecast,minimum,historyCount:[...usedMonths].filter(key=>txs.some(tx=>String(tx.date).slice(0,7)===key)).length,estimatedNet:estimates.income-estimates.expense,estimates,openingBalanceUnknown};
+    const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:openingBalance,key:currentMonth});
+    const source=sources.size>1?'budget e storico misti':sources.has('budget')?'budget':sources.has('anno_precedente')?'anno precedente':'anno corrente';
+    const historyCount=historyMonths.filter(key=>txs.some(tx=>String(tx.date||'').slice(0,7)===key)).length;
+    return {accounts,currentBalance:openingBalance,forecast,minimum,historyCount,estimatedNet:forecast.reduce((sum,row)=>sum+row.estimateIncome-row.estimateExpense,0),estimates:{source},openingBalanceUnknown,lastClosedMonth};
   }
   function renderForecastSelection() {
     const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
@@ -1207,9 +1316,9 @@
     $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
     $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
     $('#forecastEnding').textContent=euro.format(result.forecast.at(-1)?.balance??result.currentBalance);
-    $('#forecastReliability').textContent='Storico: '+result.historyCount+' mesi · base '+(result.estimates.source==='anno_corrente'?'anno corrente':'anno precedente')+' · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
+    $('#forecastReliability').textContent='Saldo al '+monthLabel(result.lastClosedMonth)+' · base '+result.estimates.source+' · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
     if(status&&result.openingBalanceUnknown.length)status.textContent+=' ATTENZIONE: il saldo iniziale è disponibile solo per '+(accountById(state.bankAccountId)?.path||'il conto principale')+'. Per gli altri conti selezionati il saldo storico potrebbe essere incompleto.';
-    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
+    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.actualIncome)+'</td><td>'+euro.format(row.actualExpense)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
   }
 
   function navigate(view) {
@@ -1700,6 +1809,22 @@
       }
     );
   }
+  async function refreshAttachmentCounts() {
+    try {
+      const result = await apiRequest('/api/attachments/counts');
+      attachmentCounts = result.counts || {};
+      const body = $('#transactionsBody');
+      if (!body) return;
+      body.querySelectorAll('[data-attachments-tx]').forEach(button => {
+        const count = Number(attachmentCounts[button.dataset.attachmentsTx] || 0);
+        let badge = button.parentElement.querySelector('.attachment-count-badge');
+        if (!badge) { badge = document.createElement('span'); badge.className = 'attachment-count-badge'; button.parentElement.appendChild(badge); }
+        badge.textContent = String(count);
+        badge.classList.toggle('hidden', count === 0);
+        badge.setAttribute('aria-label', count + ' allegati');
+      });
+    } catch (error) { /* Il registro resta utilizzabile anche se il conteggio non è disponibile. */ }
+  }
   function renderTransactions() {
     refreshAccountSearchOptions();
     populateTransactionCounterpartControls();
@@ -1737,7 +1862,8 @@
         : item.status === 'confirmed'
           ? `<button class="row-action row-action-review" data-edit-tx="${safeText(item.id)}">Rivedi</button> <button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Ripartisci</button>`
           : `<button class="row-action row-action-split" data-split-tx="${safeText(item.id)}">Dividi</button> <button class="row-action row-action-review" data-confirm-tx="${safeText(item.id)}">Conferma</button>`;
-      return `<tr><td class="tx-select-cell">${selectionCell}</td><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountPathAt(accountById(item.bankAccountId), item.date))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td>${actions} <button class="row-action" data-attachments-tx="${safeText(item.id)}">Allegati</button> <button class="row-action" data-history-tx="${safeText(item.id)}">Storico</button> <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
+      const attachmentCount = Number(attachmentCounts[item.id] || 0);
+      return `<tr><td class="tx-select-cell">${selectionCell}</td><td class="date-cell">${formatDate(item.date)}</td><td class="name-cell"><span class="name-primary"><strong>${primaryLabel}</strong>${safeText(primaryText)}</span>${causaleRow}</td><td class="amount-cell ${item.amount >= 0 ? 'amount-in' : 'amount-out'}">${euro.format(item.amount)}</td><td><span class="name-secondary">${safeText(accountPathAt(accountById(item.bankAccountId), item.date))}</span></td><td>${accountCell}</td><td><span class="confidence ${confidenceClass}">${confidenceLabel}</span></td><td><span class="status-chip ${item.counterpartSplits?.length > 1 ? 'status-confirmed' : item.status === 'confirmed' ? 'status-confirmed' : 'status-pending'}">${item.counterpartSplits?.length > 1 ? 'Suddiviso' : item.status === 'confirmed' ? 'Confermato' : 'Da rivedere'}</span></td><td class="transaction-actions">${actions} <span class="attachment-action-wrap"><button class="row-action" data-attachments-tx="${safeText(item.id)}">Allegati</button><span class="attachment-count-badge ${attachmentCount ? '' : 'hidden'}" aria-label="${attachmentCount} allegati">${attachmentCount}</span></span> <button class="row-action" data-history-tx="${safeText(item.id)}">Storico</button> <button class="row-action row-action-danger" data-delete-tx="${safeText(item.id)}">Elimina</button></td></tr>`;
     }).join('');
     $$('[data-select-tx]', body).forEach(input => input.addEventListener('change', () => {
       if (input.checked) transactionSelection.add(input.dataset.selectTx);
@@ -1761,7 +1887,8 @@
       await saveState(); renderAll();
       showNotice('Movimento eliminato', 'È stato rimosso dall’archivio locale di Gestione C/C. Il file GnuCash o bancario originale non è stato modificato.');
     }));
-    $$('[data-attachments-tx]', body).forEach(btn => btn.addEventListener('click', () => manageTransactionAttachments(btn.dataset.attachmentsTx)));
+    $('[data-attachments-tx]', body).forEach(btn => btn.addEventListener('click', () => manageTransactionAttachments(btn.dataset.attachmentsTx)));
+    void refreshAttachmentCounts();
     $$('[data-history-tx]', body).forEach(btn => btn.addEventListener('click', () => showTransactionHistory(btn.dataset.historyTx)));
     updateTransactionBulkUi(tx);
   }
@@ -1781,7 +1908,7 @@
     $('#attachmentLimitHint').textContent='Spazio usato: '+(total/1024/1024).toFixed(2)+' MB su 15 MB · massimo 5 MB per file.';
     $('#attachmentList').innerHTML=files.length?files.map(file=>'<div class="attachment-row"><div class="attachment-file-info"><strong>'+safeText(file.filename)+'</strong><small>'+Math.max(1,Math.round(file.size/1024))+' KB · '+safeText(formatDate(String(file.created_at||'').slice(0,10)))+'</small></div><div class="attachment-row-actions"><button class="row-action" type="button" data-download-attachment="'+safeText(file.id)+'">Scarica</button><button class="row-action row-action-danger" type="button" data-delete-attachment="'+safeText(file.id)+'">Elimina</button></div></div>').join(''):'<p class="empty-state">Nessun allegato associato a questo movimento.</p>';
     $('#attachmentList').querySelectorAll('[data-download-attachment]').forEach(button=>button.addEventListener('click',async()=>{const file=files.find(item=>item.id===button.dataset.downloadAttachment);if(!file)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(file.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),file.filename);}));
-    $('#attachmentList').querySelectorAll('[data-delete-attachment]').forEach(button=>button.addEventListener('click',async()=>{const file=files.find(item=>item.id===button.dataset.deleteAttachment);if(!file||!window.confirm('Eliminare definitivamente "'+file.filename+'"?'))return;try{await apiRequest('/api/attachments/delete',{method:'POST',body:JSON.stringify({id:file.id})});await refreshTransactionAttachments();}catch(error){showNotice('Eliminazione non riuscita',error.message||String(error));}}));
+    $('#attachmentList').querySelectorAll('[data-delete-attachment]').forEach(button=>button.addEventListener('click',async()=>{const file=files.find(item=>item.id===button.dataset.deleteAttachment);if(!file||!window.confirm('Eliminare definitivamente "'+file.filename+'"?'))return;try{await apiRequest('/api/attachments/delete',{method:'POST',body:JSON.stringify({id:file.id})});await refreshTransactionAttachments();void refreshAttachmentCounts();}catch(error){showNotice('Eliminazione non riuscita',error.message||String(error));}}));
   }
   async function uploadTransactionAttachment(file) {
     if(!file||!activeAttachmentTransactionId)return;
@@ -1791,6 +1918,7 @@
       const response=await fetch('/api/attachments/upload',{method:'POST',body:form,headers:{'X-CSRF-Token':csrfToken},credentials:'same-origin',cache:'no-store'});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Caricamento non riuscito.');
       await refreshTransactionAttachments();
+      void refreshAttachmentCounts();
       if(data.storage_warning)showNotice('Archivio documenti oltre 100 MB','È stato raggiunto il livello di avviso. Puoi continuare a caricare documenti.');
     }catch(error){showNotice('Caricamento non riuscito',error.message||String(error));}
   }
@@ -1807,8 +1935,9 @@
       $('#documentNext').disabled=documentSearchOffset+items.length>=Number(result.total_count||0);
       $('#documentStorageTotal').textContent=(Number(result.total_bytes||0)/1024/1024).toFixed(2)+' MB complessivi';
       $('#documentStorageWarning').classList.toggle('hidden',!result.warning);
-      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-state">Nessun documento trovato.</td></tr>';
+      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="8" class="empty-state">Nessun documento trovato.</td></tr>';
       $('#documentsBody').querySelectorAll('[data-doc-download]').forEach(button=>button.addEventListener('click',async()=>{const item=items.find(x=>x.id===button.dataset.docDownload);if(!item)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(item.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),item.filename);}));
+      $('#documentsBody').querySelectorAll('[data-doc-open]').forEach(button=>button.addEventListener('click',()=>{const item=items.find(x=>x.id===button.dataset.docOpen);if(!item)return;const preview=window.open('/api/attachments/download?id='+encodeURIComponent(item.id)+'&inline=1','_blank');if(preview)preview.opener=null;else showNotice('Anteprima bloccata','Consenti le finestre a comparsa per aprire il documento.');}));
       $('#documentsBody').querySelectorAll('[data-document-category]').forEach(select=>select.addEventListener('change',async()=>{try{await apiRequest('/api/documents/update',{method:'POST',body:JSON.stringify({id:select.dataset.documentCategory,category:select.value})});}catch(error){showNotice('Categoria non aggiornata',error.message||String(error));}}));
       $('#documentsBody').querySelectorAll('[data-doc-transaction]').forEach(button=>button.addEventListener('click',()=>{
         const txId=button.dataset.docTransaction;
