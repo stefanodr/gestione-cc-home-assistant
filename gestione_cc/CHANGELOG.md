@@ -1,3 +1,7 @@
+## [1.0.23] - 2026-11-13
+
+- Corretto definitivamente l'errore JavaScript `forEach is not a function` nell'editor di suddivisione dei movimenti: ora le raccolte di campi sono ottenute esplicitamente con `querySelectorAll`, senza usare il selettore singolo.
+
 ## [1.0.22] - 2026-11-13
 
 - Corretto l'editor di suddivisione dei movimenti: i selettori multipli ora restituiscono correttamente una raccolta di elementi, evitando l'errore JavaScript `forEach is not a function` quando si apre la finestra.
