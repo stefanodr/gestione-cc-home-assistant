@@ -83,7 +83,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="$(sed -n 's/^version: \"\\([^\"]*\\)\"/\\1/p' gestione_cc/config.yaml)"
+          VERSION="$(awk -F \" '/^version:/ {print $2; exit}' gestione_cc/config.yaml)"
           if [ -z "$VERSION" ]; then
             echo "Cannot determine the Home Assistant App version."
             exit 1
