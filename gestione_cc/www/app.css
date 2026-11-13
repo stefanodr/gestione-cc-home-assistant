@@ -240,9 +240,18 @@ body.app-ready .app-shell{visibility:visible}
 @media(max-width:700px){.attachment-row{align-items:flex-start;flex-direction:column}.attachment-modal-actions{align-items:flex-start;flex-direction:column}.attachment-row-actions{width:100%}}
 
 /* Indicatore sintetico degli allegati nel registro movimenti. */
-.attachment-action-wrap{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;vertical-align:middle;gap:3px;min-width:48px}
+.attachment-action-wrap{display:inline-grid;grid-template-rows:auto 17px;justify-items:center;align-items:center;vertical-align:middle;gap:2px;min-width:48px;line-height:1;position:relative;top:2px}.attachment-action-wrap .row-action{display:block;line-height:1.2;padding:4px 2px}
 .attachment-count-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#e6f2ee;color:#246e60;border:1px solid #b9d8ce;font-size:9px;font-weight:750;line-height:1}
 .attachment-count-badge.hidden{display:none}
 #view-search .heading-actions{flex-wrap:wrap}
 #view-search .heading-actions .button{white-space:nowrap}
 @media print{.attachment-count-badge{print-color-adjust:exact}}
+
+/* 1.0.25 — Editor metadati documento e allineamento allegati. */
+.document-metadata-card{width:min(520px,100%);max-height:90vh;overflow:auto;text-align:left}
+.document-metadata-card .modal-symbol{margin:0 0 12px}
+.document-metadata-card .account-modal-fields{grid-template-columns:1fr 1fr}
+.document-metadata-card .account-modal-fields label:nth-child(n){grid-column:auto}
+.document-metadata-card .account-modal-fields label:nth-child(1),.document-metadata-card .account-modal-fields label:nth-child(2),.document-metadata-card .account-modal-fields label:nth-child(4){grid-column:1/-1}
+.document-metadata-card .modal-actions{justify-content:flex-end}
+@media(max-width:620px){.document-metadata-card .account-modal-fields{grid-template-columns:1fr}.document-metadata-card .account-modal-fields label:nth-child(n){grid-column:auto}}
