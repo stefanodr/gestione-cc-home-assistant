@@ -60,7 +60,13 @@ def init_db():
         c.execute("CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL)")
         c.execute("CREATE TABLE IF NOT EXISTS transaction_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, transaction_id TEXT NOT NULL, event TEXT NOT NULL, changes_json TEXT NOT NULL)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
-        c.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+        c.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+        attachment_columns = {row["name"]: row for row in c.execute("PRAGMA table_info(attachments)")}
+        if attachment_columns.get("transaction_id") and attachment_columns["transaction_id"]["notnull"]:
+            c.execute("ALTER TABLE attachments RENAME TO attachments_legacy")
+            c.execute("CREATE TABLE attachments (id TEXT PRIMARY KEY, transaction_id TEXT, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+            c.execute("INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) SELECT id,transaction_id,filename,mime,size,content,created_at FROM attachments_legacy")
+            c.execute("DROP TABLE attachments_legacy")
         c.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
         c.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, document_number TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
         document_columns = {row["name"] for row in c.execute("PRAGMA table_info(document_index)")}
@@ -321,7 +327,13 @@ def ensure_transaction_feature_tables():
     with db() as connection:
         connection.execute("CREATE TABLE IF NOT EXISTS transaction_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, transaction_id TEXT NOT NULL, event TEXT NOT NULL, changes_json TEXT NOT NULL)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
-        connection.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+        connection.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+        attachment_columns = {row["name"]: row for row in connection.execute("PRAGMA table_info(attachments)")}
+        if attachment_columns.get("transaction_id") and attachment_columns["transaction_id"]["notnull"]:
+            connection.execute("ALTER TABLE attachments RENAME TO attachments_legacy")
+            connection.execute("CREATE TABLE attachments (id TEXT PRIMARY KEY, transaction_id TEXT, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+            connection.execute("INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) SELECT id,transaction_id,filename,mime,size,content,created_at FROM attachments_legacy")
+            connection.execute("DROP TABLE attachments_legacy")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
         connection.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, document_number TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
         document_columns = {row["name"] for row in connection.execute("PRAGMA table_info(document_index)")}
