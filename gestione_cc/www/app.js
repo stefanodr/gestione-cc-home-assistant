@@ -1183,7 +1183,7 @@
       // Due annualità consecutive sono sufficienti per proporre una ricorrenza annuale;
       // per frequenze più ravvicinate restano necessarie almeno tre occorrenze.
       if(candidate.frequency!=='yearly'&&sorted.length<3)continue;
-      if(candidate.error>(candidate.frequency==='yearly'&&sorted.length===2?.15:.22))continue;
+      if(candidate.error > (candidate.frequency === 'yearly' && sorted.length === 2 ? 0.15 : 0.22))continue;
       const amounts=sorted.map(tx=>Math.abs(Number(tx.amount)||0)).sort((a,b)=>a-b),am= Math.floor(amounts.length/2);
       const amountMagnitude=amounts.length%2?amounts[am]:(amounts[am-1]+amounts[am])/2;
       if(!amountMagnitude)continue;
