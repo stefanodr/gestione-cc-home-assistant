@@ -1759,6 +1759,16 @@
       const files=result.items||[];const listing=files.length?files.map((f,i)=>(i+1)+'. '+f.filename+' ('+Math.round(f.size/1024)+' KB)').join('\n'):'Nessun allegato.';
       const choice=window.prompt('Allegati · '+(tx.payee||tx.memo||'movimento')+'\n'+listing+'\n\nDigita A per aggiungere un file oppure il numero per scaricarlo.');
       if(choice===null)return;
+      if(choice.toUpperCase().startsWith('D')) {
+        const n=Number(choice.slice(1))-1;
+        if(Number.isInteger(n)&&n>=0&&n<files.length){
+          if(window.confirm('Eliminare definitivamente '+files[n].filename+'?')){
+            await apiRequest('/api/attachments/delete',{method:'POST',body:JSON.stringify({id:files[n].id})});
+            showNotice('Allegato eliminato','Il file è stato rimosso dall’archivio.');
+          }
+        }
+        return;
+      }
       if(choice.toUpperCase()==='A'){
         const picker=document.createElement('input');picker.type='file';picker.accept='.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';
         picker.onchange=async()=>{const file=picker.files&&picker.files[0];if(!file)return;if(file.size>10*1024*1024){showNotice('File troppo grande','Massimo 10 MB per allegato.');return;}
