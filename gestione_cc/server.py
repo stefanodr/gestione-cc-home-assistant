@@ -748,11 +748,13 @@ class Handler(BaseHTTPRequestHandler):
             query=parse_qs(urlparse(self.path).query)
             term=str(query.get("q",[""])[0]).strip()[:200]
             category=str(query.get("category",[""])[0])[:24]
+            document_id=str(query.get("id",[""])[0]).strip()[:160]
             try: offset=max(0,min(1000000,int(query.get("offset",["0"])[0])))
             except (TypeError,ValueError): offset=0
             with db() as connection:
                 base_sql=""" FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id"""
                 clauses=[]; params=[]
+                if document_id: clauses.append("a.id=?"); params.append(document_id)
                 if category in ("fattura","f24","bollettino","altro"): clauses.append("d.category=?"); params.append(category)
                 if term:
                     clauses.append("(a.filename LIKE ? OR d.extracted_text LIKE ? OR d.supplier LIKE ? OR d.document_date LIKE ? OR d.document_number LIKE ? OR d.amount LIKE ? OR d.fiscal_code LIKE ? OR d.tax_code LIKE ?)")
