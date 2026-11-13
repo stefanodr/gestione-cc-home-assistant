@@ -1031,8 +1031,11 @@ class Handler(BaseHTTPRequestHandler):
                 "document_number": (str(payload.get("document_number", "")).strip()[:80] or None, "document_number_manual"),
             }
             date_value = fields["document_date"][0]
+            amount_value = fields["amount"][0]
             if date_value and not re.fullmatch(r"(?:\d{4}-\d{2}-\d{2}|\d{1,2}[./-]\d{1,2}[./-]\d{2,4})", date_value):
                 self.send_json(400, {"error":"Formato data non valido. Usa GG/MM/AAAA oppure AAAA-MM-GG."}); return
+            if amount_value and not re.fullmatch(r"-?(?:\d+|\d{1,3}(?:\.\d{3})+)(?:[,.]\d{1,2})?", amount_value):
+                self.send_json(400, {"error":"Importo non valido. Usa ad esempio 1.234,56."}); return
             with db() as connection:
                 row = connection.execute("SELECT transaction_id,filename FROM attachments WHERE id=?", (attachment_id,)).fetchone()
                 if not row:
