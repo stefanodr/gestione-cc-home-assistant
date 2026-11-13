@@ -34,3 +34,5 @@ jobs:
         run: python tests/test_transaction_audit.py
       - name: Test OFX parser
         run: node tests/finance-import.test.js
+      - name: Build Home Assistant add-on image
+        run: docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest -t gestione-cc-addon-test gestione_cc
