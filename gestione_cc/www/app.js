@@ -1332,12 +1332,9 @@
       const due=forecastRecurringItems(key,ids).filter(rule=>i!==0||rule.occurrenceDate>=today);
       const programmedIncome=due.filter(rule=>Number(rule.amount)>0).reduce((sum,rule)=>sum+Number(rule.amount),0);
       const programmedExpense=due.filter(rule=>Number(rule.amount)<0).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)),0);
-      let actualIncome=0,actualExpense=0;
-      if(i===0){
-        for(const tx of txs.filter(tx=>String(tx.date||'')>cutoff&&String(tx.date||'')<=today)){
-          const flow=forecastTransactionFlow(tx,ids);if(flow>=0)actualIncome+=flow;else actualExpense+=Math.abs(flow);
-        }
-      }
+      // The forecast is a forward-looking projection: actual movements are
+      // already reflected in the last closed-month opening balance and are
+      // deliberately not mixed into the scheduled/estimated future flows.
       let estimateIncome=0,estimateExpense=0;
       for(const account of categories){
         const budget=budgetFor(account,key);
@@ -1352,8 +1349,8 @@
       estimateIncome=Math.round(estimateIncome*100)/100;
       estimateExpense=Math.round(estimateExpense*100)/100;
       const opening=balance;
-      balance=Math.round((balance+actualIncome-actualExpense+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
-      forecast.push({key,openingBalance:opening,actualIncome,actualExpense,programmedIncome,programmedExpense,estimateIncome,estimateExpense,
+      balance=Math.round((balance+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
+      forecast.push({key,openingBalance:opening,programmedIncome,programmedExpense,estimateIncome,estimateExpense,
         programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
     }
     const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:openingBalance,key:currentMonth});
@@ -1377,7 +1374,10 @@
     $('#forecastEnding').textContent=euro.format(result.forecast.at(-1)?.balance??result.currentBalance);
     $('#forecastReliability').textContent='Saldo al '+monthLabel(result.lastClosedMonth)+' · base '+result.estimates.source+' · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
     if(status&&result.openingBalanceUnknown.length)status.textContent+=' ATTENZIONE: il saldo iniziale è disponibile solo per '+(accountById(state.bankAccountId)?.path||'il conto principale')+'. Per gli altri conti selezionati il saldo storico potrebbe essere incompleto.';
-    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.actualIncome)+'</td><td>'+euro.format(row.actualExpense)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
+    const activeSchedules=(Array.isArray(state.recurringRules)?state.recurringRules:[]).filter(rule=>rule.active!==false);
+    const dueSchedules=result.forecast.reduce((sum,row)=>sum+forecastRecurringItems(row.key,new Set(result.accounts.map(account=>account.id))).length,0);
+    if(status)status.textContent+=' Impegni attivi: '+activeSchedules.length+' · occorrenze programmate nei prossimi 12 mesi: '+dueSchedules+'.';
+    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
   }
 
   function navigate(view) {
