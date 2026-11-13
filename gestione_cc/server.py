@@ -54,6 +54,10 @@ def init_db():
             c.execute("ALTER TABLE app_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
         c.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, salt BLOB NOT NULL, password_hash BLOB NOT NULL, iterations INTEGER NOT NULL)")
         c.execute("CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL)")
+        c.execute("CREATE TABLE IF NOT EXISTS transaction_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, transaction_id TEXT NOT NULL, event TEXT NOT NULL, changes_json TEXT NOT NULL)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
+        c.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
         c.execute("CREATE TABLE IF NOT EXISTS background_jobs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result_json TEXT, error TEXT)")
         c.execute("UPDATE background_jobs SET status='queued', updated_at=datetime('now') WHERE status='running'")
         opts = read_options()
@@ -281,6 +285,36 @@ def drive_download_file(file_id):
             return drive_download_file(file_id)
         raise RuntimeError("Impossibile scaricare il backup da Google Drive (HTTP " + str(error.code) + ").") from error
 
+def record_transaction_changes(connection, old_state, new_state, event="updated"):
+    """Persist a field-level, append-only history for transaction changes."""
+    old_items = {str(x.get("id")): x for x in (old_state or {}).get("transactions", []) if isinstance(x, dict) and x.get("id")}
+    new_items = {str(x.get("id")): x for x in (new_state or {}).get("transactions", []) if isinstance(x, dict) and x.get("id")}
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    count = 0
+    for tx_id in sorted(set(old_items) | set(new_items)):
+        before, after = old_items.get(tx_id), new_items.get(tx_id)
+        if before is None:
+            action, changes = "created", {"_record": {"old": None, "new": after}}
+        elif after is None:
+            action, changes = "deleted", {"_record": {"old": before, "new": None}}
+        else:
+            changes = {key: {"old": before.get(key), "new": after.get(key)}
+                       for key in sorted(set(before) | set(after))
+                       if before.get(key) != after.get(key)}
+            if not changes:
+                continue
+            action = event
+        if count >= 1000:
+            connection.execute(
+                "INSERT INTO audit(at,event) VALUES(?,?)",
+                (now, "transaction_history_truncated_after_1000_changes"))
+            break
+        connection.execute(
+            "INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+            (now, tx_id, action, json.dumps(changes, ensure_ascii=False, separators=(",", ":"))))
+        count += 1
+
+
 def current_db_revision():
     with db() as connection:
         row = connection.execute("SELECT revision FROM app_state WHERE id=1").fetchone()
@@ -478,6 +512,48 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/api/transactions/audit":
+            item = self.require_auth()
+            if not item: return
+            from urllib.parse import parse_qs
+            query = parse_qs(urlparse(self.path).query)
+            tx_id = str(query.get("transaction_id", [""])[0])[:160]
+            with db() as connection:
+                rows = connection.execute(
+                    "SELECT id,at,event,changes_json FROM transaction_audit WHERE transaction_id=? ORDER BY id DESC LIMIT 200",
+                    (tx_id,)).fetchall()
+            self.send_json(200, {"items":[{"id":r["id"],"at":r["at"],"event":r["event"],"changes":json.loads(r["changes_json"])} for r in rows]})
+            return
+        if path == "/api/attachments":
+            item = self.require_auth()
+            if not item: return
+            from urllib.parse import parse_qs
+            tx_id = str(parse_qs(urlparse(self.path).query).get("transaction_id", [""])[0])[:160]
+            with db() as connection:
+                rows = connection.execute(
+                    "SELECT id,transaction_id,filename,mime,size,created_at FROM attachments WHERE transaction_id=? ORDER BY created_at,id",
+                    (tx_id,)).fetchall()
+            self.send_json(200, {"items":[dict(r) for r in rows]})
+            return
+        if path == "/api/attachments/download":
+            item = self.require_auth()
+            if not item: return
+            from urllib.parse import parse_qs
+            attachment_id = str(parse_qs(urlparse(self.path).query).get("id", [""])[0])[:160]
+            with db() as connection:
+                row = connection.execute("SELECT filename,mime,size,content FROM attachments WHERE id=?", (attachment_id,)).fetchone()
+            if not row:
+                self.send_json(404, {"error":"Allegato non trovato"}); return
+            filename = row["filename"].replace('"', '').replace("\\", "_").replace("\r", "").replace("\n", "")[:180]
+            self.send_response(200)
+            self.send_header("Content-Type", row["mime"])
+            self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + __import__("urllib.parse", fromlist=["quote"]).quote(filename))
+            self.send_header("Content-Length", str(row["size"]))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(row["content"])
+            return
         if path == "/api/drive/session-backup/status":
             item = self.require_auth()
             if not item: return
@@ -580,7 +656,13 @@ class Handler(BaseHTTPRequestHandler):
             if not item: return
             with db() as c: row = c.execute("SELECT state_json FROM app_state WHERE id=1").fetchone()
             state = json.loads(row["state_json"]) if row else None
-            payload = {"format":"conti-chiari-local-backup","version":1,"exportedAt":time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),"state":state}
+            with db() as c:
+                attachment_rows = c.execute("SELECT id,transaction_id,filename,mime,size,content,created_at FROM attachments ORDER BY id").fetchall()
+            total = sum(int(row["size"]) for row in attachment_rows)
+            if total > 80 * 1024 * 1024:
+                self.send_json(413, {"error":"Gli allegati superano il limite di 80 MB per il backup JSON. Usa il backup SQLite."}); return
+            attachments = [{"id":r["id"],"transaction_id":r["transaction_id"],"filename":r["filename"],"mime":r["mime"],"size":r["size"],"created_at":r["created_at"],"content":base64.b64encode(r["content"]).decode("ascii")} for r in attachment_rows]
+            payload = {"format":"conti-chiari-local-backup","version":2,"exportedAt":time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),"state":state,"attachments":attachments}
             self.send_json(200, payload, {"Content-Disposition": 'attachment; filename="Conti-Chiari-backup.json"'})
             return
         if path == "/api/sqlite-backup":
@@ -622,11 +704,73 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         payload = {}
-        if path != "/api/sqlite-restore":
+        raw_body = None
+        if path not in ("/api/sqlite-restore", "/api/attachments/upload"):
             try: payload = json.loads(self.body() or b"{}")
             except Exception:
                 self.send_json(400, {"error":"JSON non valido"})
                 return
+        if path == "/api/attachments/upload":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            try:
+                from email.parser import BytesParser
+                from email.policy import default as email_policy
+                raw = self.body()
+                content_type = self.headers.get("Content-Type", "")
+                if not content_type.lower().startswith("multipart/form-data;"):
+                    raise ValueError("Formato upload non valido.")
+                message = BytesParser(policy=email_policy).parsebytes(
+                    b"Content-Type: " + content_type.encode("ascii", "strict") + b"\r\nMIME-Version: 1.0\r\n\r\n" + raw)
+                fields = {}
+                uploaded = None
+                for part in message.iter_parts():
+                    name = part.get_param("name", header="content-disposition")
+                    data = part.get_payload(decode=True) or b""
+                    if name == "file":
+                        uploaded = (part.get_filename() or "allegato", part.get_content_type().lower(), data)
+                    elif name:
+                        fields[name] = data.decode("utf-8", "replace")
+                tx_id = str(fields.get("transaction_id", ""))[:160]
+                if not tx_id or not uploaded:
+                    raise ValueError("Movimento o file non specificato.")
+                filename, mime, content = uploaded
+                if len(content) < 1 or len(content) > 10 * 1024 * 1024:
+                    raise ValueError("Ogni allegato deve avere dimensione massima di 10 MB.")
+                allowed = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}
+                suffix = Path(filename).suffix.lower()
+                if mime not in allowed or suffix not in {allowed[mime], ".jpeg" if mime == "image/jpeg" else allowed[mime]}:
+                    raise ValueError("Sono consentiti soltanto file PDF, JPEG e PNG.")
+                filename = Path(filename).name.replace("\\", "_").replace("\r", "").replace("\n", "")[:180]
+                with db() as connection:
+                    state_row = connection.execute("SELECT state_json FROM app_state WHERE id=1").fetchone()
+                    tx_ids = {str(x.get("id")) for x in json.loads(state_row["state_json"]).get("transactions", [])} if state_row else set()
+                    if tx_id not in tx_ids:
+                        raise ValueError("Il movimento selezionato non esiste più.")
+                    total = connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
+                    if int(total) + len(content) > 80 * 1024 * 1024:
+                        raise ValueError("Spazio allegati massimo raggiunto (80 MB).")
+                    attachment_id = secrets.token_urlsafe(18)
+                    connection.execute(
+                        "INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
+                        (attachment_id, tx_id, filename, mime, len(content), sqlite3.Binary(content), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
+                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_added:" + tx_id,))
+                self.send_json(201, {"ok":True,"id":attachment_id,"filename":filename,"size":len(content)})
+            except Exception as error:
+                self.send_json(400, {"error":str(error)})
+            return
+        if path == "/api/attachments/delete":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            attachment_id = str(payload.get("id", ""))[:160]
+            with db() as connection:
+                row = connection.execute("SELECT transaction_id FROM attachments WHERE id=?", (attachment_id,)).fetchone()
+                if not row:
+                    self.send_json(404, {"error":"Allegato non trovato"}); return
+                connection.execute("DELETE FROM attachments WHERE id=?", (attachment_id,))
+                connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_deleted:" + row["transaction_id"],))
+            self.send_json(200, {"ok":True})
+            return
         if path == "/api/drive/connect":
             item = self.require_auth(csrf=True)
             if not item: return
@@ -836,7 +980,24 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(409, {"error":"L'archivio è stato modificato da un altro dispositivo. Ricarica la pagina prima di riprovare."})
                     return
                 revision = current + 1
+                old_row = c.execute("SELECT state_json FROM app_state WHERE id=1").fetchone()
+                old_state = json.loads(old_row["state_json"]) if old_row else None
+                record_transaction_changes(c, old_state, state, "imported")
                 c.execute("INSERT INTO app_state(id,state_json,updated_at,revision) VALUES(1,?,datetime('now'),?) ON CONFLICT(id) DO UPDATE SET state_json=excluded.state_json, updated_at=excluded.updated_at, revision=excluded.revision", (json.dumps(state,ensure_ascii=False), revision))
+                if isinstance(payload.get("attachments"), list):
+                    if len(payload["attachments"]) > 10000: raise ValueError("Numero allegati non valido.")
+                    c.execute("DELETE FROM attachments")
+                    restored = 0
+                    for attachment in payload["attachments"]:
+                        if not isinstance(attachment, dict): raise ValueError("Allegato nel backup non valido.")
+                        data = base64.b64decode(str(attachment.get("content", "")), validate=True)
+                        mime = str(attachment.get("mime", ""))
+                        if mime not in ("application/pdf", "image/jpeg", "image/png") or len(data) > 10 * 1024 * 1024:
+                            raise ValueError("Allegato nel backup non valido.")
+                        restored += len(data)
+                        if restored > 80 * 1024 * 1024: raise ValueError("Dimensione allegati nel backup eccessiva.")
+                        c.execute("INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
+                            (str(attachment["id"]),str(attachment["transaction_id"]),Path(str(attachment["filename"])).name,mime,len(data),sqlite3.Binary(data),str(attachment.get("created_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))))
                 c.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("state_imported",))
             self.send_json(200, {"ok":True,"revision":revision,"accounts":len(state["accounts"]),"transactions":len(state["transactions"])})
             return
@@ -857,6 +1018,9 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(409, {"error":"L'archivio è stato modificato da un altro dispositivo. Ricarica la pagina prima di riprovare."})
                     return
                 revision = current + 1
+                old_row = c.execute("SELECT state_json FROM app_state WHERE id=1").fetchone()
+                old_state = json.loads(old_row["state_json"]) if old_row else None
+                record_transaction_changes(c, old_state, state, "updated")
                 c.execute("INSERT INTO app_state(id,state_json,updated_at,revision) VALUES(1,?,datetime('now'),?) ON CONFLICT(id) DO UPDATE SET state_json=excluded.state_json, updated_at=excluded.updated_at, revision=excluded.revision", (json.dumps(state,ensure_ascii=False), revision))
                 c.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("state_saved",))
             self.send_json(200, {"ok":True,"revision":revision})
