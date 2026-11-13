@@ -78,6 +78,10 @@ try {
   await page.goto('http://127.0.0.1:8765/index.html', { waitUntil: 'networkidle' });
   await page.waitForFunction(() => document.body.classList.contains('app-ready'), { timeout: 30000 });
   await page.waitForTimeout(900);
+  // L'avviso iniziale dell'app può comparire nel browser di anteprima:
+  // chiudilo per consentire la navigazione automatizzata delle schermate.
+  const notice = page.locator('#noticeModal:not(.hidden)');
+  if (await notice.count()) await notice.locator('[data-close-modal]').first().click();
   await page.screenshot({ path: path.join(outputDir, 'panoramica.png'), fullPage: false });
 
   await page.locator('.nav-item[data-view="transactions"]').click();
