@@ -737,6 +737,56 @@
     $('#advancedSearchBody').innerHTML = results.slice(0,1000).map(({tx,allocation}) => '<tr><td>' + safeText(formatDate(tx.date)) + '</td><td class="name-cell">' + safeText(transactionDescription(tx) || transactionCausale(tx) || 'Movimento') + (allocation.labels.length ? '<small class="name-secondary">Riparto: ' + safeText(allocation.labels.join(' · ')) + '</small>' : '') + '</td><td class="' + (allocation.amount>=0?'amount-in':'amount-out') + '">' + euro.format(allocation.amount) + '</td><td>' + safeText(accountLabel(tx.bankAccountId)) + '</td><td>' + safeText(allocation.labels.length ? allocation.labels.join(' · ') : accountLabel(tx.counterpartAccountId)) + '</td><td>' + (tx.status === 'confirmed' ? 'Confermato' : 'Da classificare') + '</td></tr>').join('') || '<tr><td colspan="6" class="empty-inline">Nessun movimento corrisponde ai filtri.</td></tr>';
     if (results.length > 1000) $('#searchResultCount').textContent += ' · mostrati i primi 1.000';
   }
+  function advancedSearchSummaryRows() {
+    const rows = advancedSearchResults || [];
+    const months = new Map(), years = new Map(), counterparts = new Map();
+    let income = 0, expense = 0;
+    for (const {tx, allocation} of rows) {
+      const amount = Number(allocation.amount) || 0, date = String(tx.date || '');
+      if (amount >= 0) income += amount; else expense += Math.abs(amount);
+      const month = date.slice(0,7), year = date.slice(0,4);
+      if (month) { const item=months.get(month)||{income:0,expense:0,net:0}; if(amount>=0)item.income+=amount;else item.expense+=Math.abs(amount);item.net+=amount;months.set(month,item); }
+      if (year) { const item=years.get(year)||{income:0,expense:0,net:0}; if(amount>=0)item.income+=amount;else item.expense+=Math.abs(amount);item.net+=amount;years.set(year,item); }
+      const labels = allocation.labels.length ? allocation.labels : [accountLabel(tx.counterpartAccountId)];
+      for (const label of labels) {
+        if (!label || label === '—') continue;
+        const key = month + '|' + label, item=counterparts.get(key)||{month,label,income:0,expense:0,net:0};
+        if(amount>=0)item.income+=amount;else item.expense+=Math.abs(amount);item.net+=amount;counterparts.set(key,item);
+      }
+    }
+    return {rows,income,expense,net:income-expense,months:[...months].sort((a,b)=>a[0].localeCompare(b[0])),years:[...years].sort((a,b)=>a[0].localeCompare(b[0])),counterparts:[...counterparts.values()].sort((a,b)=>a.month.localeCompare(b.month)||a.label.localeCompare(b.label,'it'))};
+  }
+  function exportAdvancedSearchPdf() {
+    if (!advancedSearchResults.length) { showNotice('Nessun risultato','Esegui prima una ricerca avanzata.'); return; }
+    const data=advancedSearchSummaryRows(), filters=searchControls();
+    const labelMonth=key=>{const [y,m]=key.split('-').map(Number);return new Intl.DateTimeFormat('it-IT',{month:'long',year:'numeric'}).format(new Date(y,m-1,1));};
+    const monthly=data.months.map(([key,v])=>'<tr><td>'+safeText(labelMonth(key))+'</td><td class="num">'+euro.format(v.income)+'</td><td class="num">'+euro.format(v.expense)+'</td><td class="num">'+euro.format(v.net)+'</td></tr>').join('');
+    const annual=data.years.map(([key,v])=>'<tr><td>'+safeText(key)+'</td><td class="num">'+euro.format(v.income)+'</td><td class="num">'+euro.format(v.expense)+'</td><td class="num">'+euro.format(v.net)+'</td></tr>').join('');
+    const counterpartRows=data.counterparts.map(v=>'<tr><td>'+safeText(labelMonth(v.month))+'</td><td>'+safeText(v.label)+'</td><td class="num">'+euro.format(v.income)+'</td><td class="num">'+euro.format(v.expense)+'</td><td class="num">'+euro.format(v.net)+'</td></tr>').join('');
+    const max=Math.max(1,...data.months.flatMap(([,v])=>[v.income,v.expense]));
+    const bars=data.months.map(([key,v])=>'<div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;align-items:center;margin:7px 0"><span>'+safeText(labelMonth(key))+'</span><span style="background:#4d9a7a;height:12px;width:'+Math.max(1,v.income/max*100)+'%"></span><span style="background:#c66c61;height:12px;width:'+Math.max(1,v.expense/max*100)+'%"></span></div>').join('');
+    const txRows=data.rows.map(({tx,allocation})=>'<tr><td>'+safeText(formatDate(tx.date))+'</td><td>'+safeText(transactionDescription(tx)||transactionCausale(tx)||'Movimento')+'</td><td>'+safeText(allocation.labels.join(' · ')||accountLabel(tx.counterpartAccountId))+'</td><td class="num">'+euro.format(allocation.amount)+'</td><td>'+safeText(tx.status==='confirmed'?'Confermato':'Da classificare')+'</td></tr>').join('');
+    const content='<h1>Ricerca avanzata · Gestione C/C</h1><p>Periodo: '+safeText(filters.from||'inizio archivio')+' – '+safeText(filters.to||'oggi')+' · '+data.rows.length+' movimenti</p><div class="summary"><div><b>Entrate</b><strong>'+euro.format(data.income)+'</strong></div><div><b>Uscite</b><strong>'+euro.format(data.expense)+'</strong></div><div><b>Saldo netto</b><strong>'+euro.format(data.net)+'</strong></div></div><h2>Andamento mensile</h2><p>Entrate (verde) · Uscite (rosso)</p>'+bars+'<h2>Riepilogo mensile</h2><table><thead><tr><th>Mese</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+monthly+'</tbody></table><h2>Riepilogo annuale</h2><table><thead><tr><th>Anno</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+annual+'</tbody></table><h2>Andamento mensile per contropartita</h2><table><thead><tr><th>Mese</th><th>Contropartita</th><th>Entrate</th><th>Uscite</th><th>Netto</th></tr></thead><tbody>'+counterpartRows+'</tbody></table><h2>Movimenti trovati</h2><table><thead><tr><th>Data</th><th>Descrizione</th><th>Contropartita</th><th>Importo</th><th>Stato</th></tr></thead><tbody>'+txRows+'</tbody></table>';
+    printHtml('Ricerca-avanzata',content);
+  }
+  function exportAdvancedSearchXlsx() {
+    if (!advancedSearchResults.length) { showNotice('Nessun risultato','Esegui prima una ricerca avanzata.'); return; }
+    const data=advancedSearchSummaryRows(), filters=searchControls();
+    const months=[['Mese','Entrate','Uscite','Saldo netto'],...data.months.map(([key,v])=>[key,v.income,v.expense,v.net])];
+    const years=[['Anno','Entrate','Uscite','Saldo netto'],...data.years.map(([key,v])=>[key,v.income,v.expense,v.net])];
+    const counterpartRows=[['Mese','Contropartita','Entrate','Uscite','Saldo netto'],...data.counterparts.map(v=>[v.month,v.label,v.income,v.expense,v.net])];
+    const transactions=[['Data','Descrizione','Conto corrente','Contropartita','Importo','Stato'],...data.rows.map(({tx,allocation})=>[tx.date,transactionDescription(tx)||transactionCausale(tx)||'Movimento',accountLabel(tx.bankAccountId),allocation.labels.join(' · ')||accountLabel(tx.counterpartAccountId),allocation.amount,tx.status==='confirmed'?'Confermato':'Da classificare'])];
+    const summary=[['GESTIONE C/C · RICERCA AVANZATA'],['Dal',filters.from||'—'],['Al',filters.to||'—'],['Movimenti',data.rows.length],['Entrate',data.income],['Uscite',data.expense],['Saldo netto',data.net]];
+    const charts=[{title:'Entrate e uscite per mese',categorySheet:'Andamento mensile',categoryCol:0,firstDataRow:2,lastDataRow:months.length,series:[{sheet:'Andamento mensile',col:1,nameCol:1},{sheet:'Andamento mensile',col:2,nameCol:2}],startCol:0,startRow:1,endCol:14,endRow:18}];
+    if(years.length>2) charts.push({title:'Entrate e uscite per anno',categorySheet:'Andamento annuale',categoryCol:0,firstDataRow:2,lastDataRow:years.length,series:[{sheet:'Andamento annuale',col:1,nameCol:1},{sheet:'Andamento annuale',col:2,nameCol:2}],startCol:0,startRow:20,endCol:14,endRow:37});
+    downloadXlsx('Ricerca-avanzata.xlsx',[
+      {name:'Riepilogo',rows:summary,titleRow:0,headerRow:-1,currencyColumns:[1]},
+      {name:'Movimenti',rows:transactions,dateColumns:[0],currencyColumns:[4]},
+      {name:'Andamento mensile',rows:months,currencyColumns:[1,2,3],charts},
+      {name:'Andamento annuale',rows:years,currencyColumns:[1,2,3]},
+      {name:'Contropartite',rows:counterpartRows,dateColumns:[0],currencyColumns:[2,3,4]}
+    ]);
+  }
   function setupFinanceViews() {
     if (setupFinanceViews.listenersBound) { if(state.transactions.length&&state.recurringDetectionLastTransactionCount!==state.transactions.length)detectRecurringProposals(); renderBudgetView(); renderForecastSelection(); return; }
     setupFinanceViews.listenersBound = true;
@@ -1832,7 +1882,7 @@
       $('#documentNext').disabled=documentSearchOffset+items.length>=Number(result.total_count||0);
       $('#documentStorageTotal').textContent=(Number(result.total_bytes||0)/1024/1024).toFixed(2)+' MB complessivi';
       $('#documentStorageWarning').classList.toggle('hidden',!result.warning);
-      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-state">Nessun documento trovato.</td></tr>';
+      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-state">Nessun documento trovato.</td></tr>';
       $('#documentsBody').querySelectorAll('[data-doc-download]').forEach(button=>button.addEventListener('click',async()=>{const item=items.find(x=>x.id===button.dataset.docDownload);if(!item)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(item.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),item.filename);}));
       $('#documentsBody').querySelectorAll('[data-doc-open]').forEach(button=>button.addEventListener('click',()=>{const item=items.find(x=>x.id===button.dataset.docOpen);if(!item)return;const preview=window.open('/api/attachments/download?id='+encodeURIComponent(item.id)+'&inline=1','_blank','noopener');if(!preview)showNotice('Anteprima bloccata','Consenti le finestre a comparsa per aprire il documento.');}));
       $('#documentsBody').querySelectorAll('[data-document-category]').forEach(select=>select.addEventListener('change',async()=>{try{await apiRequest('/api/documents/update',{method:'POST',body:JSON.stringify({id:select.dataset.documentCategory,category:select.value})});}catch(error){showNotice('Categoria non aggiornata',error.message||String(error));}}));
