@@ -36,3 +36,5 @@ jobs:
         run: node tests/finance-import.test.js
       - name: Build Home Assistant add-on image
         run: docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest -t gestione-cc-addon-test gestione_cc
+      - name: Verify local PDF and Italian OCR tools
+        run: docker run --rm --entrypoint /bin/sh gestione-cc-addon-test -c "command -v pdftotext && command -v pdfinfo && command -v pdftoppm && command -v tesseract && tesseract --list-langs 2>/dev/null | grep -qx ita"
