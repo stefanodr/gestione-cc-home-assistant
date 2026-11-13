@@ -20,6 +20,7 @@
   let editingRecurringId = null;
   let editingDocumentId = null;
   let editingDocumentOriginal = null;
+  let editingDocumentOrigin = 'archive';
 
   const $ = (selector, parent = document) => parent.querySelector(selector);
   const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
@@ -1114,24 +1115,31 @@
     const day=Math.min(Math.max(1,Number(rule.day)||1),last);
     return key+'-'+String(day).padStart(2,'0');
   }
+  function recurringFrequency(rule) {
+    const raw=String(rule.frequency||rule.periodicity||'').toLowerCase();
+    return ({mensile:'monthly',mensile_fisso:'monthly',bimestrale:'bimonthly',trimestrale:'quarterly',
+      quadrimestrale:'fourmonthly',semestrale:'halfyearly',annuale:'yearly',annually:'yearly',
+      settimanale:'weekly',quindicinale:'biweekly',una_tantum:'once'})[raw]||raw;
+  }
   function recurringOccursInMonth(rule,key) {
-    if(!rule.active)return false;
-    const start=String(rule.startDate||''),end=String(rule.endDate||'');
+    if(rule.active===false)return false;
+    const frequency=recurringFrequency(rule);
+    const start=String(rule.startDate||rule.start_date||''),end=String(rule.endDate||rule.end_date||'');
     const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number);
     if(!sy||!sm||!sd)return false;
     const monthDiff=(y-sy)*12+(m-sm);
-    if(rule.frequency==='once')return monthDiff===0;
+    if(frequency==='once')return monthDiff===0;
     const periods={monthly:1,bimonthly:2,quarterly:3,fourmonthly:4,halfyearly:6,yearly:12};
-    if(rule.frequency==='weekly'||rule.frequency==='biweekly'){
+    if(frequency==='weekly'||frequency==='biweekly'){
       const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd);
-      const step=rule.frequency==='weekly'?7:14;
+      const step=frequency==='weekly'?7:14;
       let due=new Date(origin);while(due<first)due.setDate(due.getDate()+step);
       while(due<=last){const keyDate=localDateKey(due);if(keyDate>=start&&(!end||keyDate<=end))return true;due.setDate(due.getDate()+step);}
       return false;
     }
-    const period=periods[rule.frequency];
+    const period=periods[frequency];
     if(!period||monthDiff<0||monthDiff%period!==0)return false;
-    const date=monthOccurrence(rule,key);
+    const date=monthOccurrence({...rule,day:rule.day||Number(sd)},key);
     return date>=start&&(!end||date<=end);
   }
   function transactionMatchesRecurringRule(tx,rule) {
@@ -1147,15 +1155,15 @@
   }
   function recurringOccurrenceDates(rule,key) {
     if(!recurringOccursInMonth(rule,key))return [];
-    const start=String(rule.startDate||''),end=String(rule.endDate||'');
-    const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number);
-    if(rule.frequency==='weekly'||rule.frequency==='biweekly'){
-      const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd),step=rule.frequency==='weekly'?7:14,dates=[];
+    const start=String(rule.startDate||rule.start_date||''),end=String(rule.endDate||rule.end_date||'');
+    const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number),frequency=recurringFrequency(rule);
+    if(frequency==='weekly'||frequency==='biweekly'){
+      const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd),step=frequency==='weekly'?7:14,dates=[];
       let due=new Date(origin);while(due<first)due.setDate(due.getDate()+step);
       while(due<=last){const date=localDateKey(due);if(date>=start&&(!end||date<=end))dates.push(date);due.setDate(due.getDate()+step);}
       return dates;
     }
-    const date=monthOccurrence(rule,key);
+    const date=monthOccurrence({...rule,day:rule.day||Number(sd)},key);
     return date>=start&&(!end||date<=end)?[date]:[];
   }
   function recurringAlreadyRealized(rule,date) {
@@ -1167,9 +1175,10 @@
   }
   function forecastRecurringItems(key,selectedIds) {
     const today=localDateKey(new Date());
-    return state.recurringRules.filter(r=>r.active&&selectedIds.has(r.bankAccountId))
+    return (Array.isArray(state.recurringRules)?state.recurringRules:[])
+      .filter(rule=>rule.active!==false&&selectedIds.has(String(rule.bankAccountId||rule.accountId||'')))
       .flatMap(rule=>recurringOccurrenceDates(rule,key).filter(date=>(key!==today.slice(0,7)||date>=today)&&!recurringAlreadyRealized(rule,date))
-        .map(date=>({...rule,occurrenceDate:date})));
+        .map(date=>({...rule,bankAccountId:rule.bankAccountId||rule.accountId,occurrenceDate:date})));
   }
   function transactionIsExplicitlyRecurring(tx,categoryId,key,selectedIds) {
     return state.recurringRules.some(rule=>rule.active&&rule.categoryId===categoryId&&selectedIds.has(rule.bankAccountId)&&
