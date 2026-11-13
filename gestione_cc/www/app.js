@@ -1126,7 +1126,7 @@
   function recurringFrequency(rule) {
     const raw=String(rule.frequency||rule.periodicity||'').toLowerCase();
     return ({mensile:'monthly',mensile_fisso:'monthly',bimestrale:'bimonthly',trimestrale:'quarterly',
-      quadrimestrale:'fourmonthly',semestrale:'halfyearly',annuale:'yearly',annually:'yearly',
+      quadrimestrale:'fourmonthly',semestrale:'halfyearly',annuale:'yearly',annual:'yearly',annually:'yearly',
       settimanale:'weekly',quindicinale:'biweekly',una_tantum:'once'})[raw]||raw;
   }
   function recurringOccursInMonth(rule,key) {
@@ -1157,7 +1157,7 @@
     const relevantAmount=rule.categoryId&&splits.length
       ? splits.filter(split=>split.accountId===rule.categoryId).reduce((sum,split)=>sum+Math.abs(Number(split.value)||0),0)
       : Math.abs(Number(tx.amount)||0);
-    return tx.status==='confirmed' && tx.bankAccountId===rule.bankAccountId &&
+    return tx.status==='confirmed' && tx.bankAccountId===(rule.bankAccountId||rule.accountId) &&
       Math.abs(relevantAmount-Math.abs(Number(rule.amount)||0))<=tolerance &&
       Boolean(target) && normalize(transactionDescription(tx)||transactionCausale(tx))===target;
   }
@@ -1182,10 +1182,10 @@
     });
   }
   function forecastRecurringItems(key,selectedIds) {
-    const today=localDateKey(new Date());
+    const currentMonth=localDateKey(new Date()).slice(0,7);
     return (Array.isArray(state.recurringRules)?state.recurringRules:[])
       .filter(rule=>rule.active!==false&&selectedIds.has(String(rule.bankAccountId||rule.accountId||'')))
-      .flatMap(rule=>recurringOccurrenceDates(rule,key).filter(date=>(key!==today.slice(0,7)||date>=today)&&!recurringAlreadyRealized(rule,date))
+      .flatMap(rule=>recurringOccurrenceDates(rule,key).filter(date=>key===currentMonth||!recurringAlreadyRealized(rule,date))
         .map(date=>({...rule,bankAccountId:rule.bankAccountId||rule.accountId,occurrenceDate:date})));
   }
   function transactionIsExplicitlyRecurring(tx,categoryId,key,selectedIds) {
@@ -1337,7 +1337,7 @@
     const sources=new Set();
     for(let i=0;i<12;i++){
       const key=shiftMonthKey(currentMonth,i);
-      const due=forecastRecurringItems(key,ids).filter(rule=>i!==0||rule.occurrenceDate>=today);
+      const due=forecastRecurringItems(key,ids);
       const programmedIncome=due.filter(rule=>Number(rule.amount)>0).reduce((sum,rule)=>sum+Number(rule.amount),0);
       const programmedExpense=due.filter(rule=>Number(rule.amount)<0).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)),0);
       // The forecast is a forward-looking projection: actual movements are
@@ -1350,8 +1350,7 @@
         if(historic.source==='sporadico')continue;
         sources.add(historic.source);
         const scheduledRemaining=due.filter(rule=>rule.categoryId===account.id).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)||0),0);
-        const already= i===0?categoryMonthly(account.id,key):0;
-        const residual=Math.max(0,historic.amount-scheduledRemaining-already);
+        const residual=Math.max(0,historic.amount-scheduledRemaining);
         if(account.type==='INCOME')estimateIncome+=residual;else estimateExpense+=residual;
       }
       estimateIncome=Math.round(estimateIncome*100)/100;
