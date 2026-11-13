@@ -523,7 +523,15 @@
       catch (error) { console.error('Operazione di conferma non completata', error); closeModals(); showNotice('Operazione non completata', error?.message || String(error) || 'Errore inatteso dopo la conferma.'); }
     });
     $('#confirmExclude')?.addEventListener('click', async () => { const fn=confirmCallback; closeModals(); if(!fn)return; showNotice('Operazione in corso','Attendi il completamento.'); try{await fn(false);}catch(error){showNotice('Operazione non completata',error.message||String(error));} });
-    $$('.nav-item').forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
+    $('.nav-item').forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
+    $('#closeAttachmentsModal')?.addEventListener('click',()=>$('#attachmentsModal').classList.add('hidden'));
+    $('#doneAttachmentsModal')?.addEventListener('click',()=>$('#attachmentsModal').classList.add('hidden'));
+    $('#uploadAttachmentButton')?.addEventListener('click',()=>$('#attachmentFilePicker').click());
+    $('#attachmentFilePicker')?.addEventListener('change',async event=>{const file=event.target.files?.[0];event.target.value='';if(file)await uploadTransactionAttachment(file);});
+    $('#runDocumentSearch')?.addEventListener('click',searchDocuments);
+    $('#clearDocumentSearch')?.addEventListener('click',()=>{$('#documentSearchText').value='';$('#documentSearchCategory').value='';searchDocuments();});
+    $('#documentSearchText')?.addEventListener('keydown',event=>{if(event.key==='Enter')searchDocuments();});
+
     $$('[data-goto]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.goto)));
     $('#monthPicker').addEventListener('change', () => { state.selectedMonth = $('#monthPicker').value; syncReportPeriodPicker(state.selectedMonth);  saveState(); renderAll(); });
     $('#reportMonth').addEventListener('change', () => { state.selectedMonth = overviewMonthForReportPeriod($('#reportMonth').value, reportMode); $('#monthPicker').value = state.selectedMonth;  saveState(); renderAll(); });
@@ -1203,7 +1211,7 @@
   function navigate(view) {
     $$('.content-view').forEach(section => section.classList.toggle('active', section.id === `view-${view}`));
     $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === view));
-    const names = { overview: 'Panoramica', transactions: 'Movimenti', search: 'Ricerca avanzata', budget: 'Budget', forecast: 'Previsioni', reports: 'Report', accounts: 'Piano dei conti', rules: 'Regole apprese', settings: 'Impostazioni' };
+    const names = { overview: 'Panoramica', transactions: 'Movimenti', search: 'Ricerca avanzata', documents: 'Archivio documenti', budget: 'Budget', forecast: 'Previsioni', reports: 'Report', accounts: 'Piano dei conti', rules: 'Regole apprese', settings: 'Impostazioni' };
     $('#currentSection').textContent = names[view] || 'Panoramica';
     renderAll();
     if (view === 'reports') requestAnimationFrame(drawReportChart);
@@ -1752,32 +1760,49 @@
     $$('[data-history-tx]', body).forEach(btn => btn.addEventListener('click', () => showTransactionHistory(btn.dataset.historyTx)));
     updateTransactionBulkUi(tx);
   }
+  let activeAttachmentTransactionId = null;
   async function manageTransactionAttachments(id) {
     const tx=state.transactions.find(item=>item.id===id);if(!tx)return;
-    try {
-      const result=await apiRequest('/api/attachments?transaction_id='+encodeURIComponent(id));
-      const files=result.items||[];const listing=files.length?files.map((f,i)=>(i+1)+'. '+f.filename+' ('+Math.round(f.size/1024)+' KB)').join('\n'):'Nessun allegato.';
-      const choice=window.prompt('Allegati · '+(tx.payee||tx.memo||'movimento')+'\n'+listing+'\n\nDigita A per aggiungere, D1 per eliminare il primo allegato oppure il numero per scaricarlo.');
-      if(choice===null)return;
-      if(choice.toUpperCase().startsWith('D')) {
-        const n=Number(choice.slice(1))-1;
-        if(Number.isInteger(n)&&n>=0&&n<files.length){
-          if(window.confirm('Eliminare definitivamente '+files[n].filename+'?')){
-            await apiRequest('/api/attachments/delete',{method:'POST',body:JSON.stringify({id:files[n].id})});
-            showNotice('Allegato eliminato','Il file è stato rimosso dall’archivio.');
-          }
-        }
-        return;
-      }
-      if(choice.toUpperCase()==='A'){
-        const picker=document.createElement('input');picker.type='file';picker.accept='.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';
-        picker.onchange=async()=>{const file=picker.files&&picker.files[0];if(!file)return;if(file.size>10*1024*1024){showNotice('File troppo grande','Massimo 10 MB per allegato.');return;}
-          const form=new FormData();form.append('transaction_id',id);form.append('file',file);
-          try{const response=await fetch('/api/attachments/upload',{method:'POST',body:form,headers:{'X-CSRF-Token':csrfToken},credentials:'same-origin',cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Caricamento non riuscito.');showNotice('Allegato caricato',file.name+' è stato associato al movimento.');}catch(error){showNotice('Caricamento non riuscito',error.message||String(error));}
-        };picker.click();return;
-      }
-      const index=Number(choice)-1;if(Number.isInteger(index)&&index>=0&&index<files.length){const response=await fetch('/api/attachments/download?id='+encodeURIComponent(files[index].id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),files[index].filename);}
-    }catch(error){showNotice('Allegati non disponibili',error.message||String(error));}
+    activeAttachmentTransactionId=id;
+    $('#attachmentsTransactionLabel').textContent=(tx.payee||tx.memo||'Movimento')+' · '+formatDate(tx.date);
+    $('#attachmentsModal').classList.remove('hidden');
+    await refreshTransactionAttachments();
+  }
+  async function refreshTransactionAttachments() {
+    if(!activeAttachmentTransactionId)return;
+    const result=await apiRequest('/api/attachments?transaction_id='+encodeURIComponent(activeAttachmentTransactionId));
+    const files=result.items||[];
+    const total=files.reduce((sum,file)=>sum+Number(file.size||0),0);
+    $('#attachmentLimitHint').textContent='Spazio usato: '+(total/1024/1024).toFixed(2)+' MB su 15 MB · massimo 5 MB per file.';
+    $('#attachmentList').innerHTML=files.length?files.map(file=>'<div class="attachment-row"><div class="attachment-file-info"><strong>'+safeText(file.filename)+'</strong><small>'+Math.max(1,Math.round(file.size/1024))+' KB · '+safeText(formatDate(String(file.created_at||'').slice(0,10)))+'</small></div><div class="attachment-row-actions"><button class="row-action" type="button" data-download-attachment="'+safeText(file.id)+'">Scarica</button><button class="row-action row-action-danger" type="button" data-delete-attachment="'+safeText(file.id)+'">Elimina</button></div></div>').join(''):'<p class="empty-state">Nessun allegato associato a questo movimento.</p>';
+    $('#attachmentList').querySelectorAll('[data-download-attachment]').forEach(button=>button.addEventListener('click',async()=>{const file=files.find(item=>item.id===button.dataset.downloadAttachment);if(!file)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(file.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),file.filename);}));
+    $('#attachmentList').querySelectorAll('[data-delete-attachment]').forEach(button=>button.addEventListener('click',async()=>{const file=files.find(item=>item.id===button.dataset.deleteAttachment);if(!file||!window.confirm('Eliminare definitivamente "'+file.filename+'"?'))return;try{await apiRequest('/api/attachments/delete',{method:'POST',body:JSON.stringify({id:file.id})});await refreshTransactionAttachments();}catch(error){showNotice('Eliminazione non riuscita',error.message||String(error));}}));
+  }
+  async function uploadTransactionAttachment(file) {
+    if(!file||!activeAttachmentTransactionId)return;
+    if(file.size>5*1024*1024){showNotice('File troppo grande','Il singolo allegato non può superare 5 MB.');return;}
+    const form=new FormData();form.append('transaction_id',activeAttachmentTransactionId);form.append('file',file);
+    try{
+      const response=await fetch('/api/attachments/upload',{method:'POST',body:form,headers:{'X-CSRF-Token':csrfToken},credentials:'same-origin',cache:'no-store'});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Caricamento non riuscito.');
+      await refreshTransactionAttachments();
+      if(data.storage_warning)showNotice('Archivio documenti oltre 100 MB','È stato raggiunto il livello di avviso. Puoi continuare a caricare documenti.');
+    }catch(error){showNotice('Caricamento non riuscito',error.message||String(error));}
+  }
+  async function searchDocuments() {
+    const term=$('#documentSearchText').value.trim(),category=$('#documentSearchCategory').value;
+    const params=new URLSearchParams();if(term)params.set('q',term);if(category)params.set('category',category);
+    try{
+      const result=await apiRequest('/api/documents/search?'+params.toString());
+      const items=result.items||[];
+      $('#documentResultCount').textContent=items.length+' documenti trovati';
+      $('#documentStorageTotal').textContent=(Number(result.total_bytes||0)/1024/1024).toFixed(2)+' MB complessivi';
+      $('#documentStorageWarning').classList.toggle('hidden',!result.warning);
+      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.ocr_status||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-state">Nessun documento trovato.</td></tr>';
+      $('#documentsBody').querySelectorAll('[data-doc-download]').forEach(button=>button.addEventListener('click',async()=>{const item=items.find(x=>x.id===button.dataset.docDownload);if(!item)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(item.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),item.filename);}));
+      $('#documentsBody').querySelectorAll('[data-document-category]').forEach(select=>select.addEventListener('change',async()=>{try{await apiRequest('/api/documents/update',{method:'POST',body:JSON.stringify({id:select.dataset.documentCategory,category:select.value})});}catch(error){showNotice('Categoria non aggiornata',error.message||String(error));}}));
+      $('#documentsBody').querySelectorAll('[data-doc-transaction]').forEach(button=>button.addEventListener('click',()=>{navigate('transactions');const target=$('[data-attachments-tx="'+CSS.escape(button.dataset.docTransaction)+'"]');target?.closest('tr')?.scrollIntoView({behavior:'smooth',block:'center'});target?.closest('tr')?.classList.add('document-row-highlight');}));
+    }catch(error){$('#documentResultCount').textContent='Archivio non disponibile';showNotice('Ricerca documenti non riuscita',error.message||String(error));}
   }
   async function showTransactionHistory(id) {
     try{const result=await apiRequest('/api/transactions/audit?transaction_id='+encodeURIComponent(id));const items=result.items||[];
