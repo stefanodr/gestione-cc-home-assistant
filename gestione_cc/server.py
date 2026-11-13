@@ -655,18 +655,21 @@ class Handler(BaseHTTPRequestHandler):
             query=parse_qs(urlparse(self.path).query)
             term=str(query.get("q",[""])[0]).strip()[:200]
             category=str(query.get("category",[""])[0])[:24]
+            try: offset=max(0,min(1000000,int(query.get("offset",["0"])[0])))
+            except (TypeError,ValueError): offset=0
             with db() as connection:
-                sql="""SELECT a.id,a.transaction_id,a.filename,a.mime,a.size,a.created_at,COALESCE(d.status,'queued') AS ocr_status,COALESCE(d.category,'altro') AS category,d.supplier,d.document_date,d.amount,d.fiscal_code,d.tax_code,substr(COALESCE(d.extracted_text,''),1,400) AS excerpt FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id"""
+                base_sql=""" FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id"""
                 clauses=[]; params=[]
                 if category in ("fattura","f24","bollettino","altro"): clauses.append("d.category=?"); params.append(category)
                 if term:
                     clauses.append("(a.filename LIKE ? OR d.extracted_text LIKE ? OR d.supplier LIKE ? OR d.document_date LIKE ? OR d.amount LIKE ? OR d.fiscal_code LIKE ? OR d.tax_code LIKE ?)")
                     params.extend(["%"+term+"%"]*7)
-                if clauses: sql+=" WHERE "+" AND ".join(clauses)
-                sql+=" ORDER BY a.created_at DESC LIMIT 200"
-                rows=connection.execute(sql,params).fetchall()
+                where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
+                sql="""SELECT a.id,a.transaction_id,a.filename,a.mime,a.size,a.created_at,COALESCE(d.status,'queued') AS ocr_status,COALESCE(d.category,'altro') AS category,d.supplier,d.document_date,d.amount,d.fiscal_code,d.tax_code,substr(COALESCE(d.extracted_text,''),1,400) AS excerpt""" + base_sql + where + " ORDER BY a.created_at DESC LIMIT 100 OFFSET ?"
+                rows=connection.execute(sql,params+[offset]).fetchall()
+                count=connection.execute("SELECT COUNT(*)"+base_sql+where,params).fetchone()[0]
                 total=connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
-            self.send_json(200,{"items":[dict(row) for row in rows],"total_bytes":int(total),"warning":int(total)>=100*1024*1024})
+            self.send_json(200,{"items":[dict(row) for row in rows],"total_count":int(count),"offset":offset,"page_size":100,"total_bytes":int(total),"warning":int(total)>=100*1024*1024})
             return
         if path == "/api/attachments/download":
             item = self.require_auth()
