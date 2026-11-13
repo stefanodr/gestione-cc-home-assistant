@@ -1183,7 +1183,6 @@ class Handler(BaseHTTPRequestHandler):
                 try: c.execute("DELETE FROM document_fts")
                 except sqlite3.OperationalError: pass
                 restored = 0
-                valid_tx_ids = {str(tx["id"]) for tx in state["transactions"]}
                 seen_attachment_ids = set()
                 for attachment in attachment_payload:
                     if not isinstance(attachment, dict): raise ValueError("Allegato nel backup non valido.")
