@@ -86,7 +86,14 @@ const pastRule = { id: 'past', active: true, bankAccountId: 'bank', categoryId: 
 const futureRule = { id: 'future', active: true, bankAccountId: 'bank', categoryId: 'rent', description: 'Affitto', amount: -700, frequency: 'monthly', day: 15, startDate: '2026-01-15' };
 forecastContext.state.recurringRules = [pastRule, futureRule];
 const selected = new Set(['bank']);
-assert.deepEqual(Array.from(forecastContext.forecastRecurringItems('2026-11', selected), r => r.id), ['future']);
+// The forecast starts from the last closed month, so it includes the full
+// current month even when a scheduled day is earlier than today's date.
+assert.deepEqual(Array.from(forecastContext.forecastRecurringItems('2026-11', selected), r => r.id), ['past', 'future']);
+const annualRule = { id: 'annual', active: true, bankAccountId: 'bank', description: 'Assicurazione', amount: -300, frequency: 'annual', day: 13, startDate: '2024-11-13' };
+const italianAnnualRule = { ...annualRule, id: 'italian-annual', frequency: 'annuale', startDate: '2025-03-01', day: 1 };
+assert.deepEqual(Array.from(forecastContext.recurringOccurrenceDates(annualRule, '2026-11')), ['2026-11-13']);
+assert.deepEqual(Array.from(forecastContext.recurringOccurrenceDates(italianAnnualRule, '2027-03')), ['2027-03-01']);
+assert.deepEqual(Array.from(forecastContext.recurringOccurrenceDates({ ...annualRule, active: false }, '2026-11')), []);
 const matchingTx = { status: 'confirmed', bankAccountId: 'bank', date: '2026-11-16', amount: -700, description: 'Affitto' };
 forecastContext.state.transactions = [matchingTx];
 assert.equal(forecastContext.transactionIsExplicitlyRecurring(matchingTx, 'rent', '2026-11', selected), true);

@@ -20,6 +20,7 @@
   let editingRecurringId = null;
   let editingDocumentId = null;
   let editingDocumentOriginal = null;
+  let editingDocumentOrigin = 'archive';
 
   const $ = (selector, parent = document) => parent.querySelector(selector);
   const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
@@ -416,7 +417,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.25</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.26</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -538,14 +539,22 @@
       const payload={id:editingDocumentId,supplier:$('#editDocumentSupplier').value,amount:$('#editDocumentAmount').value,
         document_date:$('#editDocumentDate').value,document_number:$('#editDocumentNumber').value};
       payload.manual_fields=Object.keys(editingDocumentOriginal||{}).filter(key=>payload[key]!==editingDocumentOriginal[key]);
-      if(!payload.manual_fields.length){$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;return;}
+      const origin=editingDocumentOrigin;
+      if(!payload.manual_fields.length){
+        $('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;editingDocumentOrigin='archive';
+        if(origin==='movement'){await refreshTransactionAttachments();void refreshAttachmentCounts();}
+        return;
+      }
       try{await apiRequest('/api/documents/metadata',{method:'POST',body:JSON.stringify(payload)});
-        $('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;await searchDocuments();
+        $('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;editingDocumentOrigin='archive';
+        if(origin==='movement'){await refreshTransactionAttachments();void refreshAttachmentCounts();}
+        else await searchDocuments();
         showNotice('Documento aggiornato','Le correzioni manuali sono state salvate e saranno mantenute anche dopo una nuova scansione OCR.');
       }catch(error){showNotice('Modifica non salvata',error.message||String(error));}
     });
-    $('#cancelDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;});
-    $('#closeDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;});
+    const closeDocumentEditor=()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;editingDocumentOrigin='archive';};
+    $('#cancelDocumentMetadata')?.addEventListener('click',closeDocumentEditor);
+    $('#closeDocumentMetadata')?.addEventListener('click',closeDocumentEditor);
     $('#runDocumentSearch')?.addEventListener('click',()=>searchDocuments(true));
     $('#clearDocumentSearch')?.addEventListener('click',()=>{$('#documentSearchText').value='';$('#documentSearchCategory').value='';searchDocuments(true);});
     $('#documentSearchText')?.addEventListener('keydown',event=>{if(event.key==='Enter')searchDocuments(true);});
@@ -1114,24 +1123,31 @@
     const day=Math.min(Math.max(1,Number(rule.day)||1),last);
     return key+'-'+String(day).padStart(2,'0');
   }
+  function recurringFrequency(rule) {
+    const raw=String(rule.frequency||rule.periodicity||'').toLowerCase();
+    return ({mensile:'monthly',mensile_fisso:'monthly',bimestrale:'bimonthly',trimestrale:'quarterly',
+      quadrimestrale:'fourmonthly',semestrale:'halfyearly',annuale:'yearly',annual:'yearly',annually:'yearly',
+      settimanale:'weekly',quindicinale:'biweekly',una_tantum:'once'})[raw]||raw;
+  }
   function recurringOccursInMonth(rule,key) {
-    if(!rule.active)return false;
-    const start=String(rule.startDate||''),end=String(rule.endDate||'');
+    if(rule.active===false)return false;
+    const frequency=recurringFrequency(rule);
+    const start=String(rule.startDate||rule.start_date||''),end=String(rule.endDate||rule.end_date||'');
     const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number);
     if(!sy||!sm||!sd)return false;
     const monthDiff=(y-sy)*12+(m-sm);
-    if(rule.frequency==='once')return monthDiff===0;
+    if(frequency==='once')return monthDiff===0;
     const periods={monthly:1,bimonthly:2,quarterly:3,fourmonthly:4,halfyearly:6,yearly:12};
-    if(rule.frequency==='weekly'||rule.frequency==='biweekly'){
+    if(frequency==='weekly'||frequency==='biweekly'){
       const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd);
-      const step=rule.frequency==='weekly'?7:14;
+      const step=frequency==='weekly'?7:14;
       let due=new Date(origin);while(due<first)due.setDate(due.getDate()+step);
       while(due<=last){const keyDate=localDateKey(due);if(keyDate>=start&&(!end||keyDate<=end))return true;due.setDate(due.getDate()+step);}
       return false;
     }
-    const period=periods[rule.frequency];
+    const period=periods[frequency];
     if(!period||monthDiff<0||monthDiff%period!==0)return false;
-    const date=monthOccurrence(rule,key);
+    const date=monthOccurrence({...rule,day:rule.day||Number(sd)},key);
     return date>=start&&(!end||date<=end);
   }
   function transactionMatchesRecurringRule(tx,rule) {
@@ -1141,21 +1157,21 @@
     const relevantAmount=rule.categoryId&&splits.length
       ? splits.filter(split=>split.accountId===rule.categoryId).reduce((sum,split)=>sum+Math.abs(Number(split.value)||0),0)
       : Math.abs(Number(tx.amount)||0);
-    return tx.status==='confirmed' && tx.bankAccountId===rule.bankAccountId &&
+    return tx.status==='confirmed' && tx.bankAccountId===(rule.bankAccountId||rule.accountId) &&
       Math.abs(relevantAmount-Math.abs(Number(rule.amount)||0))<=tolerance &&
       Boolean(target) && normalize(transactionDescription(tx)||transactionCausale(tx))===target;
   }
   function recurringOccurrenceDates(rule,key) {
     if(!recurringOccursInMonth(rule,key))return [];
-    const start=String(rule.startDate||''),end=String(rule.endDate||'');
-    const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number);
-    if(rule.frequency==='weekly'||rule.frequency==='biweekly'){
-      const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd),step=rule.frequency==='weekly'?7:14,dates=[];
+    const start=String(rule.startDate||rule.start_date||''),end=String(rule.endDate||rule.end_date||'');
+    const [sy,sm,sd]=start.split('-').map(Number),[y,m]=key.split('-').map(Number),frequency=recurringFrequency(rule);
+    if(frequency==='weekly'||frequency==='biweekly'){
+      const first=new Date(y,m-1,1),last=new Date(y,m,0),origin=new Date(sy,sm-1,sd),step=frequency==='weekly'?7:14,dates=[];
       let due=new Date(origin);while(due<first)due.setDate(due.getDate()+step);
       while(due<=last){const date=localDateKey(due);if(date>=start&&(!end||date<=end))dates.push(date);due.setDate(due.getDate()+step);}
       return dates;
     }
-    const date=monthOccurrence(rule,key);
+    const date=monthOccurrence({...rule,day:rule.day||Number(sd)},key);
     return date>=start&&(!end||date<=end)?[date]:[];
   }
   function recurringAlreadyRealized(rule,date) {
@@ -1166,10 +1182,11 @@
     });
   }
   function forecastRecurringItems(key,selectedIds) {
-    const today=localDateKey(new Date());
-    return state.recurringRules.filter(r=>r.active&&selectedIds.has(r.bankAccountId))
-      .flatMap(rule=>recurringOccurrenceDates(rule,key).filter(date=>(key!==today.slice(0,7)||date>=today)&&!recurringAlreadyRealized(rule,date))
-        .map(date=>({...rule,occurrenceDate:date})));
+    const currentMonth=localDateKey(new Date()).slice(0,7);
+    return (Array.isArray(state.recurringRules)?state.recurringRules:[])
+      .filter(rule=>rule.active!==false&&selectedIds.has(String(rule.bankAccountId||rule.accountId||'')))
+      .flatMap(rule=>recurringOccurrenceDates(rule,key).filter(date=>key===currentMonth||!recurringAlreadyRealized(rule,date))
+        .map(date=>({...rule,bankAccountId:rule.bankAccountId||rule.accountId,occurrenceDate:date})));
   }
   function transactionIsExplicitlyRecurring(tx,categoryId,key,selectedIds) {
     return state.recurringRules.some(rule=>rule.active&&rule.categoryId===categoryId&&selectedIds.has(rule.bankAccountId)&&
@@ -1200,7 +1217,7 @@
   function renderRecurringRules() {
     const body=$('#recurringBody');if(!body)return;
     const labels={once:'Una tantum',weekly:'Settimanale',biweekly:'Quindicinale',monthly:'Mensile',bimonthly:'Bimestrale',quarterly:'Trimestrale',fourmonthly:'Quadrimestrale',halfyearly:'Semestrale',yearly:'Annuale'};
-    body.innerHTML=state.recurringRules.map(r=>'<tr><td>'+safeText(r.description)+'</td><td>'+euro.format(r.amount)+'</td><td>'+labels[r.frequency]+'</td><td>'+safeText(r.startDate)+'</td><td>'+(r.active?'Attiva':'Sospesa')+'</td><td><button class="row-action" data-edit-rec="'+safeText(r.id)+'">Modifica</button> <button class="row-action" data-toggle-rec="'+safeText(r.id)+'">'+(r.active?'Sospendi':'Attiva')+'</button> <button class="row-action row-action-danger" data-delete-rec="'+safeText(r.id)+'">Elimina</button></td></tr>').join('')||'<tr><td colspan="6" class="empty-inline">Nessuna ricorrenza configurata.</td></tr>';
+    body.innerHTML=state.recurringRules.map(r=>'<tr><td>'+safeText(r.description)+'</td><td>'+euro.format(r.amount)+'</td><td>'+labels[r.frequency]+'</td><td>'+safeText(r.startDate)+'</td><td>'+(r.active!==false?'Attiva':'Sospesa')+'</td><td><button class="row-action" data-edit-rec="'+safeText(r.id)+'">Modifica</button> <button class="row-action" data-toggle-rec="'+safeText(r.id)+'">'+(r.active!==false?'Sospendi':'Attiva')+'</button> <button class="row-action row-action-danger" data-delete-rec="'+safeText(r.id)+'">Elimina</button></td></tr>').join('')||'<tr><td colspan="6" class="empty-inline">Nessuna ricorrenza configurata.</td></tr>';
     body.querySelectorAll('[data-edit-rec]').forEach(b=>b.addEventListener('click',()=>{const r=state.recurringRules.find(x=>x.id===b.dataset.editRec);if(!r)return;editingRecurringId=r.id;$('#recDescription').value=r.description;$('#recAmount').value=r.amount;$('#recBankAccount').value=r.bankAccountId;$('#recCategory').value=r.categoryId||'';$('#recFrequency').value=r.frequency;$('#recDay').value=r.day||1;$('#recStart').value=r.startDate;$('#recEnd').value=r.endDate||'';$('#addRecurringRule').textContent='Salva modifica';$('#recDescription').focus();}));
     body.querySelectorAll('[data-toggle-rec]').forEach(b=>b.addEventListener('click',()=>{const r=state.recurringRules.find(x=>x.id===b.dataset.toggleRec);if(r)r.active=!r.active;saveState();renderForecastSelection();}));
     body.querySelectorAll('[data-delete-rec]').forEach(b=>b.addEventListener('click',()=>{state.recurringRules=state.recurringRules.filter(x=>x.id!==b.dataset.deleteRec);saveState();renderForecastSelection();}));
@@ -1320,15 +1337,12 @@
     const sources=new Set();
     for(let i=0;i<12;i++){
       const key=shiftMonthKey(currentMonth,i);
-      const due=forecastRecurringItems(key,ids).filter(rule=>i!==0||rule.occurrenceDate>=today);
+      const due=forecastRecurringItems(key,ids);
       const programmedIncome=due.filter(rule=>Number(rule.amount)>0).reduce((sum,rule)=>sum+Number(rule.amount),0);
       const programmedExpense=due.filter(rule=>Number(rule.amount)<0).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)),0);
-      let actualIncome=0,actualExpense=0;
-      if(i===0){
-        for(const tx of txs.filter(tx=>String(tx.date||'')>cutoff&&String(tx.date||'')<=today)){
-          const flow=forecastTransactionFlow(tx,ids);if(flow>=0)actualIncome+=flow;else actualExpense+=Math.abs(flow);
-        }
-      }
+      // The forecast is a forward-looking projection: actual movements are
+      // already reflected in the last closed-month opening balance and are
+      // deliberately not mixed into the scheduled/estimated future flows.
       let estimateIncome=0,estimateExpense=0;
       for(const account of categories){
         const budget=budgetFor(account,key);
@@ -1336,15 +1350,14 @@
         if(historic.source==='sporadico')continue;
         sources.add(historic.source);
         const scheduledRemaining=due.filter(rule=>rule.categoryId===account.id).reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)||0),0);
-        const already= i===0?categoryMonthly(account.id,key):0;
-        const residual=Math.max(0,historic.amount-scheduledRemaining-already);
+        const residual=Math.max(0,historic.amount-scheduledRemaining);
         if(account.type==='INCOME')estimateIncome+=residual;else estimateExpense+=residual;
       }
       estimateIncome=Math.round(estimateIncome*100)/100;
       estimateExpense=Math.round(estimateExpense*100)/100;
       const opening=balance;
-      balance=Math.round((balance+actualIncome-actualExpense+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
-      forecast.push({key,openingBalance:opening,actualIncome,actualExpense,programmedIncome,programmedExpense,estimateIncome,estimateExpense,
+      balance=Math.round((balance+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
+      forecast.push({key,openingBalance:opening,programmedIncome,programmedExpense,estimateIncome,estimateExpense,
         programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
     }
     const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:openingBalance,key:currentMonth});
@@ -1368,7 +1381,10 @@
     $('#forecastEnding').textContent=euro.format(result.forecast.at(-1)?.balance??result.currentBalance);
     $('#forecastReliability').textContent='Saldo al '+monthLabel(result.lastClosedMonth)+' · base '+result.estimates.source+' · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
     if(status&&result.openingBalanceUnknown.length)status.textContent+=' ATTENZIONE: il saldo iniziale è disponibile solo per '+(accountById(state.bankAccountId)?.path||'il conto principale')+'. Per gli altri conti selezionati il saldo storico potrebbe essere incompleto.';
-    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.actualIncome)+'</td><td>'+euro.format(row.actualExpense)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
+    const activeSchedules=(Array.isArray(state.recurringRules)?state.recurringRules:[]).filter(rule=>rule.active!==false);
+    const dueSchedules=result.forecast.reduce((sum,row)=>sum+forecastRecurringItems(row.key,new Set(result.accounts.map(account=>account.id))).length,0);
+    if(status)status.textContent+=' Impegni attivi: '+activeSchedules.length+' · occorrenze programmate nei prossimi 12 mesi: '+dueSchedules+'.';
+    $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
   }
 
   function navigate(view) {
@@ -1960,6 +1976,40 @@
     $('#attachmentList').querySelectorAll('[data-download-attachment]').forEach(button=>button.addEventListener('click',async()=>{const file=files.find(item=>item.id===button.dataset.downloadAttachment);if(!file)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(file.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),file.filename);}));
     $('#attachmentList').querySelectorAll('[data-delete-attachment]').forEach(button=>button.addEventListener('click',async()=>{const file=files.find(item=>item.id===button.dataset.deleteAttachment);if(!file||!window.confirm('Eliminare definitivamente "'+file.filename+'"?'))return;try{await apiRequest('/api/attachments/delete',{method:'POST',body:JSON.stringify({id:file.id})});await refreshTransactionAttachments();void refreshAttachmentCounts();}catch(error){showNotice('Eliminazione non riuscita',error.message||String(error));}}));
   }
+  function openDocumentMetadataEditor(item,origin='archive',pending=false) {
+    if(!item?.id)return;
+    editingDocumentId=item.id;
+    editingDocumentOrigin=origin;
+    $('#editDocumentSupplier').value=item.supplier||'';
+    $('#editDocumentAmount').value=item.amount||'';
+    const rawDate=String(item.document_date||'');
+    const dmy=rawDate.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    $('#editDocumentDate').value=dmy?(String(dmy[3].length===2?(Number(dmy[3])<70?'20':'19')+dmy[3]:dmy[3])+'-'+String(dmy[2]).padStart(2,'0')+'-'+String(dmy[1]).padStart(2,'0')):parseDate(rawDate);
+    $('#editDocumentNumber').value=item.document_number||'';
+    editingDocumentOriginal={supplier:$('#editDocumentSupplier').value,amount:$('#editDocumentAmount').value,
+      document_date:$('#editDocumentDate').value,document_number:$('#editDocumentNumber').value};
+    $('#documentMetadataTitle').textContent=origin==='movement'?'Controlla i dati dell’allegato':'Correggi dati documento';
+    $('#documentMetadataIntro').textContent=pending
+      ?'Il riconoscimento è ancora in corso o non è riuscito. Puoi inserire o correggere i dati qui; le modifiche manuali saranno conservate.'
+      :origin==='movement'
+        ?'Il riconoscimento OCR è terminato. Controlla i dati dell’allegato e correggi quelli non corretti prima di chiudere.'
+        :'I campi e le descrizioni corrispondono a quelli dell’Archivio documenti. Le correzioni manuali saranno mantenute anche dopo successive scansioni.';
+    $('#saveDocumentMetadata').textContent=origin==='movement'?'Conferma dati':'Salva correzioni';
+    $('#documentMetadataModal').classList.remove('hidden');
+    $('#editDocumentSupplier').focus();
+  }
+  async function waitForDocumentOcr(attachmentId,filename) {
+    const deadline=Date.now()+120000;
+    let latest=null;
+    while(Date.now()<deadline){
+      const result=await apiRequest('/api/documents/search?id='+encodeURIComponent(attachmentId));
+      latest=(result.items||[]).find(item=>item.id===attachmentId)||latest;
+      if(latest&&['done','failed'].includes(latest.ocr_status))return {item:latest,pending:false};
+      $('#attachmentLimitHint').textContent='Allegato caricato. Riconoscimento OCR in corso…';
+      await new Promise(resolve=>setTimeout(resolve,800));
+    }
+    return {item:latest||{id:attachmentId,filename},pending:true};
+  }
   async function uploadTransactionAttachment(file) {
     if(!file||!activeAttachmentTransactionId)return;
     if(file.size>5*1024*1024){showNotice('File troppo grande','Il singolo allegato non può superare 5 MB.');return;}
@@ -1969,10 +2019,14 @@
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Caricamento non riuscito.');
       await refreshTransactionAttachments();
       void refreshAttachmentCounts();
-      if(data.storage_warning)showNotice('Archivio documenti oltre 100 MB','È stato raggiunto il livello di avviso. Puoi continuare a caricare documenti.');
+      $('#attachmentLimitHint').textContent='Allegato caricato. Attendo il riconoscimento dei dati…';
+      const result=await waitForDocumentOcr(data.id,data.filename);
+      await refreshTransactionAttachments();
+      if(data.storage_warning)$('#attachmentLimitHint').textContent+=' · Archivio documenti oltre 100 MB (avviso)';
+      openDocumentMetadataEditor(result.item,'movement',result.pending||result.item?.ocr_status==='failed');
     }catch(error){showNotice('Caricamento non riuscito',error.message||String(error));}
   }
-  async function searchDocuments(resetPage = false) {
+    async function searchDocuments(resetPage = false) {
     if(resetPage)documentSearchOffset=0;
     const term=$('#documentSearchText').value.trim(),category=$('#documentSearchCategory').value;
     const params=new URLSearchParams();if(term)params.set('q',term);if(category)params.set('category',category);params.set('offset',String(documentSearchOffset));
@@ -1987,18 +2041,7 @@
       $('#documentStorageWarning').classList.toggle('hidden',!result.warning);
       $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(item.document_date||'—')+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-edit="'+safeText(item.id)+'">Modifica</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="8" class="empty-state">Nessun documento trovato.</td></tr>';
       $('#documentsBody').querySelectorAll('[data-doc-edit]').forEach(button=>button.addEventListener('click',()=>{
-        const item=items.find(x=>x.id===button.dataset.docEdit);if(!item)return;
-        editingDocumentId=item.id;
-        $('#editDocumentSupplier').value=item.supplier||'';
-        $('#editDocumentAmount').value=item.amount||'';
-        const rawDate=String(item.document_date||'');
-        const dmy=rawDate.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
-        $('#editDocumentDate').value=dmy?(String(dmy[3].length===2?(Number(dmy[3])<70?'20':'19')+dmy[3]:dmy[3])+'-'+String(dmy[2]).padStart(2,'0')+'-'+String(dmy[1]).padStart(2,'0')):parseDate(rawDate);
-        $('#editDocumentNumber').value=item.document_number||'';
-        editingDocumentOriginal={supplier:$('#editDocumentSupplier').value,amount:$('#editDocumentAmount').value,
-          document_date:$('#editDocumentDate').value,document_number:$('#editDocumentNumber').value};
-        $('#documentMetadataModal').classList.remove('hidden');
-        $('#editDocumentSupplier').focus();
+        const item=items.find(x=>x.id===button.dataset.docEdit);if(item)openDocumentMetadataEditor(item,'archive');
       }));
       $('#documentsBody').querySelectorAll('[data-doc-download]').forEach(button=>button.addEventListener('click',async()=>{const item=items.find(x=>x.id===button.dataset.docDownload);if(!item)return;const response=await fetch('/api/attachments/download?id='+encodeURIComponent(item.id),{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error('Download non riuscito.');downloadBlob(await response.blob(),item.filename);}));
       $('#documentsBody').querySelectorAll('[data-doc-open]').forEach(button=>button.addEventListener('click',()=>{const item=items.find(x=>x.id===button.dataset.docOpen);if(!item)return;const preview=window.open('/api/attachments/download?id='+encodeURIComponent(item.id)+'&inline=1','_blank');if(preview)preview.opener=null;else showNotice('Anteprima bloccata','Consenti le finestre a comparsa per aprire il documento.');}));

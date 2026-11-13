@@ -748,17 +748,19 @@ class Handler(BaseHTTPRequestHandler):
             query=parse_qs(urlparse(self.path).query)
             term=str(query.get("q",[""])[0]).strip()[:200]
             category=str(query.get("category",[""])[0])[:24]
+            document_id=str(query.get("id",[""])[0]).strip()[:160]
             try: offset=max(0,min(1000000,int(query.get("offset",["0"])[0])))
             except (TypeError,ValueError): offset=0
             with db() as connection:
                 base_sql=""" FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id"""
                 clauses=[]; params=[]
+                if document_id: clauses.append("a.id=?"); params.append(document_id)
                 if category in ("fattura","f24","bollettino","altro"): clauses.append("d.category=?"); params.append(category)
                 if term:
                     clauses.append("(a.filename LIKE ? OR d.extracted_text LIKE ? OR d.supplier LIKE ? OR d.document_date LIKE ? OR d.document_number LIKE ? OR d.amount LIKE ? OR d.fiscal_code LIKE ? OR d.tax_code LIKE ?)")
                     params.extend(["%"+term+"%"]*8)
                 where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
-                sql="""SELECT a.id,a.transaction_id,a.filename,a.mime,a.size,a.created_at,COALESCE(d.status,'queued') AS ocr_status,COALESCE(d.category,'altro') AS category,d.supplier,d.document_date,d.document_number,d.amount,d.fiscal_code,d.tax_code,substr(COALESCE(d.extracted_text,''),1,400) AS excerpt""" + base_sql + where + " ORDER BY a.created_at DESC LIMIT 100 OFFSET ?"
+                sql="""SELECT a.id,a.transaction_id,a.filename,a.mime,a.size,a.created_at,COALESCE(d.status,'queued') AS ocr_status,COALESCE(d.category,'altro') AS category,d.supplier,d.document_date,d.document_number,d.amount,d.fiscal_code,d.tax_code,d.error AS ocr_error,substr(COALESCE(d.extracted_text,''),1,400) AS excerpt""" + base_sql + where + " ORDER BY a.created_at DESC LIMIT 100 OFFSET ?"
                 rows=connection.execute(sql,params+[offset]).fetchall()
                 count=connection.execute("SELECT COUNT(*)"+base_sql+where,params).fetchone()[0]
                 total=connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
