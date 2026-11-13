@@ -68,6 +68,13 @@ def init_db():
         except sqlite3.OperationalError: pass
         c.execute("CREATE TABLE IF NOT EXISTS background_jobs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result_json TEXT, error TEXT)")
         c.execute("UPDATE background_jobs SET status='queued', updated_at=datetime('now') WHERE status='running'")
+        # Backfill attachments created by versions before the OCR index existed.
+        for attachment in c.execute("SELECT a.id FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id WHERE d.attachment_id IS NULL").fetchall():
+            attachment_id = str(attachment["id"])
+            c.execute("INSERT INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',datetime('now'))", (attachment_id,))
+            job_id = secrets.token_urlsafe(24)
+            c.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at,result_json) VALUES(?, 'document_ocr', 'queued', datetime('now'), datetime('now'), ?)",
+                      (job_id, json.dumps({"attachment_id": attachment_id})))
         opts = read_options()
         username = str(opts.get("admin_username", "admin")).strip() or "admin"
         pin = str(opts.get("bootstrap_pin", ""))
@@ -1161,6 +1168,7 @@ class Handler(BaseHTTPRequestHandler):
                 try: c.execute("DELETE FROM document_fts")
                 except sqlite3.OperationalError: pass
                 restored = 0
+                per_transaction_bytes = {}
                 valid_tx_ids = {str(tx["id"]) for tx in state["transactions"]}
                 seen_attachment_ids = set()
                 for attachment in attachment_payload:
@@ -1179,8 +1187,9 @@ class Handler(BaseHTTPRequestHandler):
                         raise ValueError("Allegato nel backup non valido.")
                     seen_attachment_ids.add(attachment_id)
                     restored += len(data)
-                    tx_total=sum(int(x.get("size",0)) for x in attachment_payload if isinstance(x,dict) and str(x.get("transaction_id",""))==tx_id)
-                    if tx_total > 15 * 1024 * 1024: raise ValueError("Gli allegati di una registrazione superano 15 MB.")
+                    per_transaction_bytes[tx_id] = per_transaction_bytes.get(tx_id, 0) + len(data)
+                    if per_transaction_bytes[tx_id] > 15 * 1024 * 1024:
+                        raise ValueError("Gli allegati di una registrazione superano 15 MB.")
                     c.execute("INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
                         (attachment_id,tx_id,filename,mime,len(data),sqlite3.Binary(data),str(attachment.get("created_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))))
                 for document in documents_payload:
@@ -1193,6 +1202,13 @@ class Handler(BaseHTTPRequestHandler):
                     arow=c.execute("SELECT filename FROM attachments WHERE id=?",(attachment_id,)).fetchone()
                     try: c.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",(attachment_id,arow["filename"],category,extracted,document.get("supplier") or "",document.get("document_date") or "",document.get("amount") or "",document.get("fiscal_code") or "",document.get("tax_code") or ""))
                     except sqlite3.OperationalError: pass
+                # Older JSON backups have attachments but no OCR index; queue them for local processing.
+                indexed_ids = {str(row["attachment_id"]) for row in c.execute("SELECT attachment_id FROM document_index").fetchall()}
+                for attachment_id in seen_attachment_ids - indexed_ids:
+                    c.execute("INSERT INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',datetime('now'))", (attachment_id,))
+                    job_id = secrets.token_urlsafe(24)
+                    c.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at,result_json) VALUES(?, 'document_ocr', 'queued', datetime('now'), datetime('now'), ?)",
+                              (job_id, json.dumps({"attachment_id": attachment_id})))
                 c.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("state_imported",))
             self.send_json(200, {"ok":True,"revision":revision,"accounts":len(state["accounts"]),"transactions":len(state["transactions"])})
             return
