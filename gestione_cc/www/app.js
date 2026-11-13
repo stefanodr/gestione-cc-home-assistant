@@ -2044,12 +2044,12 @@
     return `<div class="split-row"><input class="split-account-search" type="text" list="accountSearchOptions" value="${row.accountId ? safeText(accountLabel(row.accountId)) : ''}" placeholder="Cerca categoria o conto…" autocomplete="off" aria-label="Cerca categoria o conto di contropartita"><input class="split-amount" type="text" inputmode="decimal" value="${amountInputFormat.format(Number(row.value || 0))}" aria-label="Importo della contropartita"><button class="split-remove" type="button" aria-label="Rimuovi riga">×</button></div>`;
   }
   function bindSplitRows() {
-    $('.split-account-search, .split-amount', $('#splitRows')).forEach(input => input.addEventListener('input', updateSplitTotals));
-    $('.split-amount', $('#splitRows')).forEach(input => {
+    $( '.split-account-search, .split-amount', $('#splitRows')).forEach(input => input.addEventListener('input', updateSplitTotals));
+    $( '.split-amount', $('#splitRows')).forEach(input => {
       input.addEventListener('focus', () => ungroupAmountField(input));
       input.addEventListener('blur', () => groupAmountField(input));
     });
-    $('.split-remove', $('#splitRows')).forEach(button => button.addEventListener('click', () => { button.closest('.split-row').remove(); updateSplitTotals(); }));
+    $( '.split-remove', $('#splitRows')).forEach(button => button.addEventListener('click', () => { button.closest('.split-row').remove(); updateSplitTotals(); }));
   }
   function updateSplitTotals() {
     const tx = state.transactions.find(t => t.id === splitEditingId); if (!tx) return;
