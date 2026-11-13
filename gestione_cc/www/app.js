@@ -428,7 +428,7 @@
     $('#reportPeriodMode').value = reportMode;
     setupControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.28</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.30</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -2068,23 +2068,35 @@
   function renderDocumentStorageChart(categoryBytes,totalBytes) {
     const names={fattura:'Fattura',f24:'F24',bollettino:'Bollettino',contabile:'Contabile',estratto_conto:'Estratto conto',documento:'Documento',altro:'Altro'};
     const colors={fattura:'#3d8f82',f24:'#4f78b8',bollettino:'#d49a45',contabile:'#8c70b5',estratto_conto:'#438eb0',documento:'#c47770',altro:'#9aa7a3'};
-    const entries=Object.entries(names).map(([key,label])=>({key,label,bytes:Number(categoryBytes[key]||0)})).filter(item=>item.bytes>0);
-    const total=Math.max(0,totalBytes),limit=100*1024*1024,used=Math.min(total,limit);
+    const entries=Object.entries(names).map(([key,label])=>({key,label,bytes:Math.max(0,Number(categoryBytes[key]||0))}));
+    const total=Math.max(0,totalBytes),limit=100*1024*1024;
+    const used=Math.min(total,limit);
+    // Fino a 100 MB ogni settore rappresenta la quota reale del limite.
+    // Oltre 100 MB l'anello è pieno e mostra la ripartizione percentuale delle categorie.
+    const denominator=total>limit?total:limit;
     const segments=[];let cursor=0;
-    if(used>0){for(const item of entries){const size=item.bytes/used*100;if(size<=0)continue;segments.push(colors[item.key]+' '+cursor.toFixed(2)+'% '+Math.min(100,cursor+size).toFixed(2)+'%');cursor+=size;}}
-    if(total<limit)segments.push('#e9efed '+(used/limit*100).toFixed(2)+'% 100%');
+    for(const item of entries){
+      const size=item.bytes/denominator*100;
+      if(size<=0)continue;
+      const next=Math.min(100,cursor+size);
+      segments.push(colors[item.key]+' '+cursor.toFixed(4)+'% '+next.toFixed(4)+'%');
+      cursor=next;
+    }
+    if(total<limit)segments.push('#e9efed '+(used/limit*100).toFixed(4)+'% 100%');
     const donut=$('#documentStorageDonut');
-    if(donut){donut.style.background=segments.length?'conic-gradient('+segments.join(',')+')':'#e9efed';donut.setAttribute('aria-label',(total/1024/1024).toFixed(2)+' MB utilizzati su 100 MB');}
+    if(donut){
+      donut.style.background='conic-gradient('+(segments.length?segments.join(','):'#e9efed 0% 100%')+')';
+      donut.setAttribute('aria-label',(total/1024/1024).toFixed(2)+' MB utilizzati su 100 MB');
+    }
     const capacity=$('#documentStorageCapacity');if(capacity)capacity.textContent=(total/1024/1024).toFixed(2)+' / 100 MB';
     const legend=$('#documentStorageLegend');
     if(legend){
       const format=bytes=>(bytes/1024/1024).toFixed(2)+' MB';
       legend.innerHTML=entries.map(item=>'<span class="document-storage-legend-item"><i style="--document-color:'+colors[item.key]+'"></i><span>'+safeText(item.label)+'</span><strong>'+format(item.bytes)+'</strong></span>').join('')
         +'<span class="document-storage-legend-item document-storage-free"><i></i><span>'+(total>limit?'Oltre soglia':'Disponibile')+'</span><strong>'+format(Math.max(0,limit-total))+'</strong></span>';
-      if(!entries.length)legend.innerHTML='<span class="document-storage-empty">Nessun allegato archiviato</span><span class="document-storage-legend-item document-storage-free"><i></i><span>Disponibile</span><strong>100,00 MB</strong></span>';
     }
   }
-    async function searchDocuments(resetPage = false) {
+  async function searchDocuments(resetPage = false) {
     if(resetPage)documentSearchOffset=0;
     const term=$('#documentSearchText').value.trim(),category=$('#documentSearchCategory').value;
     const params=new URLSearchParams();if(term)params.set('q',term);if(category)params.set('category',category);params.set('offset',String(documentSearchOffset));
