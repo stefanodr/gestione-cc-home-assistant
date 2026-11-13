@@ -200,6 +200,7 @@ const annualRecurrenceContext = {
   normalize: value => String(value || '').toLowerCase().trim(),
   transactionDescription: tx => tx.description || '',
   transactionCausale: tx => tx.memo || '',
+  localDateKey: date => date.toISOString().slice(0,10),
   uid: prefix => prefix + '-test',
   renderRecurringProposals: () => {},
   saveState: () => {}
