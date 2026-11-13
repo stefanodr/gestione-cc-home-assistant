@@ -62,7 +62,13 @@ Il database centrale è `/data/gestione_cc.sqlite3`. L'archivio comprende piano 
 
 ### Allegati e storico dei movimenti
 
-Dalla riga di un movimento usa **Allegati** per aggiungere, scaricare o eliminare file PDF, JPEG o PNG. Il limite è 10 MB per file e 80 MB complessivi. I file sono conservati come BLOB nel database SQLite, non in una cartella pubblica del web server; sono accessibili solo dopo autenticazione.
+Dalla riga di un movimento usa **Allegati** per aprire la finestra dedicata. Il pulsante **UPLOAD · Carica allegato** apre il selettore file del computer; dall'elenco puoi scaricare o eliminare ogni documento. Sono ammessi PDF, JPEG e PNG: massimo **5 MB per file** e **15 MB complessivi per singolo movimento**. Non è previsto un limite fisso complessivo per l'archivio. Al raggiungimento di 100 MB compare un avviso informativo, senza bloccare ulteriori caricamenti.
+
+I file sono conservati come BLOB nel database SQLite, non in una cartella pubblica del web server; sono accessibili solo dopo autenticazione. Al caricamento il server esegue localmente l'estrazione del testo dai PDF e l'OCR in italiano per PDF scannerizzati e immagini JPEG/PNG. Per i PDF scannerizzati l'OCR elabora fino alle prime 30 pagine. Nessun documento viene inviato a servizi OCR esterni. L'elaborazione avviene una sola volta al caricamento; gli allegati preesistenti vengono messi in coda automaticamente dopo l'aggiornamento.
+
+L'OCR propone la categoria **Fattura**, **F24**, **Bollettino** o **Altro** e tenta di riconoscere data, importo, fornitore/ente, codice fiscale e codice tributo. Sono dati indicativi, da verificare sul documento originale; la categoria può essere modificata.
+
+La voce **Archivio documenti** nel menu laterale consente di cercare nei nomi dei file e nel testo OCR, oltre che nei metadati riconosciuti. Puoi filtrare per categoria, scaricare il documento e tornare al movimento originale quando è ancora presente nel registro.
 
 Usa **Storico** per consultare le modifiche registrate per quel movimento. Lo storico è append-only e conserva data/ora, tipo di evento e valori precedenti/nuovi dei campi modificati. Le modifiche sono registrate quando il server riceve e salva lo stato; le modifiche effettuate prima dell'aggiornamento non possono essere ricostruite retroattivamente.
 
@@ -73,9 +79,9 @@ L'importazione GnuCash in modalità aggiunta associa i conti tramite percorso e 
 ## 7. Backup e ripristino
 
 ### Backup JSON
-Esporta lo stato applicativo, gli allegati e lo storico dettagliato in un file JSON, utile per migrazioni compatibili. Per archivi con allegati oltre 80 MB usa il backup SQLite.
+Esporta lo stato applicativo, gli allegati, lo storico dettagliato e l'indice OCR in un file JSON. Non è più previsto il precedente limite fisso di 80 MB per gli allegati; per archivi voluminosi resta consigliato il backup SQLite, più efficiente.
 
-Il backup SQLite include automaticamente allegati e storico. Anche le copie locali e i backup facoltativi su Google Drive includono queste tabelle. Il ripristino di database precedenti alla versione 1.0.19 crea automaticamente le nuove tabelle senza cancellare i dati contabili.
+Il backup SQLite include automaticamente allegati e storico. Anche le copie locali e i backup facoltativi su Google Drive includono queste tabelle. Il ripristino di database precedenti alla versione 1.0.20 crea automaticamente le nuove tabelle; gli allegati esistenti vengono indicizzati e messi in coda per l'OCR senza cancellare i dati contabili.
 
 ### Backup SQLite
 Scarica una copia del database SQLite. Le copie automatiche vengono create prima delle scritture quando è trascorso l'intervallo previsto; vengono conservate fino a 30 copie in `/data/backups`.
@@ -211,7 +217,13 @@ The central database is `/data/gestione_cc.sqlite3`. It contains the chart of ac
 
 ### Transaction attachments and history
 
-Use **Attachments** on a transaction row to add, download or delete PDF, JPEG or PNG files. The limit is 10 MB per file and 80 MB total. Files are stored as BLOBs in SQLite, not in a public web-server directory, and are available only after authentication.
+Use **Attachments** on a transaction row to open its dedicated dialog. **UPLOAD · Carica allegato** opens the computer's file picker; the list lets you download or delete each document. PDF, JPEG and PNG are supported, with a maximum of **5 MB per file** and **15 MB total per transaction**. There is no fixed overall archive-size cap. At 100 MB the App displays an informational warning but does not block further uploads.
+
+Files are stored as BLOBs in SQLite, not in a public web-server directory, and are available only after authentication. On upload, the server locally extracts text from PDFs and runs Italian OCR on scanned PDFs and JPEG/PNG images. Scanned-PDF OCR processes up to the first 30 pages. Documents are never sent to external OCR services. OCR runs once on upload; existing attachments are automatically queued after the update.
+
+OCR suggests a category (**Invoice**, **F24**, **Payment slip** or **Other**) and attempts to detect the date, amount, supplier/authority, tax code and tax-payment code. These values are estimates and must be checked against the original document; the category can be changed.
+
+The **Document archive** menu searches filenames, OCR text and extracted metadata. You can filter by category, download a document and return to its original transaction if that transaction is still present in the register.
 
 Use **History** to inspect recorded changes for that transaction. The append-only log stores timestamps, event types and before/after field values. Changes made before this update cannot be reconstructed retroactively.
 
@@ -222,9 +234,9 @@ GnuCash merge mode maps accounts by account path and adds transactions/rules wit
 ## 7. Backup and restore
 
 ### JSON backup
-Exports the application state, attachments and detailed transaction history to JSON for compatible data migration or transfer. Use SQLite backup for archives with more than 80 MB of attachments.
+Exports the application state, attachments, detailed transaction history and OCR index to JSON for compatible data migration or transfer. The former fixed 80 MB attachment cap has been removed; SQLite backup remains more efficient for large archives.
 
-SQLite backups include attachments and transaction history. Local snapshots and optional Google Drive backups include these tables as well. Restoring a database created before version 1.0.19 automatically creates the new tables without deleting accounting data.
+SQLite backups include attachments and transaction history. Local snapshots and optional Google Drive backups include these tables as well. Restoring a database created before version 1.0.20 automatically creates the new tables; existing attachments are indexed and queued for OCR without deleting accounting data.
 
 ### SQLite backup
 Downloads a copy of the SQLite database. Automatic snapshots are created before writes when the configured interval has elapsed; up to 30 local copies are retained under `/data/backups`.
