@@ -363,39 +363,51 @@ def classify_document(text, filename=""):
 
 def extract_document_metadata(text):
     value = str(text or "")
-    lines = [re.sub(r"\s+", " ", line).strip(" |\t") for line in value.splitlines() if line.strip()]
-    date_match = re.search(r"(?i)(?:data\s+(?:documento|fattura|emissione)|emesso\s+il)\s*[:\-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})", value)
+    lines = [re.sub(r"\\s+", " ", line).strip(" |\\t") for line in value.splitlines() if line.strip()]
+    date_match = re.search(r"(?i)(?:data\\s+(?:documento|fattura|emissione)|emesso\\s+il|data\\s+di\\s+emissione)\\s*[:\\-]?\\s*(\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4})", value)
     if not date_match:
-        date_match = re.search(r"\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b", value)
-    number_match = re.search(r"(?i)(?:fattura|nota\s+di\s+credito|documento)\s*(?:n(?:umero)?\.?|nr\.?|#)\s*[:\-]?\s*([A-Z0-9][A-Z0-9./_-]{0,29})", value)
-    if not number_match:
-        number_match = re.search(r"(?i)(?:numero\s+documento|n\.\s*documento)\s*[:\-]?\s*([A-Z0-9][A-Z0-9./_-]{0,29})", value)
-    fiscal_match = re.search(r"\b[A-Z]{6}[A-Z0-9]{2}[A-Z][A-Z0-9]{2}[A-Z][A-Z0-9]{3}[A-Z]\b", value.upper())
-    tax_match = re.search(r"(?i)cod(?:ice)?\s*tributo\s*[:\-]?\s*([A-Z0-9]{3,6})", value)
-    amount_match = re.search(r"(?i)(?:totale\s+(?:da\s+)?pagare|importo\s+totale|totale\s+documento|importo)\s*[:€ ]{0,8}([0-9.]{1,12},[0-9]{2})", value)
-    excluded = re.compile(r"fattura|codice fiscale|partita iva|pagina|cliente|cod\.?\s*cliente|numero cliente|destinatario|intestatario|documento|data |numero |iban|telefono|email|\b(?:p\.iva|c\.f\.)\b", re.I)
-    candidates = []
-    for index, line in enumerate(lines[:25]):
-        if len(line) < 4 or excluded.search(line) or re.fullmatch(r"[\d\s./:-]+", line):
-            continue
-        digits = sum(ch.isdigit() for ch in line)
-        if digits / max(1, len(line)) > 0.25:
-            continue
-        score = 0
-        if re.search(r"(?i)\b(s\.r\.l\.?|srl|s\.p\.a\.?|spa|s\.a\.s\.?|sas|s\.n\.c\.?|snc|societ[aà]|energia|servizi|assicurazioni|telecom|bank|banca)\b", line):
-            score += 5
-        if re.search(r"[A-ZÀ-Ü][a-zà-ÿ]{2,}", line):
-            score += 2
-        if index < 6:
-            score += 2
-        if len(line) <= 120:
-            score += 1
-        candidates.append((score, index, line))
-    supplier = max(candidates, default=(0, 0, None), key=lambda item: (item[0], -item[1]))[2]
+        date_match = re.search(r"\\b(\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4})\\b", value)
+    number_pattern = r"(?i)(?:numero\\s+fattura|n(?:umero)?\\.?\\s*fattura|fattura\\s*(?:n(?:umero)?\\.?|nr\\.?|n[°º]|#)|nota\\s+di\\s+credito\\s*(?:n(?:umero)?\\.?|nr\\.?|#)|numero\\s+documento|n\\.?\\s*documento|documento\\s*(?:n(?:umero)?\\.?|nr\\.?|#))\\s*[:\\-]?\\s*([A-Z0-9][A-Z0-9./_-]{0,39})"
+    number_match = re.search(number_pattern, value)
+    fiscal_match = re.search(r"\\b[A-Z]{6}[A-Z0-9]{2}[A-Z][A-Z0-9]{2}[A-Z][A-Z0-9]{3}[A-Z]\\b", value.upper())
+    tax_match = re.search(r"(?i)cod(?:ice)?\\s*tributo\\s*[:\\-]?\\s*([A-Z0-9]{3,6})", value)
+    amount_pattern = r"(?i)(?:totale\\s+(?:da\\s+)?pagare|importo\\s+totale|totale\\s+(?:del\\s+)?documento|totale\\s+fattura|da\\s+pagare)\\s*[:\\-]?\\s*(?:€\\s*)?([0-9][0-9. ]{0,14}(?:,[0-9]{2}|\\.[0-9]{2}))"
+    amount_match = re.search(amount_pattern, value)
+    supplier = None
+    supplier_labels = re.compile(r"(?i)^(?:cedente\\s*/?\\s*prestatore(?:\\s*\\([^)]*\\))?|fornitore|emittente|ragione\\s+sociale|mittente)\\s*[:\\-]?\\s*(.*)$")
+    for index, line in enumerate(lines[:35]):
+        match = supplier_labels.match(line)
+        if match:
+            candidate = match.group(1).strip(" :-")
+            if len(candidate) < 3 and index + 1 < len(lines):
+                candidate = lines[index + 1]
+            if candidate and not re.search(r"(?i)partita\\s+iva|codice\\s+fiscale|indirizzo|cap\\b|telefono|email", candidate):
+                supplier = candidate[:160]
+                break
+    if not supplier:
+        excluded = re.compile(r"fattura|codice fiscale|partita iva|pagina|cliente|cod\\.?\\s*cliente|numero cliente|destinatario|intestatario|documento|data |numero |iban|telefono|email|\\b(?:p\\.?iva|c\\.?f\\.?)\\b|totale|importo|indirizzo|cap\\b", re.I)
+        candidates = []
+        for index, line in enumerate(lines[:25]):
+            if len(line) < 4 or excluded.search(line) or re.fullmatch(r"[\\d\\s./:-]+", line):
+                continue
+            digits = sum(ch.isdigit() for ch in line)
+            if digits / max(1, len(line)) > 0.25:
+                continue
+            score = 0
+            if re.search(r"(?i)\\b(s\\.?r\\.?l\\.?|srl|s\\.?p\\.?a\\.?|spa|s\\.?a\\.?s\\.?|sas|s\\.?n\\.?c\\.?|snc|societ[aà]|energia|servizi|assicurazioni|telecom|bank|banca)\\b", line):
+                score += 5
+            if re.search(r"[A-ZÀ-Ü][a-zà-ÿ]{2,}", line):
+                score += 2
+            if index < 6:
+                score += 2
+            if len(line) <= 120:
+                score += 1
+            candidates.append((score, index, line))
+        supplier = max(candidates, default=(0, 0, None), key=lambda item: (item[0], -item[1]))[2]
     return {"supplier":supplier[:160] if supplier else None,
             "document_date":date_match.group(1) if date_match else None,
             "document_number":number_match.group(1) if number_match else None,
-            "amount":amount_match.group(1) if amount_match else None,
+            "amount":amount_match.group(1).strip() if amount_match else None,
             "fiscal_code":fiscal_match.group(0) if fiscal_match else None,
             "tax_code":tax_match.group(1).upper() if tax_match else None}
 
