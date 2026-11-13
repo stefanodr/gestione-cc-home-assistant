@@ -285,6 +285,15 @@ def drive_download_file(file_id):
             return drive_download_file(file_id)
         raise RuntimeError("Impossibile scaricare il backup da Google Drive (HTTP " + str(error.code) + ").") from error
 
+def ensure_transaction_feature_tables():
+    """Migrate feature tables after restoring an older SQLite backup."""
+    with db() as connection:
+        connection.execute("CREATE TABLE IF NOT EXISTS transaction_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, transaction_id TEXT NOT NULL, event TEXT NOT NULL, changes_json TEXT NOT NULL)")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
+        connection.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
+
+
 def record_transaction_changes(connection, old_state, new_state, event="updated"):
     """Persist a field-level, append-only history for transaction changes."""
     old_items = {str(x.get("id")): x for x in (old_state or {}).get("transactions", []) if isinstance(x, dict) and x.get("id")}
@@ -869,6 +878,7 @@ class Handler(BaseHTTPRequestHandler):
                 finally:
                     destination.close()
                     source.close()
+                ensure_transaction_feature_tables()
                 sessions.clear()
                 drive_cfg = drive_read_config()
                 if drive_cfg.get("token"):
@@ -907,6 +917,7 @@ class Handler(BaseHTTPRequestHandler):
                 destination.commit()
                 destination.close()
                 source.close()
+                ensure_transaction_feature_tables()
                 sessions.clear()
                 drive_cfg = drive_read_config()
                 if drive_cfg.get("token"):
