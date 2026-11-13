@@ -73,7 +73,7 @@ L'importazione GnuCash in modalità aggiunta associa i conti tramite percorso e 
 ## 7. Backup e ripristino
 
 ### Backup JSON
-Esporta lo stato applicativo e gli allegati in un file JSON, utile per migrazioni compatibili. Per archivi con allegati oltre 80 MB usa il backup SQLite.
+Esporta lo stato applicativo, gli allegati e lo storico dettagliato in un file JSON, utile per migrazioni compatibili. Per archivi con allegati oltre 80 MB usa il backup SQLite.
 
 Il backup SQLite include automaticamente allegati e storico. Anche le copie locali e i backup facoltativi su Google Drive includono queste tabelle. Il ripristino di database precedenti alla versione 1.0.19 crea automaticamente le nuove tabelle senza cancellare i dati contabili.
 
@@ -222,7 +222,7 @@ GnuCash merge mode maps accounts by account path and adds transactions/rules wit
 ## 7. Backup and restore
 
 ### JSON backup
-Exports the application state and its attachments to JSON for compatible data migration or transfer. Use SQLite backup for archives with more than 80 MB of attachments.
+Exports the application state, attachments and detailed transaction history to JSON for compatible data migration or transfer. Use SQLite backup for archives with more than 80 MB of attachments.
 
 SQLite backups include attachments and transaction history. Local snapshots and optional Google Drive backups include these tables as well. Restoring a database created before version 1.0.19 automatically creates the new tables without deleting accounting data.
 
