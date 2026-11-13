@@ -1748,8 +1748,8 @@
       await saveState(); renderAll();
       showNotice('Movimento eliminato', 'È stato rimosso dall’archivio locale di Gestione C/C. Il file GnuCash o bancario originale non è stato modificato.');
     }));
-    $('[data-attachments-tx]', body).forEach(btn => btn.addEventListener('click', () => manageTransactionAttachments(btn.dataset.attachmentsTx)));
-    $('[data-history-tx]', body).forEach(btn => btn.addEventListener('click', () => showTransactionHistory(btn.dataset.historyTx)));
+    $$('[data-attachments-tx]', body).forEach(btn => btn.addEventListener('click', () => manageTransactionAttachments(btn.dataset.attachmentsTx)));
+    $$('[data-history-tx]', body).forEach(btn => btn.addEventListener('click', () => showTransactionHistory(btn.dataset.historyTx)));
     updateTransactionBulkUi(tx);
   }
   async function manageTransactionAttachments(id) {
