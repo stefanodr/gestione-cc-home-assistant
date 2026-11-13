@@ -1767,7 +1767,7 @@
     activeAttachmentTransactionId=id;
     $('#attachmentsTransactionLabel').textContent=(tx.payee||tx.memo||'Movimento')+' · '+formatDate(tx.date);
     $('#attachmentsModal').classList.remove('hidden');
-    await refreshTransactionAttachments();
+    try{await refreshTransactionAttachments();}catch(error){showNotice('Allegati non disponibili',error.message||String(error));}
   }
   async function refreshTransactionAttachments() {
     if(!activeAttachmentTransactionId)return;
