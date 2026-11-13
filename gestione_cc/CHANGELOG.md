@@ -1,3 +1,21 @@
+## [1.0.28] - 2026-11-13
+
+### Aggiunto
+- Ampliate le categorie dell'archivio documenti con Contabile, Estratto conto e Documento, disponibili nella classificazione automatica, nella modifica manuale e nel filtro dell'archivio.
+- Migliorata la classificazione automatica per riconoscere estratti conto, contabili di pagamento e documentazione generica.
+
+### Corretto
+- Il piè di pagina mostra la versione corretta dell'add-on (1.0.28).
+- Evitato il ricalcolo di Budget e Previsioni durante la navigazione nelle pagine che non li visualizzano; gli aggiornamenti vengono eseguiti quando si apre la relativa pagina.
+
+### Added
+- Expanded the document archive categories with Accounting receipt, Bank statement and Document, available in automatic classification, manual editing and archive filtering.
+- Improved automatic classification to identify bank statements, payment receipts and generic documents.
+
+### Fixed
+- The footer now displays the correct add-on version (1.0.28).
+- Prevented Budget and Forecast recalculations while navigating pages that do not display them; updates run when the corresponding page is opened.
+
 ## [1.0.27] - 2026-11-13
 
 ### Italiano

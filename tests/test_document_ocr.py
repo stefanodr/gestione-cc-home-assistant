@@ -30,6 +30,9 @@ class DocumentOcrHelpersTest(unittest.TestCase):
         self.assertEqual(classify("Bollettino conto corrente postale"), "bollettino")
         self.assertEqual(classify("Fattura elettronica imponibile IVA 22%"), "fattura")
         self.assertEqual(classify("Documento generico", "scan.png"), "altro")
+        self.assertEqual(classify("Estratto conto bancario - lista movimenti"), "estratto_conto")
+        self.assertEqual(classify("Contabile di bonifico eseguito"), "contabile")
+        self.assertEqual(classify("Certificato di attestazione"), "documento")
 
     def test_metadata_extraction(self):
         extract = NAMESPACE["extract_document_metadata"]
