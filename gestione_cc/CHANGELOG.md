@@ -1,3 +1,15 @@
+## [1.0.27] - 2026-11-13
+
+### Italiano
+- Ripristinata nell'Archivio documenti la visualizzazione delle date nel formato italiano GG/MM/AAAA (ad esempio 04/09/2026), mantenendo il formato ISO nei dati interni e nei campi di modifica.
+- Rivista la previsione storica per calcolare le stime in base al mese di calendario previsto, confrontandolo con gli stessi mesi dello storico disponibile. In questo modo le proiezioni possono riflettere la stagionalità invece di ripetere una mediana annuale identica.
+- Il budget viene applicato soltanto al mese per cui è stato salvato, evitando di propagare automaticamente lo stesso importo a tutti i mesi futuri privi di un budget specifico.
+
+### English
+- Restored Italian DD/MM/YYYY date display in the Document Archive (for example, 04/09/2026), while retaining ISO dates internally and in edit controls.
+- Updated historical forecasting to estimate each projected calendar month from the corresponding months in the available history, allowing seasonal patterns instead of repeating one annual median.
+- Budgets are now applied only to the month for which they were saved, rather than automatically carrying the same amount into every future month without a specific budget.
+
 ## [1.0.26] - 2026-11-13
 
 ### Italiano
