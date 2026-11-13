@@ -545,7 +545,7 @@
       }catch(error){showNotice('Modifica non salvata',error.message||String(error));}
     });
     $('#cancelDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;});
-    $('#closeDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;});
+    $('#closeDocumentMetadata')?.addEventListener('click',()=>{$('#documentMetadataModal').classList.add('hidden');editingDocumentId=null;editingDocumentOriginal=null;});
     $('#runDocumentSearch')?.addEventListener('click',()=>searchDocuments(true));
     $('#clearDocumentSearch')?.addEventListener('click',()=>{$('#documentSearchText').value='';$('#documentSearchCategory').value='';searchDocuments(true);});
     $('#documentSearchText')?.addEventListener('keydown',event=>{if(event.key==='Enter')searchDocuments(true);});
