@@ -1175,12 +1175,15 @@
     const proposals=[];
     for(const items of groups.values()){
       const sorted=items.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-      if(sorted.length<3)continue;
+      if(sorted.length<2)continue;
       const gaps=[];for(let i=1;i<sorted.length;i++){const days=(Date.parse(sorted[i].date+'T12:00:00Z')-Date.parse(sorted[i-1].date+'T12:00:00Z'))/86400000;if(days>0)gaps.push(days);}
-      if(gaps.length<2)continue;
+      if(gaps.length<1)continue;
       const ordered=[...gaps].sort((a,b)=>a-b),mid=Math.floor(ordered.length/2),typical=ordered.length%2?ordered[mid]:(ordered[mid-1]+ordered[mid])/2;
       const candidate=labels.map(([frequency,days])=>({frequency,days,error:Math.abs(typical-days)/days})).sort((a,b)=>a.error-b.error)[0];
-      if(candidate.error>.22)continue;
+      // Due annualità consecutive sono sufficienti per proporre una ricorrenza annuale;
+      // per frequenze più ravvicinate restano necessarie almeno tre occorrenze.
+      if(candidate.frequency!=='yearly'&&sorted.length<3)continue;
+      if(candidate.error>(candidate.frequency==='yearly'&&sorted.length===2?.15:.22))continue;
       const amounts=sorted.map(tx=>Math.abs(Number(tx.amount)||0)).sort((a,b)=>a-b),am= Math.floor(amounts.length/2);
       const amountMagnitude=amounts.length%2?amounts[am]:(amounts[am-1]+amounts[am])/2;
       if(!amountMagnitude)continue;
