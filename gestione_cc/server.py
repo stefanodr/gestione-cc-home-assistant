@@ -361,6 +361,9 @@ def classify_document(text, filename=""):
     if re.search(r"\b(modello\s+)?f24\b|codice tributo|erario|inps|inail", sample): return "f24"
     if re.search(r"bollettino|conto corrente postale|ccp\b|pago", sample): return "bollettino"
     if re.search(r"fattura|documento commerciale|imponibile|iva\s+(?:22|10|4)\s*%", sample): return "fattura"
+    if re.search(r"estratto\s+conto|lista\s+movimenti|movimenti\s+del\s+conto|saldo\s+(?:contabile|disponibile)", sample): return "estratto_conto"
+    if re.search(r"contabile\s+(?:di\s+)?(?:bonifico|pagamento)|ricevuta\s+(?:di\s+)?pagamento|quietanza|disposizione\s+di\s+bonifico|bonifico\s+eseguito|pagamento\s+eseguito", sample): return "contabile"
+    if re.search(r"\bdocumento\b|documentazione|attestazione|certificato|comunicazione", sample): return "documento"
     return "altro"
 
 
@@ -755,7 +758,7 @@ class Handler(BaseHTTPRequestHandler):
                 base_sql=""" FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id"""
                 clauses=[]; params=[]
                 if document_id: clauses.append("a.id=?"); params.append(document_id)
-                if category in ("fattura","f24","bollettino","altro"): clauses.append("d.category=?"); params.append(category)
+                if category in ("fattura","f24","bollettino","contabile","estratto_conto","documento","altro"): clauses.append("d.category=?"); params.append(category)
                 if term:
                     clauses.append("(a.filename LIKE ? OR d.extracted_text LIKE ? OR d.supplier LIKE ? OR d.document_date LIKE ? OR d.document_number LIKE ? OR d.amount LIKE ? OR d.fiscal_code LIKE ? OR d.tax_code LIKE ?)")
                     params.extend(["%"+term+"%"]*8)
@@ -1009,7 +1012,7 @@ class Handler(BaseHTTPRequestHandler):
             if not item: return
             attachment_id = str(payload.get("id", ""))[:160]
             category = str(payload.get("category", "altro"))
-            if category not in ("fattura", "f24", "bollettino", "altro"):
+            if category not in ("fattura", "f24", "bollettino", "contabile", "estratto_conto", "documento", "altro"):
                 self.send_json(400, {"error":"Categoria documento non valida."}); return
             with db() as connection:
                 row = connection.execute("SELECT a.transaction_id,a.filename,d.extracted_text,d.supplier,d.document_date,d.amount,d.fiscal_code,d.tax_code FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id WHERE a.id=?", (attachment_id,)).fetchone()
@@ -1342,7 +1345,7 @@ class Handler(BaseHTTPRequestHandler):
                 for document in documents_payload:
                     if not isinstance(document,dict) or str(document.get("attachment_id","")) not in seen_attachment_ids: raise ValueError("Metadati OCR non validi.")
                     attachment_id=str(document["attachment_id"]); category=str(document.get("category","altro"))
-                    if category not in ("fattura","f24","bollettino","altro"): category="altro"
+                    if category not in ("fattura","f24","bollettino","contabile","estratto_conto","documento","altro"): category="altro"
                     extracted=str(document.get("extracted_text",""))[:1000000]
                     c.execute("INSERT INTO document_index(attachment_id,status,category,extracted_text,supplier,document_date,document_number,amount,fiscal_code,tax_code,updated_at,error,supplier_manual,document_date_manual,document_number_manual,amount_manual) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (attachment_id,str(document.get("status","done")),category,extracted,document.get("supplier"),document.get("document_date"),document.get("document_number"),document.get("amount"),document.get("fiscal_code"),document.get("tax_code"),str(document.get("updated_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),document.get("error"),int(bool(document.get("supplier_manual",0))),int(bool(document.get("document_date_manual",0))),int(bool(document.get("document_number_manual",0))),int(bool(document.get("amount_manual",0)))))
