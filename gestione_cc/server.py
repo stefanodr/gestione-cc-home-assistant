@@ -1052,8 +1052,12 @@ class Handler(BaseHTTPRequestHandler):
                 audit_fields = {}
                 for name in manual_fields:
                     value, flag = fields[name]
-                    assignments.extend([name + "=?", flag + "=1"])
-                    values.append(value)
+                    # A correction equal to the current OCR value is a confirmation,
+                    # not a permanent override. This keeps the field eligible for re-OCR.
+                    current = connection.execute("SELECT " + name + " FROM document_index WHERE attachment_id=?", (attachment_id,)).fetchone()
+                    current_value = str(current[name] or "").strip() if current else ""
+                    assignments.extend([name + "=?", flag + "=?"])
+                    values.extend([value, int(bool(value) and value.strip() == current_value)])
                     audit_fields[name] = value
                 assignments.append("updated_at=?")
                 values.extend([time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), attachment_id])
