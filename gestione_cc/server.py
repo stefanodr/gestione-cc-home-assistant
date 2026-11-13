@@ -1168,7 +1168,6 @@ class Handler(BaseHTTPRequestHandler):
                 try: c.execute("DELETE FROM document_fts")
                 except sqlite3.OperationalError: pass
                 restored = 0
-                per_transaction_bytes = {}
                 valid_tx_ids = {str(tx["id"]) for tx in state["transactions"]}
                 seen_attachment_ids = set()
                 for attachment in attachment_payload:
@@ -1182,14 +1181,11 @@ class Handler(BaseHTTPRequestHandler):
                                        (mime == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
                                        (mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")))
                     if (mime not in ("application/pdf", "image/jpeg", "image/png") or
-                        not valid_signature or len(data) < 1 or len(data) > 5 * 1024 * 1024 or
+                        not valid_signature or len(data) < 1 or len(data) > 10 * 1024 * 1024 or
                         not attachment_id or attachment_id in seen_attachment_ids or tx_id not in valid_tx_ids):
                         raise ValueError("Allegato nel backup non valido.")
                     seen_attachment_ids.add(attachment_id)
                     restored += len(data)
-                    per_transaction_bytes[tx_id] = per_transaction_bytes.get(tx_id, 0) + len(data)
-                    if per_transaction_bytes[tx_id] > 15 * 1024 * 1024:
-                        raise ValueError("Gli allegati di una registrazione superano 15 MB.")
                     c.execute("INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
                         (attachment_id,tx_id,filename,mime,len(data),sqlite3.Binary(data),str(attachment.get("created_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))))
                 for document in documents_payload:
