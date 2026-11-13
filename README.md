@@ -25,12 +25,14 @@ Gestione C/C è un'applicazione web self-hosted per la gestione dei conti person
 
 - **Panoramica finanziaria:** entrate, uscite, saldo netto, saldo del conto, andamento storico e spese per categoria.
 - **Registro movimenti:** importazione, ricerca, filtri, inserimento manuale e classificazione.
+- **Allegati ai movimenti:** caricamento, download ed eliminazione di documenti PDF, JPEG e PNG; massimo 10 MB per file e 80 MB complessivi.
 - **Ripartizione:** suddivisione di un movimento tra più contropartite o categorie.
 - **Piano dei conti:** struttura gerarchica compatibile con i conti importati da GnuCash.
 - **Importazione:** backup GnuCash e file QIF, CSV e XLSX nei formati supportati.
 - **Regole apprese:** suggerimenti locali basati sulle classificazioni confermate.
 - **Report:** analisi mensile, trimestrale, semestrale e annuale, confronti storici e scostamenti per categoria.
 - **Esportazione:** report XLSX e anteprima PDF stampabile; il browser consente di salvare il documento come PDF.
+- **Storico dettagliato:** traccia append-only di creazioni, modifiche e cancellazioni dei movimenti, con data/ora e valori precedenti e nuovi.
 - **Archivio centralizzato:** database SQLite persistente, condiviso tra i dispositivi autorizzati.
 - **Backup e ripristino:** backup JSON e SQLite, copie automatiche locali, backup facoltativo su Google Drive e ripristino con controlli d'integrità.
 - **Accesso protetto:** PIN amministratore di 6 cifre e connessione HTTPS.
@@ -100,7 +102,7 @@ Quando apri una segnalazione indica versioni Home Assistant/App, architettura e 
 
 ## Stato e licenza
 
-Versione di distribuzione dichiarata: **1.0.7**. Il progetto è distribuito con licenza proprietaria d'uso personale, non con una licenza open source. L'uso personale gratuito è consentito alle persone fisiche nei limiti di `LICENSE`; l'uso professionale, aziendale, la modifica, la redistribuzione e lo sfruttamento commerciale richiedono un accordo scritto, salvo i diritti inderogabili e quelli dei componenti di terze parti. Consultare `COMMERCIAL-LICENSING.md`. La pubblicazione non sostituisce i test nel sistema dell'utente.
+Versione di distribuzione dichiarata: **1.0.19**. Il progetto è distribuito con licenza proprietaria d'uso personale, non con una licenza open source. L'uso personale gratuito è consentito alle persone fisiche nei limiti di `LICENSE`; l'uso professionale, aziendale, la modifica, la redistribuzione e lo sfruttamento commerciale richiedono un accordo scritto, salvo i diritti inderogabili e quelli dei componenti di terze parti. Consultare `COMMERCIAL-LICENSING.md`. La pubblicazione non sostituisce i test nel sistema dell'utente.
 
 ---
 
@@ -116,12 +118,14 @@ Gestione C/C is a self-hosted personal finance web application distributed as a 
 
 - **Financial overview:** income, expenses, net cash flow, account balance, historical trends and spending by category.
 - **Transaction register:** import, search, filters, manual entries and categorisation.
+- **Transaction attachments:** upload, download and deletion of PDF, JPEG and PNG documents; 10 MB per file and 80 MB total.
 - **Split transactions:** allocate transactions across multiple accounts or categories.
 - **Chart of accounts:** hierarchical structure compatible with imported GnuCash accounts.
 - **Import:** GnuCash backups and supported QIF, CSV and XLSX transaction files.
 - **Learned rules:** local suggestions based on confirmed classifications.
 - **Reports:** monthly, quarterly, half-yearly and annual analysis, historical comparisons and category variances.
 - **Exports:** XLSX reports and printable PDF preview; use the browser's “Save as PDF” destination to create a PDF.
+- **Detailed history:** append-only log of transaction creation, edits and deletion, including timestamps and before/after values.
 - **Centralised storage:** persistent SQLite database shared by authorised devices.
 - **Backup and restore:** JSON and SQLite backups, local automatic snapshots, optional Google Drive retention and integrity-checked restore.
 - **Protected access:** six-digit administrator PIN and HTTPS.
@@ -191,4 +195,4 @@ When reporting an issue, include Home Assistant/App versions, architecture and r
 
 ## Status and licence
 
-Declared distribution version: **1.0.7**. The project is distributed under a proprietary personal-use licence, not an open-source licence. Free personal use by individuals is permitted under `LICENSE`; professional or business use, modification, redistribution and commercial exploitation require a written agreement, subject to mandatory legal rights and third-party component licences. See `COMMERCIAL-LICENSING.md`. A version number does not replace testing on the user's own system.
+Declared distribution version: **1.0.19**. The project is distributed under a proprietary personal-use licence, not an open-source licence. Free personal use by individuals is permitted under `LICENSE`; professional or business use, modification, redistribution and commercial exploitation require a written agreement, subject to mandatory legal rights and third-party component licences. See `COMMERCIAL-LICENSING.md`. A version number does not replace testing on the user's own system.
