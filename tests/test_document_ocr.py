@@ -42,6 +42,19 @@ class DocumentOcrHelpersTest(unittest.TestCase):
         self.assertEqual(result["amount"], "1.234,56")
         self.assertEqual(result["fiscal_code"], "RSSMRA80A01H501U")
         self.assertEqual(result["supplier"], "ACME Energia")
+        self.assertEqual(result["document_number"], "2026/123")
+
+    def test_supplier_ignores_customer_number(self):
+        extract = NAMESPACE["extract_document_metadata"]
+        result = extract(
+            "ACME Energia S.p.A.\\nFattura n. 2026/123 del 12/10/2026\\n"
+            "Numero cliente: 987654321\\nCodice cliente: 123456789\\n"
+            "Totale da pagare: 89,90"
+        )
+        self.assertEqual(result["supplier"], "ACME Energia S.p.A.")
+        self.assertNotIn("987654321", result["supplier"])
+        self.assertEqual(result["document_date"], "12/10/2026")
+        self.assertEqual(result["document_number"], "2026/123")
 
 
 if __name__ == "__main__":
