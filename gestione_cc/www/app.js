@@ -570,6 +570,8 @@
     $('#clearDocumentSearch')?.addEventListener('click',()=>{$('#documentSearchText').value='';$('#documentSearchCategory').value='';searchDocuments(true);});
     $('#documentSearchText')?.addEventListener('keydown',event=>{if(event.key==='Enter')searchDocuments(true);});
     $('#documentSearchCategory')?.addEventListener('change',()=>searchDocuments(true));
+    $('#uploadStandaloneDocument')?.addEventListener('click',()=>$('#standaloneDocumentPicker')?.click());
+    $('#standaloneDocumentPicker')?.addEventListener('change',async event=>{const file=event.target.files?.[0];event.target.value='';if(file)await uploadStandaloneDocument(file);});
     $('#documentPrev')?.addEventListener('click',()=>{documentSearchOffset=Math.max(0,documentSearchOffset-100);searchDocuments();});
     $('#documentNext')?.addEventListener('click',()=>{documentSearchOffset+=100;searchDocuments();});
 
@@ -2048,6 +2050,40 @@
       openDocumentMetadataEditor(result.item,'movement',result.pending||result.item?.ocr_status==='failed');
     }catch(error){showNotice('Caricamento non riuscito',error.message||String(error));}
   }
+  async function uploadStandaloneDocument(file) {
+    if(!file)return;
+    if(file.size>5*1024*1024){showNotice('File troppo grande','Il singolo documento non può superare 5 MB.');return;}
+    const form=new FormData();form.append('file',file);
+    const button=$('#uploadStandaloneDocument');if(button)button.disabled=true;
+    try{
+      const response=await fetch('/api/attachments/upload',{method:'POST',body:form,headers:{'X-CSRF-Token':csrfToken},credentials:'same-origin',cache:'no-store'});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Caricamento non riuscito.');
+      const result=await waitForDocumentOcr(data.id,data.filename);
+      await searchDocuments(true);
+      if(data.storage_warning)showNotice('Archivio documenti oltre 100 MB','Il documento è stato caricato, ma lo spazio complessivo ha superato 100 MB.');
+      openDocumentMetadataEditor(result.item,'archive',result.pending||result.item?.ocr_status==='failed');
+    }catch(error){showNotice('Caricamento non riuscito',error.message||String(error));}
+    finally{if(button)button.disabled=false;}
+  }
+  function renderDocumentStorageChart(categoryBytes,totalBytes) {
+    const names={fattura:'Fattura',f24:'F24',bollettino:'Bollettino',contabile:'Contabile',estratto_conto:'Estratto conto',documento:'Documento',altro:'Altro'};
+    const colors={fattura:'#3d8f82',f24:'#4f78b8',bollettino:'#d49a45',contabile:'#8c70b5',estratto_conto:'#438eb0',documento:'#c47770',altro:'#9aa7a3'};
+    const entries=Object.entries(names).map(([key,label])=>({key,label,bytes:Number(categoryBytes[key]||0)})).filter(item=>item.bytes>0);
+    const total=Math.max(0,totalBytes),limit=100*1024*1024,used=Math.min(total,limit);
+    const segments=[];let cursor=0;
+    if(used>0){for(const item of entries){const size=item.bytes/used*100;if(size<=0)continue;segments.push(colors[item.key]+' '+cursor.toFixed(2)+'% '+Math.min(100,cursor+size).toFixed(2)+'%');cursor+=size;}}
+    if(total<limit)segments.push('#e9efed '+(used/limit*100).toFixed(2)+'% 100%');
+    const donut=$('#documentStorageDonut');
+    if(donut){donut.style.background=segments.length?'conic-gradient('+segments.join(',')+')':'#e9efed';donut.setAttribute('aria-label',(total/1024/1024).toFixed(2)+' MB utilizzati su 100 MB');}
+    const capacity=$('#documentStorageCapacity');if(capacity)capacity.textContent=(total/1024/1024).toFixed(2)+' / 100 MB';
+    const legend=$('#documentStorageLegend');
+    if(legend){
+      const format=bytes=>(bytes/1024/1024).toFixed(2)+' MB';
+      legend.innerHTML=entries.map(item=>'<span class="document-storage-legend-item"><i style="--document-color:'+colors[item.key]+'"></i><span>'+safeText(item.label)+'</span><strong>'+format(item.bytes)+'</strong></span>').join('')
+        +'<span class="document-storage-legend-item document-storage-free"><i></i><span>'+(total>limit?'Oltre soglia':'Disponibile')+'</span><strong>'+format(Math.max(0,limit-total))+'</strong></span>';
+      if(!entries.length)legend.innerHTML='<span class="document-storage-empty">Nessun allegato archiviato</span><span class="document-storage-legend-item document-storage-free"><i></i><span>Disponibile</span><strong>100,00 MB</strong></span>';
+    }
+  }
     async function searchDocuments(resetPage = false) {
     if(resetPage)documentSearchOffset=0;
     const term=$('#documentSearchText').value.trim(),category=$('#documentSearchCategory').value;
@@ -2061,7 +2097,8 @@
       $('#documentNext').disabled=documentSearchOffset+items.length>=Number(result.total_count||0);
       $('#documentStorageTotal').textContent=(Number(result.total_bytes||0)/1024/1024).toFixed(2)+' MB complessivi';
       $('#documentStorageWarning').classList.toggle('hidden',!result.warning);
-      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="contabile" '+(item.category==='contabile'?'selected':'')+'>Contabile</option><option value="estratto_conto" '+(item.category==='estratto_conto'?'selected':'')+'>Estratto conto</option><option value="documento" '+(item.category==='documento'?'selected':'')+'>Documento</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(formatDocumentDate(item.document_date))+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-edit="'+safeText(item.id)+'">Modifica</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> <button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button></td></tr>').join(''):'<tr><td colspan="8" class="empty-state">Nessun documento trovato.</td></tr>';
+      renderDocumentStorageChart(result.category_bytes||{},Number(result.total_bytes||0));
+      $('#documentsBody').innerHTML=items.length?items.map(item=>'<tr><td class="name-cell"><strong>'+safeText(item.filename)+'</strong><small class="document-excerpt">'+safeText(item.excerpt||'Testo non ancora disponibile')+'</small></td><td><select class="document-category-select" data-document-category="'+safeText(item.id)+'"><option value="fattura" '+(item.category==='fattura'?'selected':'')+'>Fattura</option><option value="f24" '+(item.category==='f24'?'selected':'')+'>F24</option><option value="bollettino" '+(item.category==='bollettino'?'selected':'')+'>Bollettino</option><option value="contabile" '+(item.category==='contabile'?'selected':'')+'>Contabile</option><option value="estratto_conto" '+(item.category==='estratto_conto'?'selected':'')+'>Estratto conto</option><option value="documento" '+(item.category==='documento'?'selected':'')+'>Documento</option><option value="altro" '+(item.category==='altro'?'selected':'')+'>Altro</option></select></td><td>'+safeText(item.supplier||'—')+'</td><td>'+safeText(item.amount||'—')+'</td><td>'+safeText(formatDocumentDate(item.document_date))+'</td><td>'+safeText(item.document_number||'—')+'</td><td>'+safeText(({queued:'In attesa',done:'Completato',failed:'Errore'})[item.ocr_status]||'In attesa')+'</td><td><button class="row-action" type="button" data-doc-open="'+safeText(item.id)+'">Apri</button> <button class="row-action" type="button" data-doc-edit="'+safeText(item.id)+'">Modifica</button> <button class="row-action" type="button" data-doc-download="'+safeText(item.id)+'">Scarica</button> '+(item.transaction_id?'<button class="row-action" type="button" data-doc-transaction="'+safeText(item.transaction_id)+'">Movimento</button>':'<span class="document-unlinked-label">Non collegato</span>')+'</td></tr>').join(''):'<tr><td colspan="8" class="empty-state">Nessun documento trovato.</td></tr>';
       $('#documentsBody').querySelectorAll('[data-doc-edit]').forEach(button=>button.addEventListener('click',()=>{
         const item=items.find(x=>x.id===button.dataset.docEdit);if(item)openDocumentMetadataEditor(item,'archive');
       }));
@@ -3202,7 +3239,6 @@
       }
       const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       downloadBlob(blob, filename);
-      showNotice('File Excel pronto', `Creato ${filename}. Puoi aprirlo con Excel o LibreOffice.`);
     } catch (error) { showNotice('Esportazione Excel non riuscita', error?.message || String(error)); }
   }
   function printHtml(title, content, options = {}) {

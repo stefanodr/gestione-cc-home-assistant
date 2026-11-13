@@ -60,7 +60,13 @@ def init_db():
         c.execute("CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL)")
         c.execute("CREATE TABLE IF NOT EXISTS transaction_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, transaction_id TEXT NOT NULL, event TEXT NOT NULL, changes_json TEXT NOT NULL)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
-        c.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+        c.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+        attachment_columns = {row["name"]: row for row in c.execute("PRAGMA table_info(attachments)")}
+        if attachment_columns.get("transaction_id") and attachment_columns["transaction_id"]["notnull"]:
+            c.execute("ALTER TABLE attachments RENAME TO attachments_legacy")
+            c.execute("CREATE TABLE attachments (id TEXT PRIMARY KEY, transaction_id TEXT, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+            c.execute("INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) SELECT id,transaction_id,filename,mime,size,content,created_at FROM attachments_legacy")
+            c.execute("DROP TABLE attachments_legacy")
         c.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
         c.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, document_number TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
         document_columns = {row["name"] for row in c.execute("PRAGMA table_info(document_index)")}
@@ -321,7 +327,13 @@ def ensure_transaction_feature_tables():
     with db() as connection:
         connection.execute("CREATE TABLE IF NOT EXISTS transaction_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, transaction_id TEXT NOT NULL, event TEXT NOT NULL, changes_json TEXT NOT NULL)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
-        connection.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+        connection.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+        attachment_columns = {row["name"]: row for row in connection.execute("PRAGMA table_info(attachments)")}
+        if attachment_columns.get("transaction_id") and attachment_columns["transaction_id"]["notnull"]:
+            connection.execute("ALTER TABLE attachments RENAME TO attachments_legacy")
+            connection.execute("CREATE TABLE attachments (id TEXT PRIMARY KEY, transaction_id TEXT, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
+            connection.execute("INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) SELECT id,transaction_id,filename,mime,size,content,created_at FROM attachments_legacy")
+            connection.execute("DROP TABLE attachments_legacy")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_attachments_tx ON attachments(transaction_id,created_at)")
         connection.execute("""CREATE TABLE IF NOT EXISTS document_index (attachment_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', category TEXT NOT NULL DEFAULT 'altro', extracted_text TEXT NOT NULL DEFAULT '', supplier TEXT, document_date TEXT, document_number TEXT, amount TEXT, fiscal_code TEXT, tax_code TEXT, updated_at TEXT NOT NULL, error TEXT)""")
         document_columns = {row["name"] for row in connection.execute("PRAGMA table_info(document_index)")}
@@ -767,7 +779,9 @@ class Handler(BaseHTTPRequestHandler):
                 rows=connection.execute(sql,params+[offset]).fetchall()
                 count=connection.execute("SELECT COUNT(*)"+base_sql+where,params).fetchone()[0]
                 total=connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
-            self.send_json(200,{"items":[dict(row) for row in rows],"total_count":int(count),"offset":offset,"page_size":100,"total_bytes":int(total),"warning":int(total)>=100*1024*1024})
+                category_rows=connection.execute("SELECT COALESCE(d.category,'altro') AS category,COALESCE(SUM(a.size),0) AS bytes FROM attachments a LEFT JOIN document_index d ON d.attachment_id=a.id GROUP BY COALESCE(d.category,'altro')").fetchall()
+                category_bytes={str(row["category"]):int(row["bytes"]) for row in category_rows}
+            self.send_json(200,{"items":[dict(row) for row in rows],"total_count":int(count),"offset":offset,"page_size":100,"total_bytes":int(total),"category_bytes":category_bytes,"warning":int(total)>=100*1024*1024})
             return
         if path == "/api/attachments/download":
             item = self.require_auth()
@@ -971,8 +985,8 @@ class Handler(BaseHTTPRequestHandler):
                     elif name:
                         fields[name] = data.decode("utf-8", "replace")
                 tx_id = str(fields.get("transaction_id", ""))[:160]
-                if not tx_id or not uploaded:
-                    raise ValueError("Movimento o file non specificato.")
+                if not uploaded:
+                    raise ValueError("File non specificato.")
                 filename, mime, content = uploaded
                 if len(content) < 1 or len(content) > 5 * 1024 * 1024:
                     raise ValueError("Ogni allegato deve avere dimensione massima di 5 MB.")
@@ -986,21 +1000,25 @@ class Handler(BaseHTTPRequestHandler):
                 with db() as connection:
                     state_row = connection.execute("SELECT state_json FROM app_state WHERE id=1").fetchone()
                     tx_ids = {str(x.get("id")) for x in json.loads(state_row["state_json"]).get("transactions", [])} if state_row else set()
-                    if tx_id not in tx_ids:
-                        raise ValueError("Il movimento selezionato non esiste più.")
-                    per_transaction = connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments WHERE transaction_id=?", (tx_id,)).fetchone()[0]
-                    if int(per_transaction) + len(content) > 15 * 1024 * 1024:
-                        raise ValueError("Gli allegati di questa registrazione non possono superare complessivamente 15 MB.")
+                    if tx_id:
+                        if tx_id not in tx_ids:
+                            raise ValueError("Il movimento selezionato non esiste più.")
+                        per_transaction = connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments WHERE transaction_id=?", (tx_id,)).fetchone()[0]
+                        if int(per_transaction) + len(content) > 15 * 1024 * 1024:
+                            raise ValueError("Gli allegati di questa registrazione non possono superare complessivamente 15 MB.")
                     total = connection.execute("SELECT COALESCE(SUM(size),0) FROM attachments").fetchone()[0]
                     attachment_id = secrets.token_urlsafe(18)
                     connection.execute(
                         "INSERT INTO attachments(id,transaction_id,filename,mime,size,content,created_at) VALUES(?,?,?,?,?,?,?)",
                         (attachment_id, tx_id, filename, mime, len(content), sqlite3.Binary(content), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
                     connection.execute("INSERT INTO document_index(attachment_id,status,category,updated_at) VALUES(?,'queued','altro',?)", (attachment_id,time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
-                    connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
-                        (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), tx_id, "attachment_added",
-                         json.dumps({"attachment": {"old": None, "new": {"id": attachment_id, "filename": filename, "size": len(content)}}}, ensure_ascii=False)))
-                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_added:" + tx_id,))
+                    if tx_id:
+                        connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                            (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), tx_id, "attachment_added",
+                             json.dumps({"attachment": {"old": None, "new": {"id": attachment_id, "filename": filename, "size": len(content)}}}, ensure_ascii=False)))
+                        connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_added:" + tx_id,))
+                    else:
+                        connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("standalone_document_added:" + attachment_id,))
                 enqueue_document_ocr(attachment_id)
                 total_after=int(total)+len(content)
                 self.send_json(201, {"ok":True,"id":attachment_id,"filename":filename,"size":len(content),"ocr_status":"queued","storage_warning":total_after>=100*1024*1024,"total_bytes":total_after})
@@ -1023,7 +1041,10 @@ class Handler(BaseHTTPRequestHandler):
                     connection.execute("DELETE FROM document_fts WHERE attachment_id=?", (attachment_id,))
                     connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)", (attachment_id,row["filename"],category,row["extracted_text"] or "",row["supplier"] or "",row["document_date"] or "",row["amount"] or "",row["fiscal_code"] or "",row["tax_code"] or ""))
                 except sqlite3.OperationalError: pass
-                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)", (time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),row["transaction_id"],"attachment_category_changed",json.dumps({"attachment":{"id":attachment_id,"filename":row["filename"],"category":category}},ensure_ascii=False)))
+                if row["transaction_id"]:
+                    connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)", (time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),row["transaction_id"],"attachment_category_changed",json.dumps({"attachment":{"id":attachment_id,"filename":row["filename"],"category":category}},ensure_ascii=False)))
+                else:
+                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("standalone_document_category_changed:" + attachment_id,))
             self.send_json(200, {"ok":True})
             return
         if path == "/api/documents/metadata":
@@ -1067,9 +1088,12 @@ class Handler(BaseHTTPRequestHandler):
                     connection.execute("INSERT INTO document_fts(attachment_id,filename,category,extracted_text,supplier,document_date,amount,fiscal_code,tax_code) VALUES(?,?,?,?,?,?,?,?,?)",
                         (attachment_id,row["filename"],indexed["category"],indexed["extracted_text"] or "",indexed["supplier"] or "",indexed["document_date"] or "",indexed["amount"] or "",indexed["fiscal_code"] or "",indexed["tax_code"] or ""))
                 except sqlite3.OperationalError: pass
-                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
-                    (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_metadata_corrected",
-                     json.dumps({"attachment_id":attachment_id,"filename":row["filename"],"fields":audit_fields}, ensure_ascii=False)))
+                if row["transaction_id"]:
+                    connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                        (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_metadata_corrected",
+                         json.dumps({"attachment_id":attachment_id,"filename":row["filename"],"fields":audit_fields}, ensure_ascii=False)))
+                else:
+                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("standalone_document_metadata_corrected:" + attachment_id,))
             self.send_json(200, {"ok":True})
             return
         if path == "/api/attachments/delete":
@@ -1084,10 +1108,13 @@ class Handler(BaseHTTPRequestHandler):
                 connection.execute("DELETE FROM document_index WHERE attachment_id=?", (attachment_id,))
                 try: connection.execute("DELETE FROM document_fts WHERE attachment_id=?", (attachment_id,))
                 except sqlite3.OperationalError: pass
-                connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
-                    (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_deleted",
-                     json.dumps({"attachment": {"old": {"id": attachment_id, "filename": row["filename"], "size": row["size"]}, "new": None}}, ensure_ascii=False)))
-                connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_deleted:" + row["transaction_id"],))
+                if row["transaction_id"]:
+                    connection.execute("INSERT INTO transaction_audit(at,transaction_id,event,changes_json) VALUES(?,?,?,?)",
+                        (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), row["transaction_id"], "attachment_deleted",
+                         json.dumps({"attachment": {"old": {"id": attachment_id, "filename": row["filename"], "size": row["size"]}, "new": None}}, ensure_ascii=False)))
+                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("transaction_attachment_deleted:" + row["transaction_id"],))
+                else:
+                    connection.execute("INSERT INTO audit(at,event) VALUES(datetime('now'),?)", ("standalone_document_deleted:" + attachment_id,))
             self.send_json(200, {"ok":True})
             return
         if path == "/api/drive/connect":
@@ -1331,12 +1358,12 @@ class Handler(BaseHTTPRequestHandler):
                     data = base64.b64decode(str(attachment.get("content", "")), validate=True)
                     mime = str(attachment.get("mime", ""))
                     attachment_id = str(attachment.get("id", ""))
-                    tx_id = str(attachment.get("transaction_id", ""))
+                    tx_id = str(attachment.get("transaction_id") or "") or None
                     filename = Path(str(attachment.get("filename", "allegato"))).name[:180]
                     valid_signature = valid_attachment_signature(mime, data)
                     if (mime not in ("application/pdf", "image/jpeg", "image/png") or
                         not valid_signature or len(data) < 1 or len(data) > 10 * 1024 * 1024 or
-                        not attachment_id or attachment_id in seen_attachment_ids or not tx_id):
+                        not attachment_id or attachment_id in seen_attachment_ids):
                         raise ValueError("Allegato nel backup non valido.")
                     seen_attachment_ids.add(attachment_id)
                     restored += len(data)

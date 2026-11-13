@@ -1,3 +1,25 @@
+## [1.0.29] - 2026-11-13
+
+### Aggiunto
+- Caricamento diretto nell'Archivio documenti di PDF e immagini non collegati a un movimento.
+- Grafico ad anello dello spazio occupato, suddiviso per categoria, con legenda e spazio residuo rispetto a 100 MB.
+- Riepilogo delle dimensioni occupate da ogni categoria documentale.
+
+### Corretto
+- Eliminato il messaggio di conferma superfluo dopo la generazione dei file Excel: il download parte direttamente. Restano gli avvisi di errore e le conferme operative.
+- I documenti autonomi sono inclusi nei backup e non mostrano un collegamento a un movimento inesistente.
+
+## [1.0.29] - 2026-11-13
+
+### Added
+- Direct upload of PDFs and images into the document archive without linking them to a transaction.
+- Doughnut chart of storage usage by document category, with legend and remaining capacity against 100 MB.
+- Per-category document storage totals.
+
+### Fixed
+- Removed the redundant success dialog after Excel generation; downloads now start directly. Error alerts and operational confirmations remain.
+- Standalone documents are included in backups and do not show a link to a non-existent transaction.
+
 ## [1.0.28] - 2026-11-13
 
 ### Aggiunto
