@@ -1307,7 +1307,12 @@
       const usePrior=currentActive<3&&priorActive>=3;
       const values=usePrior?priorValues:currentValues;
       const active=values.filter(value=>value>0);
-      if(active.length<3)return {amount:0,source:'sporadico'};
+      // Historical projections require a recurring pattern across at least
+      // 40% of the observed months (minimum three). Irregular expenses stay
+      // excluded; explicit recurring rules, including annual ones, are added
+      // separately above and are not subject to this historical threshold.
+      const minimumActiveMonths=Math.max(3,Math.ceil(values.length*0.4));
+      if(active.length<minimumActiveMonths)return {amount:0,source:'sporadico'};
       return {amount:median(active),source:usePrior?'anno_precedente':'anno_corrente'};
     };
     const forecast=[];
