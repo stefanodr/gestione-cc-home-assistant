@@ -1,3 +1,21 @@
+## [1.0.26] - 2026-11-13
+
+### Italiano
+- Riordinato il modulo di modifica dei documenti: ogni descrizione è ora associata direttamente al proprio campo e usa le stesse denominazioni dell'Archivio documenti.
+- In Movimenti, dopo il caricamento di un allegato, l'interfaccia attende il completamento del riconoscimento OCR e apre automaticamente il modulo per verificare o correggere fornitore/ente, importo, data e numero documento. Se l'OCR fallisce o richiede più tempo, è comunque possibile inserire i dati manualmente.
+- Riallineato il pulsante Allegati con Ripartisci e Storico; il numero degli allegati è spostato sotto il pulsante senza alterarne l'allineamento.
+- Semplificata la tabella Previsioni: rimossi i valori effettivi, mostrando soltanto entrate e uscite programmate, stimate e i saldi proiettati. Il saldo di partenza resta quello dell'ultimo mese chiuso.
+- Reso più robusto il riconoscimento delle ricorrenze nelle previsioni, con normalizzazione delle frequenze e compatibilità con le varianti dei dati salvati. Aggiunto un riepilogo del numero di impegni attivi e delle occorrenze programmate nei 12 mesi.
+- Aggiornati l'icona e il logo dell'add-on Home Assistant usando lo stesso marchio presente nel README.
+
+### English
+- Reworked the document editing form: each description is now directly associated with its input and uses the same labels as the Document Archive.
+- In Transactions, after an attachment is uploaded, the interface waits for OCR to finish and automatically opens the form to review or correct supplier/entity, amount, date and document number. If OCR fails or takes longer, the fields can still be completed manually.
+- Realigned the Attachments button with Split and History; the attachment count now appears below the button without affecting button alignment.
+- Simplified the Forecast table by removing actual figures and showing only scheduled and estimated income/expenses and projected balances. The opening balance remains based on the latest closed month.
+- Made scheduled recurrence handling more robust by normalizing frequency values and supporting saved-data variants. Added a summary of active commitments and scheduled occurrences over the next 12 months.
+- Updated the Home Assistant add-on icon and logo to use the same brand mark shown in the README.
+
 ## [1.0.25] - 2026-11-13
 
 ### Italiano
