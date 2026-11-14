@@ -123,6 +123,11 @@ class IntegrationApiDtoTest(unittest.TestCase):
     def test_unknown_status_endpoint_returns_no_payload(self):
         self.assertIsNone(NAMESPACE["integration_status"]("/api/integration/v1/private/export"))
 
+    def test_security_log_is_excluded_from_supervisor_addon_backups(self):
+        config = (SERVER.parents[0] / "config.yaml").read_text(encoding="utf-8")
+        self.assertIn("backup_exclude:", config)
+        self.assertIn("- access_log.sqlite3*", config)
+
     def test_security_log_is_not_in_accounting_database(self):
         connection = sqlite3.connect(self.db_path)
         row = connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='access_log'").fetchone()
