@@ -32,6 +32,7 @@ MAX_BODY = 512 * 1024 * 1024  # Large JSON restores may include base64-encoded d
 SESSION_SECONDS = 8 * 60 * 60
 sessions = {}
 login_failures = {}
+login_lockout_logged = {}
 last_auto_backup = 0.0
 LOGIN_WINDOW = 300
 LOGIN_MAX = 5
@@ -1457,7 +1458,9 @@ class Handler(BaseHTTPRequestHandler):
             recent = [stamp for stamp in login_failures.get(peer, []) if now - stamp < LOGIN_WINDOW]
             login_failures[peer] = recent
             if len(recent) >= LOGIN_MAX:
-                record_access_event("temporary_lockout", "blocked", peer)
+                if now - login_lockout_logged.get(peer, 0) >= LOGIN_WINDOW:
+                    record_access_event("temporary_lockout", "blocked", peer)
+                    login_lockout_logged[peer] = now
                 self.send_json(429, {"error":"Troppi tentativi. Riprova tra alcuni minuti."}); return
             username = verify_pin(pin) if valid_pin(pin) else None
             if not username:
