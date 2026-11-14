@@ -1,3 +1,17 @@
+## [1.0.32] - 2026-11-14
+
+### Corretto
+- Sostituito il selettore privacy a tre modalità con un solo interruttore OFF/ON. OFF mostra tutti i valori; ON oscura gli importi in euro, inclusi i contenuti caricati dinamicamente, lasciando leggibili date, codici e campi di modifica.
+- Migliorato l'avanzamento del caricamento del database: la barra viene aggiornata dopo le fasi effettive di connessione, ricezione, preparazione e salvataggio, con ridisegno tra una fase e l'altra.
+- Allineato il pulsante Allegati alle altre azioni dei movimenti e spostato il contatore sotto il pulsante.
+- Aggiornata la versione dell'add-on a 1.0.32.
+
+### Fixed
+- Replaced the three-mode privacy selector with a single OFF/ON switch. OFF shows all values; ON masks euro amounts, including dynamically loaded content, while keeping dates, codes and editable fields readable.
+- Improved database-loading progress updates after actual connection, retrieval, preparation and save stages, allowing the progress bar to repaint between stages.
+- Aligned the Attachments button with the other transaction actions and moved its count below the button.
+- Updated the add-on version to 1.0.32.
+
 ## [1.0.31] - 2026-11-14
 
 ### Aggiunto
