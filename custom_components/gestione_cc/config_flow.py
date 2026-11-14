@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_URL
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import selector
 
 from .const import CONF_CA_CERT, DEFAULT_CA_CERT, DOMAIN
 
@@ -71,7 +72,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema({
             vol.Required(CONF_URL): str,
-            vol.Required("token"): str,
+            vol.Required("token"): selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+            ),
             vol.Required(CONF_CA_CERT, default=DEFAULT_CA_CERT): str,
         })
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
