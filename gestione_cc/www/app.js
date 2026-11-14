@@ -1401,7 +1401,9 @@
     const openingBase=allLiquidSelected||ids.has(state.bankAccountId)?Number(state.openingBalance)||0:0;
     const openingTransactions=state.transactions.filter(tx=>String(tx.date||'')<=cutoff&&tx.status!=='duplicate'&&(allLiquidSelected||ids.has(tx.bankAccountId)));
     const openingBalance=Math.round((openingBase+openingTransactions.reduce((sum,tx)=>sum+(Number(tx.amount)||0),0)+Number.EPSILON)*100)/100;
-    const openingBalanceUnknown=[];
+    const openingBalanceUnknown=accounts
+      .filter(account=>account.id!==state.bankAccountId&&account.openingBalance==null)
+      .map(account=>account.path||account.name||account.id);
     const categories=state.accounts.filter(a=>a.hierarchyType!=='Mastro'&&
       (['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))));
     // Use up to 24 closed months so each projected month can follow its own
