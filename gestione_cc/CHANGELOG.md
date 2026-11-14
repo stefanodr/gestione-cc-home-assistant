@@ -1,3 +1,13 @@
+## [1.0.34] - 2026-11-14
+
+### Aggiunto
+- Integrata in Impostazioni una guida operativa consultabile per argomenti, con ricerca, sezioni espandibili e contenuti in italiano e inglese.
+- Aggiunti collegamenti rapidi dalla guida alle schermate principali dell'app.
+
+### Added
+- Added an in-app user guide under Settings, organized into expandable topics with search and Italian/English content.
+- Added quick links from the guide to the main application sections.
+
 ## [1.0.33] - 2026-11-14
 
 ### Corretto
