@@ -43,6 +43,7 @@ class GestioneCCSensor(CoordinatorEntity, SensorEntity):
         self._field = field
         self._attr_name = f"Gestione C/C {name}"
         self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_suggested_object_id = f"gestione_cc_{key}"
         self._attr_icon = icon
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = state_class
