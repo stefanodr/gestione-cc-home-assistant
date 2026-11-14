@@ -1,3 +1,15 @@
+## [1.0.33] - 2026-11-14
+
+### Corretto
+- Ripristinate al pulsante Allegati dimensioni coerenti con i pulsanti Ripartisci e Storico; il contatore è collocato sotto il pulsante in uno spazio dedicato.
+- Aggiornata l'etichetta dell'interruttore privacy in "Nascondi importi per privacy".
+- Rimossa dalla documentazione dell'add-on la dicitura statica "Versione / Version: 1.0.19", non aggiornata automaticamente.
+
+### Fixed
+- Restored the Attachments button dimensions to match the Split and History buttons; the attachment count now appears below the button in a dedicated space.
+- Updated the privacy switch label to "Hide amounts for privacy".
+- Removed the static "Version / Version: 1.0.19" line from the add-on documentation because it was not updated automatically.
+
 ## [1.0.32] - 2026-11-14
 
 ### Corretto
