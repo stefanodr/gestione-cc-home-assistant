@@ -1,3 +1,21 @@
+## [1.0.44] - 2026-11-14
+
+### Correzione certificati HTTPS
+- Corretta la generazione della CA privata: ora include le estensioni X.509 obbligatorie `basicConstraints` e `keyUsage`, oltre agli identificatori della chiave.
+- All'avvio viene verificata anche la CA già presente. Se non è conforme, viene creata una nuova CA e i vecchi certificati sono conservati in una cartella di backup protetta in `/data/tls`.
+- Il certificato HTTPS del server viene rigenerato e verificato rispetto alla nuova CA. Dopo l'aggiornamento è necessario scaricare e installare nuovamente il certificato CA in Home Assistant.
+- Nessuna modifica al database contabile, al PIN, al token dell'integrazione, all'hostname, alla porta HTTPS o alle regole di accesso LAN.
+
+### HTTPS certificate fix
+- Fixed private CA generation: it now includes the required X.509 `basicConstraints` and `keyUsage` extensions, together with key identifiers.
+- Startup now validates the existing CA. If it is not compliant, a new CA is generated and the previous certificates are retained in a protected backup folder under `/data/tls`.
+- The HTTPS server certificate is regenerated and verified against the new CA. After updating, download and install the new CA certificate in Home Assistant.
+- No changes to the accounting database, PIN, integration token, hostname, HTTPS port or LAN access rules.
+
+### Versioni / Versions
+- Versione app / App version: 1.7.14.
+- Versione add-on / Add-on version: 1.0.44.
+
 ## [1.0.43] - 2026-11-14
 
 ### Correzioni
