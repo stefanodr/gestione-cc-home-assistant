@@ -3,9 +3,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
+(async () => {
+
 const source = fs.readFileSync('gestione_cc/www/app.js', 'utf8');
 function extract(name, nextName) {
-  const start = source.indexOf('function ' + name + '(');
+  const asyncStart = source.indexOf('async function ' + name + '(');
+  const start = asyncStart >= 0 ? asyncStart : source.indexOf('function ' + name + '(');
   assert.notEqual(start, -1, 'Funzione non trovata: ' + name);
   const end = source.indexOf('function ' + nextName + '(', start + 1);
   assert.notEqual(end, -1, 'Delimitatore non trovato: ' + nextName);
@@ -164,6 +167,7 @@ const forecastBuildContext = {
   normalize: value => String(value || '').toLowerCase().trim(),
   transactionDescription: tx => tx.description || '',
   localDateKey: () => '2026-11-09',
+  requestAnimationFrame: callback => setImmediate(callback),
   accountById: id => forecastBuildContext.state.accounts.find(a => a.id === id)
 };
 vm.createContext(forecastBuildContext);
@@ -183,15 +187,15 @@ const buildHelpers = [
   extract('buildForecast', 'renderForecastSelection')
 ].join('\n');
 vm.runInContext(buildHelpers + '\nthis.buildForecast = buildForecast;', forecastBuildContext);
-const allForecast = forecastBuildContext.buildForecast();
+const allForecast = await forecastBuildContext.buildForecast();
 assert.equal(allForecast.currentBalance, 1000);
 assert.equal(allForecast.openingBalanceUnknown.length, 1);
 forecastBuildContext.state.forecastSettings.accountIds = ['bank'];
-const bankForecast = forecastBuildContext.buildForecast();
+const bankForecast = await forecastBuildContext.buildForecast();
 assert.equal(bankForecast.currentBalance, 1000);
 assert.equal(bankForecast.openingBalanceUnknown.length, 0);
 forecastBuildContext.state.forecastSettings.accountIds = ['savings'];
-const savingsForecast = forecastBuildContext.buildForecast();
+const savingsForecast = await forecastBuildContext.buildForecast();
 assert.equal(savingsForecast.currentBalance, 0);
 assert.equal(savingsForecast.openingBalanceUnknown.length, 1);
 
@@ -220,3 +224,4 @@ assert.equal(annualRecurrenceContext.state.recurringProposals[0].frequency, 'yea
 assert.equal(annualRecurrenceContext.state.recurringProposals[0].occurrences, 2);
 
 console.log('OK: OFX, ricorrenze, trasferimenti, budget e saldi previsionali su più conti.');
+})().catch(error => { console.error(error); process.exitCode = 1; });
