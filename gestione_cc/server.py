@@ -692,7 +692,7 @@ def integration_token_digest(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 def integration_job_counts():
-    allowed = {"document_ocr", "drive_session_backup"}
+    allowed = {"document_ocr", "drive_session_backup", "integration_local_backup", "integration_google_drive_backup", "integration_integrity_check"}
     counts = {"queued": 0, "running": 0, "done": 0, "failed": 0}
     with db() as connection:
         rows = connection.execute("SELECT kind,status,COUNT(*) AS total FROM background_jobs WHERE created_at >= datetime('now','-7 days') GROUP BY kind,status").fetchall()
