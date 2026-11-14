@@ -1,3 +1,13 @@
+## [1.1.1] - In sviluppo / In development
+
+### Correzioni
+- Spostato il controllo del file CA e il caricamento del contesto SSL fuori dall'event loop di Home Assistant, evitando chiamate bloccanti durante la configurazione.
+- Inizializzazione del contesto SSL asincrona anche all'avvio dell'integrazione; gli errori di caricamento del certificato vengono segnalati come errore di configurazione/aggiornamento senza disattivare la verifica TLS.
+
+### Fixes
+- Moved CA file checks and SSL context creation out of Home Assistant's event loop to prevent blocking calls during configuration.
+- SSL context is now initialized asynchronously when the integration starts; certificate-loading errors are reported without disabling TLS verification.
+
 ## [1.1.0] - 2026-11-14
 
 ### Aggiunto
