@@ -26,6 +26,8 @@ views:
             name: Database integro
           - entity: sensor.gestione_cc_database_size
             name: Dimensione database
+          - entity: sensor.gestione_cc_database_last_write
+            name: Ultima modifica database
           - entity: sensor.gestione_cc_database_last_check
             name: Ultimo controllo integrità
       - type: entities
@@ -40,6 +42,8 @@ views:
             name: Google Drive collegato
           - entity: sensor.gestione_cc_backup_drive_last
             name: Ultimo backup Google Drive
+          - entity: sensor.gestione_cc_storage_total
+            name: Capacità volume dati
           - entity: sensor.gestione_cc_storage_free
             name: Spazio libero
           - entity: sensor.gestione_cc_storage_used
@@ -58,6 +62,10 @@ views:
             name: OCR in elaborazione
           - entity: sensor.gestione_cc_ocr_failed
             name: OCR in errore
+          - entity: sensor.gestione_cc_jobs_queued
+            name: Processi in coda
+          - entity: sensor.gestione_cc_jobs_running
+            name: Processi in esecuzione
           - entity: sensor.gestione_cc_jobs_failed
             name: Processi in errore
       - type: grid
