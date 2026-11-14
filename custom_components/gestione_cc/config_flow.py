@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 import ipaddress
 import ssl
@@ -40,33 +41,41 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_local_url"
             elif not token or len(token) > 256:
                 errors["base"] = "invalid_token"
-            elif not Path(ca_path).is_file():
-                errors["base"] = "ca_file_missing"
             else:
                 try:
-                    context = ssl.create_default_context(cafile=ca_path)
-                    session = async_get_clientsession(self.hass)
-                    async with session.get(
-                        f"{url}/api/integration/v1/health",
-                        headers={"Authorization": f"Bearer {token}"},
-                        ssl=context,
-                        timeout=aiohttp.ClientTimeout(total=10),
-                    ) as response:
-                        if response.status == 401:
-                            errors["base"] = "invalid_auth"
-                        elif response.status != 200:
-                            errors["base"] = "cannot_connect"
-                        else:
-                            payload = await response.json()
-                            if payload.get("available") is not True:
-                                errors["base"] = "invalid_response"
+                    # File access and certificate parsing are blocking operations:
+                    # run both in the executor, never on Home Assistant's event loop.
+                    ca_exists = await self.hass.async_add_executor_job(
+                        partial(Path(ca_path).is_file)
+                    )
+                    if not ca_exists:
+                        errors["base"] = "ca_file_missing"
+                    else:
+                        context = await self.hass.async_add_executor_job(
+                            partial(ssl.create_default_context, cafile=ca_path)
+                        )
+                        session = async_get_clientsession(self.hass)
+                        async with session.get(
+                            f"{url}/api/integration/v1/health",
+                            headers={"Authorization": f"Bearer {token}"},
+                            ssl=context,
+                            timeout=aiohttp.ClientTimeout(total=10),
+                        ) as response:
+                            if response.status == 401:
+                                errors["base"] = "invalid_auth"
+                            elif response.status != 200:
+                                errors["base"] = "cannot_connect"
                             else:
-                                await self.async_set_unique_id(url.lower())
-                                self._abort_if_unique_id_configured()
-                                return self.async_create_entry(
-                                    title="Gestione C/C",
-                                    data={CONF_URL: url, "token": token, CONF_CA_CERT: ca_path},
-                                )
+                                payload = await response.json()
+                                if payload.get("available") is not True:
+                                    errors["base"] = "invalid_response"
+                                else:
+                                    await self.async_set_unique_id(url.lower())
+                                    self._abort_if_unique_id_configured()
+                                    return self.async_create_entry(
+                                        title="Gestione C/C",
+                                        data={CONF_URL: url, "token": token, CONF_CA_CERT: ca_path},
+                                    )
                 except (aiohttp.ClientError, TimeoutError, OSError, ssl.SSLError, ValueError):
                     errors["base"] = "cannot_connect"
 
