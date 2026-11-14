@@ -1,4 +1,5 @@
 import asyncio
+from functools import partial
 import logging
 import ssl
 import time
@@ -12,9 +13,11 @@ from .const import API_ENDPOINTS, COMMANDS, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 class GestioneCCCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, entry):
+        self.hass = hass
         self.base_url = entry.data["url"].rstrip("/")
         self.token = entry.data["token"]
-        self.ssl_context = ssl.create_default_context(cafile=entry.data["ca_cert_path"])
+        self.ca_path = entry.data["ca_cert_path"]
+        self.ssl_context = None
         self.session = async_get_clientsession(hass)
         self._poll_cache = {}
         self._last_poll = {}
@@ -24,6 +27,17 @@ class GestioneCCCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=DEFAULT_SCAN_INTERVAL,
         )
+
+    async def async_initialize(self):
+        """Load the CA certificate outside Home Assistant's event loop."""
+        try:
+            self.ssl_context = await self.hass.async_add_executor_job(
+                partial(ssl.create_default_context, cafile=self.ca_path)
+            )
+        except (OSError, ssl.SSLError, ValueError) as error:
+            raise UpdateFailed(
+                f"Impossibile caricare il certificato CA Gestione C/C: {type(error).__name__}"
+            ) from error
 
     async def _get(self, endpoint):
         async with self.session.get(
