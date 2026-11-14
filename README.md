@@ -23,6 +23,23 @@
 | ![Panoramica Gestione C/C](docs/screenshots/panoramica.png) | ![Movimenti Gestione C/C](docs/screenshots/movimenti.png) | ![Report Gestione C/C](docs/screenshots/report.png) |
 | Entrate, uscite, saldi e andamento. | Consultazione e classificazione dei movimenti. | Analisi dei flussi e confronti tra periodi. |
 
+## Integrazione Home Assistant — versione 1.1 (anteprima)
+
+La versione 1.1 introduce una prima integrazione HACS per il monitoraggio **esclusivamente tecnico** di Gestione C/C e per l'avvio di alcune operazioni di manutenzione.
+
+- Sensori tecnici per disponibilità, database, backup, spazio, allegati e processi.
+- Pulsanti per backup locale, backup Google Drive e controllo integrità.
+- Esempi di dashboard e automazioni Home Assistant.
+- Comunicazione HTTPS con CA dedicata e accesso limitato alla rete locale.
+
+**Privacy:** l'integrazione non legge il database contabile, i movimenti, i saldi, i documenti, i file di backup o il registro accessi. Home Assistant riceve soltanto stati tecnici predefiniti. Le operazioni di manutenzione non consentono di scaricare o consultare i dati.
+
+Questa versione è destinata al collaudo. L'installazione e la configurazione sono descritte in [README dell'integrazione](custom_components/gestione_cc/README.md); gli esempi sono in [dashboard](docs/dashboard_gestione_cc.yaml) e [automazioni](docs/automazioni_gestione_cc.yaml).
+
+La documentazione estesa delle nuove funzionalità e la presentazione completa saranno consolidate dopo il collaudo, nella successiva release 2.0.
+
+---
+
 ## Funzionalità principali
 
 - **Migrazione da GnuCash:** importa piano dei conti, movimenti e regole da un libro GnuCash in formato XML, anche compresso con GZIP, mantenendo i dati già presenti. [Dettagli sull'importazione](gestione_cc/DOCS.md#6-dati-importazione-e-compatibilità).
