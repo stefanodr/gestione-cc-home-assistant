@@ -6,7 +6,7 @@ from .const import DOMAIN
 
 
 SENSORS = [
-    ("uptime", "health", "uptime_seconds", "Tempo attività", "mdi:timer-outline", None, SensorStateClass.TOTAL_INCREASING),
+    ("uptime", "health", "uptime_seconds", "Tempo attività", "mdi:timer-outline", None, SensorStateClass.MEASUREMENT),
     ("database_size", "database", "size_bytes", "Dimensione database", "mdi:database", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
     ("database_last_write", "database", "last_write_at", "Ultima modifica database", "mdi:database-clock", None, None),
     ("backup_local_count", "backups", "local_count", "Copie backup locali", "mdi:backup-restore", None, SensorStateClass.MEASUREMENT),
