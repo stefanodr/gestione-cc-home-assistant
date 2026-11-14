@@ -12,6 +12,13 @@ if ! echo "$HOSTNAME_CFG" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
   bashio::log.error "hostname non valido: usare un nome DNS semplice, ad esempio homeassistant.local"
   exit 1
 fi
+if python3 -c 'import ipaddress,sys; ipaddress.IPv4Address(sys.argv[1])' "$HOSTNAME_CFG" >/dev/null 2>&1; then
+  SAN_ENTRY="IP:$HOSTNAME_CFG"
+  SAN_MARKER="IP Address:$HOSTNAME_CFG"
+else
+  SAN_ENTRY="DNS:$HOSTNAME_CFG"
+  SAN_MARKER="DNS:$HOSTNAME_CFG"
+fi
 CA_CREATED=0
 if [ ! -s /data/tls/root-ca.crt ] || [ ! -s /data/tls/root-ca.key ]; then
   CA_CREATED=1
@@ -24,13 +31,13 @@ if [ ! -s /data/tls/root-ca.crt ] || [ ! -s /data/tls/root-ca.key ]; then
 fi
 NEED_CERT="$CA_CREATED"
 if [ ! -s /data/tls/server.crt ] || [ ! -s /data/tls/server.key ]; then NEED_CERT=1; fi
-if [ "$NEED_CERT" -eq 0 ] && ! openssl x509 -in /data/tls/server.crt -noout -ext subjectAltName 2>/dev/null | grep -Fq "DNS:$HOSTNAME_CFG"; then NEED_CERT=1; fi
+if [ "$NEED_CERT" -eq 0 ] && ! openssl x509 -in /data/tls/server.crt -noout -ext subjectAltName 2>/dev/null | grep -Fq "$SAN_MARKER"; then NEED_CERT=1; fi
 if [ "$NEED_CERT" -eq 1 ]; then
   bashio::log.info "Creo/aggiorno il certificato HTTPS per $HOSTNAME_CFG"
   openssl req -new -newkey rsa:3072 -nodes \
     -keyout /data/tls/server.key -out /data/tls/server.csr \
     -subj "/CN=$HOSTNAME_CFG"
-  printf "subjectAltName=DNS:$HOSTNAME_CFG\nextendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyEncipherment\n" > /data/tls/server.ext
+  printf "subjectAltName=$SAN_ENTRY\nextendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyEncipherment\n" > /data/tls/server.ext
   openssl x509 -req -in /data/tls/server.csr -CA /data/tls/root-ca.crt \
     -CAkey /data/tls/root-ca.key -CAcreateserial -out /data/tls/server.crt \
     -days 825 -sha256 -extfile /data/tls/server.ext
