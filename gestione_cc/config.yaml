@@ -1,7 +1,7 @@
 name: "Gestione C/C"
 slug: "gestione_cc"
 description: "Gestione C/C privata, con archivio centralizzato e accesso LAN autenticato"
-version: "1.0.43"
+version: "1.1.0"
 backup_exclude:
   - access_log.sqlite3*
 url: "https://github.com/stefanodr/gestione-cc-home-assistant"
