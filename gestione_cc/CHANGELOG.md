@@ -1,3 +1,17 @@
+## [1.0.43] - 2026-11-14
+
+### Correzioni
+- Corretta la versione add-on mostrata nel piè di pagina: ora è allineata alla versione effettivamente installata.
+- Centralizzata la versione dell'add-on in una costante per evitare etichette obsolete nell'interfaccia.
+
+### Fixes
+- Fixed the add-on version displayed in the application footer so it matches the installed add-on version.
+- Centralized the add-on version in a constant to prevent stale version labels in the interface.
+
+### Versioni / Versions
+- Versione add-on / Add-on version: 1.0.43.
+- Versione app inclusa / Bundled application version: 1.7.14.
+
 ## [1.0.42] - 2026-11-14
 
 ### Aggiunto e corretto
