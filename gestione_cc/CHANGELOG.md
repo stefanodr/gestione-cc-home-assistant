@@ -14,7 +14,8 @@
 
 ### Versioni / Versions
 - Versione app / App version: 1.7.14.
-- Versione add-on / Add-on version: 1.0.44.
+- Versione add-on Home Assistant / Home Assistant add-on version: 1.1.1.
+- Versione backend visualizzata dall'API / Backend version reported by the API: 1.0.44.
 
 ## [1.0.43] - 2026-11-14
 
