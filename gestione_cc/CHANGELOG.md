@@ -1,14 +1,18 @@
-## [1.0.37] - 2026-11-14
+## [1.0.38] - 2026-11-14
 
-### Corretto
-- Corretta la ricerca delle etichette della Guida: titolo, introduzione e lingua sono elementi esterni al pannello e vengono ora individuati nel documento.
-- Evitato l'errore JavaScript che interrompeva il rendering iniziale, la ricerca e l'apertura completa della guida.
-- Allineata la versione dell'add-on a 1.0.37 nei metadati e nel piè di pagina.
+### Migliorato
+- Riscritta e ampliata la Guida all'utilizzo con 12 capitoli operativi in italiano e inglese.
+- Separati Budget e Previsioni in due capitoli distinti.
+- Aggiunte procedure passo-passo, esempi, controlli e indicazioni per interpretare i risultati.
+- Mantenuti i collegamenti alle sezioni dell'applicazione soltanto alla fine di ciascun capitolo.
+- Aggiornata la versione dell'add-on a 1.0.38 nel menu e nei metadati.
 
-### Fixed
-- Fixed User Guide label lookup: title, introduction and language labels are outside the guide panel and are now selected from the document.
-- Prevented the JavaScript error that stopped initial rendering, search and full-guide expansion.
-- Updated the add-on version to 1.0.37 in metadata and footer.
+### Improved
+- Rewrote and expanded the User Guide with 12 operational chapters in Italian and English.
+- Split Budget and Forecasts into separate chapters.
+- Added step-by-step procedures, examples, checks and guidance for interpreting results.
+- Kept links to application sections at the end of each chapter only.
+- Updated the add-on version to 1.0.38 in the sidebar and metadata.
 
 ## [1.0.35] - 2026-11-14
 
