@@ -35,6 +35,10 @@ jobs:
         run: python tests/test_transaction_audit.py
       - name: Test OFX parser
         run: node tests/finance-import.test.js
+      - name: Install DOM test dependency
+        run: npm install --no-save --no-package-lock jsdom@26
+      - name: Test global privacy modes
+        run: node tests/privacy-ui.test.js
       - name: Build Home Assistant add-on image
         run: docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest -t gestione-cc-addon-test gestione_cc
       - name: Verify local PDF and Italian OCR tools
