@@ -16,7 +16,7 @@ Questa è la prima versione di sviluppo della custom integration. Non è ancora 
 5. Riavviare Home Assistant.
 6. Dalla pagina Impostazioni → Sicurezza di Gestione C/C, scaricare il certificato CA. Copiarlo nella cartella `/ssl` di Home Assistant (con nome `gestione-cc-ca.crt`) e verificare che Home Assistant Core possa leggerlo.
 7. Aggiungere **Gestione C/C** da Impostazioni → Dispositivi e servizi.
-8. Inserire URL HTTPS locale, token (campo mascherato) e percorso `/ssl/gestione-cc-ca.crt`.
+8. Inserire URL HTTPS locale, token (campo mascherato) e percorso `/ssl/gestione-cc-ca.crt`. Il nome host o l'indirizzo IP nell'URL deve coincidere con il valore `hostname` configurato nell'add-on: il certificato server viene emesso con SAN DNS oppure IP in base a tale valore.
 
 ### Installazione manuale per sviluppo
 In alternativa, copiare la directory `custom_components/gestione_cc` in `/config/custom_components/gestione_cc`, quindi seguire i passaggi 5–8. La distribuzione prevista per gli utenti è tramite HACS.
