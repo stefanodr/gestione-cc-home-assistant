@@ -5,6 +5,8 @@ import ipaddress
 import os
 import re
 import shutil
+import secrets
+import threading
 import sqlite3
 import tempfile
 import time
@@ -15,7 +17,7 @@ from unittest.mock import patch
 
 SERVER = Path(__file__).resolve().parents[1] / "gestione_cc" / "server.py"
 TREE = ast.parse(SERVER.read_text(encoding="utf-8"))
-TARGETS = {"integration_token_digest", "integration_setting", "integration_job_counts", "integration_status", "access_db", "record_access_event", "cleanup_access_log", "access_db_connection"}
+TARGETS = {"integration_token_digest", "integration_setting", "integration_job_counts", "integration_status", "access_db", "record_access_event", "cleanup_access_log", "access_db_connection", "enqueue_integration_job"}
 NAMESPACE = {
     "hashlib": hashlib,
     "contextmanager": contextmanager,
@@ -27,6 +29,8 @@ NAMESPACE = {
     "time": time,
     "Path": Path,
     "shutil": shutil,
+    "secrets": secrets,
+    "BACKGROUND_JOBS_LOCK": threading.Lock(),
 }
 for node in TREE.body:
     if isinstance(node, ast.FunctionDef) and node.name in TARGETS:
@@ -50,7 +54,7 @@ class IntegrationApiDtoTest(unittest.TestCase):
             CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE app_state (id INTEGER PRIMARY KEY, updated_at TEXT);
             INSERT INTO app_state VALUES (1, '2026-11-14T18:00:00Z');
-            CREATE TABLE background_jobs (id TEXT, kind TEXT, status TEXT);
+            CREATE TABLE background_jobs (id TEXT, kind TEXT, status TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT, result_json TEXT, error TEXT);
             CREATE TABLE attachments (id TEXT, filename TEXT, size INTEGER, content BLOB);
             INSERT INTO background_jobs VALUES ('secret-job-id', 'document_ocr', 'queued');
             INSERT INTO background_jobs VALUES ('secret-job-id-2', 'document_ocr', 'failed');
@@ -122,6 +126,22 @@ class IntegrationApiDtoTest(unittest.TestCase):
         self.assertNotIn("secret-job-id", str(result))
         self.assertNotIn("unrelated-job", str(result))
 
+    def test_integration_command_is_queued_without_exposing_job_id(self):
+        result = NAMESPACE["enqueue_integration_job"]("local_backup")
+        self.assertEqual(result, {"status": "queued", "operation": "local_backup"})
+        connection = sqlite3.connect(self.db_path)
+        row = connection.execute("SELECT kind,status FROM background_jobs WHERE kind LIKE 'integration_%'").fetchone()
+        connection.close()
+        self.assertEqual(row, ("integration_local_backup", "queued"))
+        self.assertNotIn("id", result)
+
+    def test_only_one_integration_maintenance_job_can_be_active(self):
+        connection = sqlite3.connect(self.db_path)
+        connection.execute("INSERT INTO background_jobs(id,kind,status) VALUES('queued-id','integration_local_backup','queued')")
+        connection.commit()
+        connection.close()
+        with self.assertRaises(RuntimeError):
+            NAMESPACE["enqueue_integration_job"]("integrity_check")
     def test_unknown_status_endpoint_returns_no_payload(self):
         self.assertIsNone(NAMESPACE["integration_status"]("/api/integration/v1/private/export"))
 
