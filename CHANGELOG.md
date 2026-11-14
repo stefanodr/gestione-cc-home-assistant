@@ -1,3 +1,13 @@
+## [1.1.5] - 2026-11-14
+
+### Miglioramenti
+- I sensori Dimensione database, Dimensione allegati, Spazio totale, Spazio libero e Spazio utilizzato mostrano ora valori in MB decimali, con precisione di due cifre.
+- Aggiunta la classe dispositivo Dimensione dati per consentire a Home Assistant di interpretare correttamente l'unità.
+
+### Improvements
+- Database size, attachment size, total space, free space and used space sensors now report decimal MB values with two-digit precision.
+- Added the Data Size device class so Home Assistant correctly interprets the unit.
+
 ## [1.1.4] - 2026-11-14
 
 ### Correzioni
