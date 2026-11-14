@@ -1,3 +1,25 @@
+## [1.0.42] - 2026-11-14
+
+### Aggiunto e corretto
+- Aggiunta nel Piano dei conti la casella **Mutuo** per i conti patrimoniali non liquidi.
+- I movimenti associati a un conto contrassegnato come Mutuo non vengono più conteggiati tra i trasferimenti.
+- I movimenti dei conti Mutuo vengono inclusi nell'analisi delle spese del Report, anche senza attivare l'inclusione Budget/Report.
+- Il flag Mutuo si applica anche ai sottoconti del conto contrassegnato.
+- Rinominata la colonna del Piano dei conti da **Budget** a **Budget/Report** e aggiunta la colonna **Mutuo**.
+- Aggiornata l'esportazione PDF del Piano dei conti per includere il nuovo flag.
+
+### Added and fixed
+- Added a **Mortgage** checkbox to non-liquid balance-sheet accounts in the Chart of Accounts.
+- Transactions assigned to an account marked as Mortgage are no longer counted as transfers.
+- Mortgage-account transactions are included in Report expense analysis even when Budget/Report inclusion is not enabled.
+- The Mortgage flag also applies to subaccounts of the marked account.
+- Renamed the Chart of Accounts column from **Budget** to **Budget/Report** and added a **Mortgage** column.
+- Updated the Chart of Accounts PDF export to include the new flag.
+
+### Versioni / Versions
+- Versione add-on / Add-on version: 1.0.42.
+- Versione app inclusa / Bundled application version: 1.7.14.
+
 ## [1.0.41] - 2026-11-14
 
 ### Corretto
