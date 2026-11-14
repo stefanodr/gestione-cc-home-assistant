@@ -240,7 +240,7 @@ body.app-ready .app-shell{visibility:visible}
 @media(max-width:700px){.attachment-row{align-items:flex-start;flex-direction:column}.attachment-modal-actions{align-items:flex-start;flex-direction:column}.attachment-row-actions{width:100%}}
 
 /* Indicatore sintetico degli allegati nel registro movimenti. */
-.attachment-action-wrap{display:inline-flex;align-items:center;vertical-align:middle;gap:0;min-width:0;line-height:1;position:relative;top:0}.attachment-action-wrap .row-action{display:inline-flex;align-items:center;justify-content:center;flex:none;line-height:inherit;padding:0}.attachment-action-wrap .attachment-count-badge{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%)}#view-transactions .data-table td:last-child{padding-bottom:29px}
+.attachment-action-wrap{display:inline-flex;flex-direction:column;align-items:center;justify-content:flex-start;vertical-align:middle;gap:0;min-width:68px;line-height:1;position:relative;top:0}.attachment-action-wrap .row-action{display:inline-flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;min-width:68px;min-height:22px;line-height:1.2;padding:3px 7px}.attachment-action-wrap .attachment-count-badge{position:static;transform:none;margin-top:5px;flex:none}.attachment-count-badge.hidden{display:inline-flex;visibility:hidden}#view-transactions .data-table td:last-child{padding-bottom:5px}
 .attachment-count-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#e6f2ee;color:#246e60;border:1px solid #b9d8ce;font-size:9px;font-weight:750;line-height:1}
 .attachment-count-badge.hidden{display:none}
 #view-search .heading-actions{flex-wrap:wrap}
