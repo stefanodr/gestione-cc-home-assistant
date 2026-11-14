@@ -21,8 +21,10 @@ options:
   bootstrap_pin: ""
   hostname: "homeassistant.local"
   lan_network: "192.168.1.0/24"
+  integration_network: "172.30.32.1/32"
 schema:
   admin_username: str
   bootstrap_pin: password
   hostname: str
   lan_network: str
+  integration_network: str
