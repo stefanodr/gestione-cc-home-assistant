@@ -29,7 +29,7 @@ Endpoint di sola lettura (prefisso `/api/integration/v1/`):
 - `backups/status`: stato collegamento Drive, data/esito ultimo backup locale e Drive, conteggio copie locali (mai nomi o percorsi).
 - `storage/status`: capacità, occupazione e spazio libero del volume dati, senza percorsi.
 - `documents/status`: solo conteggio e byte aggregati degli allegati.
-- `jobs/status`: conteggi aggregati OCR/background (queued/running/failed); nessun ID, payload, errore grezzo o riferimento a documenti.
+- `jobs/status`: conteggi aggregati dei processi degli ultimi 7 giorni e contatori OCR separati (coda, elaborazione, errori); nessun ID, payload, errore grezzo o riferimento a documenti.
 
 Comandi POST consentiti (implementazione iniziale):
 - `/api/integration/v1/commands/local-backup`: avvia una copia SQLite locale.
@@ -114,6 +114,10 @@ Dashboard tecnica opzionale con soli stati tecnici, sensori e pulsanti autorizza
 - Nessuna modifica al PIN, ai dati esistenti o al comportamento di backup/restore senza test di regressione.
 - Test PWA per assicurare che dati autenticati e API sensibili non siano memorizzati in cache.
 - Collaudo finale nell'ambiente Home Assistant reale prima di qualsiasi aggiornamento dell'add-on.
+
+### Dashboard e automazioni di esempio
+
+Sono stati aggiunti `docs/dashboard_gestione_cc.yaml` e `docs/automazioni_gestione_cc.yaml`. La dashboard mostra esclusivamente stati tecnici, backup, spazio, allegati aggregati, OCR e pulsanti manutentivi; include un collegamento Companion all'URL LAN configurato. Le automazioni di esempio avvisano per app offline, integrità non superata, spazio libero sotto 2 GB ed errori OCR. Prima dell'uso vanno verificati gli entity_id generati e sostituito `notify.notify` con il servizio notifiche dell'utente.
 
 ## Vincoli operativi
 
