@@ -14,7 +14,7 @@
     if (privacyMode !== '3' || !root) return;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode(node) {
       const parent = node.parentElement;
-      if (!parent || parent.closest('script,style,input,textarea,select,button,.privacy-digit-mask,[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
+      if (!parent || parent.closest('script,style,input,textarea,select,.privacy-control,.privacy-digit-mask,[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
       return /\d/.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }});
     const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
@@ -22,7 +22,7 @@
       const fragment=document.createDocumentFragment();
       for (const part of node.nodeValue.split(/(\d+(?:[.,]\d+)?)/g)) {
         if (!part) continue;
-        if (/^\d/.test(part)) { const span=document.createElement('span'); span.className='privacy-digit-mask'; span.textContent='•'.repeat(Math.max(3,part.length)); span.dataset.original=part; fragment.append(span); }
+        if (/^\d/.test(part)) { const span=document.createElement('span'); span.className='privacy-digit-mask'; span.textContent='*'.repeat(Math.max(3,part.length)); span.dataset.original=part; fragment.append(span); }
         else fragment.append(document.createTextNode(part));
       }
       node.replaceWith(fragment);
