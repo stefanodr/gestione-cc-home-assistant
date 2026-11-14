@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import ssl
+import time
 
 import aiohttp
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -15,6 +16,8 @@ class GestioneCCCoordinator(DataUpdateCoordinator):
         self.token = entry.data["token"]
         self.ssl_context = ssl.create_default_context(cafile=entry.data["ca_cert_path"])
         self.session = async_get_clientsession(hass)
+        self._poll_cache = {}
+        self._last_poll = {}
         super().__init__(
             hass,
             logger=logging.getLogger(__name__),
@@ -38,10 +41,25 @@ class GestioneCCCoordinator(DataUpdateCoordinator):
             return payload
 
     async def _async_update_data(self):
+        intervals = {
+            "health": 60,
+            "database": 300,
+            "backups": 300,
+            "storage": 300,
+            "documents": 120,
+            "jobs": 120,
+        }
+        now = time.monotonic()
+        due = [
+            key for key in API_ENDPOINTS
+            if key not in self._poll_cache or now - self._last_poll.get(key, 0) >= intervals[key]
+        ]
         try:
-            keys = list(API_ENDPOINTS)
-            values = await asyncio.gather(*(self._get(API_ENDPOINTS[key]) for key in keys))
-            return dict(zip(keys, values))
+            values = await asyncio.gather(*(self._get(API_ENDPOINTS[key]) for key in due))
+            for key, value in zip(due, values):
+                self._poll_cache[key] = value
+                self._last_poll[key] = now
+            return dict(self._poll_cache)
         except (aiohttp.ClientError, TimeoutError, ssl.SSLError, ValueError) as error:
             raise UpdateFailed(f"Connessione Gestione C/C non disponibile: {type(error).__name__}") from error
 
@@ -57,5 +75,6 @@ class GestioneCCCoordinator(DataUpdateCoordinator):
             payload = await response.json()
             if response.status >= 400:
                 raise UpdateFailed(payload.get("code", payload.get("error", "Comando non riuscito")))
+            self._last_poll.clear()
             await self.async_request_refresh()
             return payload
