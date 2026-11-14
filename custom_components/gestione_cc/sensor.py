@@ -6,6 +6,8 @@ from .const import DOMAIN
 
 
 SENSORS = [
+    ("app_version", "health", "app_version", "Versione applicazione", "mdi:tag-outline", None, None),
+    ("addon_version", "health", "addon_version", "Versione add-on", "mdi:puzzle-outline", None, None),
     ("uptime", "health", "uptime_seconds", "Tempo attività", "mdi:timer-outline", None, SensorStateClass.MEASUREMENT),
     ("database_size", "database", "size_bytes", "Dimensione database", "mdi:database", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
     ("database_last_write", "database", "last_write_at", "Ultima modifica database", "mdi:database-clock", None, None),
