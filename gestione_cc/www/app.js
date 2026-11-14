@@ -703,6 +703,8 @@
     $('#bankFile').addEventListener('change', onBankFile);
     $('#gnucashFile').addEventListener('change', onGnuCashFile);
     $('#exportBackup').addEventListener('click', exportBackup);
+    $('#refreshAccessLog')?.addEventListener('click', refreshAccessLog);
+    refreshAccessLog();
     $('#createIntegrationToken')?.addEventListener('click', createIntegrationToken);
     $('#revokeIntegrationToken')?.addEventListener('click', revokeIntegrationToken);
     $('#hideIntegrationToken')?.addEventListener('click', hideIntegrationToken);
@@ -2728,6 +2730,29 @@
     $('#settingsTxCount').textContent = String(state.transactions.length);
     $('#settingsAccountCount').textContent = String(state.accounts.filter(a => !['ROOT'].includes(a.type)).length);
     $('#settingsRuleCount').textContent = String(state.rules.filter(r => r.source !== 'demo').length);
+  }
+
+  async function refreshAccessLog() {
+    const body = $('#accessLogBody');
+    const count = $('#accessLogCount');
+    const message = $('#accessLogMessage');
+    if (!body) return;
+    body.innerHTML = '<tr><td colspan="4">Caricamento…</td></tr>';
+    try {
+      const result = await apiRequest('/api/security/access-log');
+      const items = Array.isArray(result.items) ? result.items : [];
+      if (count) count.textContent = String(items.length);
+      const eventLabels = { login: 'Accesso', logout: 'Uscita', session_expired: 'Sessione scaduta', temporary_lockout: 'Blocco temporaneo' };
+      const outcomeLabels = { success: 'Riuscito', failed: 'Non riuscito', expired: 'Scaduta', blocked: 'Bloccato' };
+      body.innerHTML = items.length ? items.map(item => {
+        const date = item.at ? new Date(item.at).toLocaleString('it-IT') : '—';
+        return '<tr><td>' + safeText(date) + '</td><td>' + safeText(eventLabels[item.event] || item.event || '—') + '</td><td>' + safeText(outcomeLabels[item.outcome] || item.outcome || '—') + '</td><td>' + safeText(item.ip_address || '—') + '</td></tr>';
+      }).join('') : '<tr><td colspan="4">Nessun accesso registrato negli ultimi 30 giorni.</td></tr>';
+      if (message) message.textContent = 'Mostrati gli ultimi ' + items.length + ' eventi disponibili.';
+    } catch (error) {
+      body.innerHTML = '<tr><td colspan="4">Registro non disponibile.</td></tr>';
+      if (message) message.textContent = error.message || 'Impossibile caricare il registro accessi.';
+    }
   }
 
   async function refreshIntegrationTokenStatus() {
