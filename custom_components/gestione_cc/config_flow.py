@@ -1,4 +1,5 @@
 from functools import partial
+import logging
 from pathlib import Path
 import ipaddress
 import ssl
@@ -12,6 +13,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import selector
 
 from .const import CONF_CA_CERT, DEFAULT_CA_CERT, DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _valid_local_https_url(value: str) -> bool:
@@ -49,6 +52,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         partial(Path(ca_path).is_file)
                     )
                     if not ca_exists:
+                        _LOGGER.warning("Configuration test failed: CA file is missing or unreadable")
                         errors["base"] = "ca_file_missing"
                     else:
                         context = await self.hass.async_add_executor_job(
@@ -62,12 +66,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             timeout=aiohttp.ClientTimeout(total=10),
                         ) as response:
                             if response.status == 401:
+                                _LOGGER.warning("Configuration test failed: API returned HTTP 401 (invalid token)")
                                 errors["base"] = "invalid_auth"
                             elif response.status != 200:
+                                _LOGGER.warning("Configuration test failed: API returned HTTP %s", response.status)
                                 errors["base"] = "cannot_connect"
                             else:
                                 payload = await response.json()
-                                if payload.get("available") is not True:
+                                if not isinstance(payload, dict) or payload.get("available") is not True:
+                                    _LOGGER.warning("Configuration test failed: API health response is invalid")
                                     errors["base"] = "invalid_response"
                                 else:
                                     await self.async_set_unique_id(url.lower())
@@ -76,7 +83,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                         title="Gestione C/C",
                                         data={CONF_URL: url, "token": token, CONF_CA_CERT: ca_path},
                                     )
-                except (aiohttp.ClientError, TimeoutError, OSError, ssl.SSLError, ValueError):
+                except (aiohttp.ClientError, TimeoutError, OSError, ssl.SSLError, ValueError) as err:
+                    # Never log user_input, request headers, or the bearer token.
+                    _LOGGER.warning(
+                        "Configuration connection test failed (%s): %s",
+                        type(err).__name__,
+                        err,
+                    )
                     errors["base"] = "cannot_connect"
 
         schema = vol.Schema({
