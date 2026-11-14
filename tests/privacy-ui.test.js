@@ -14,6 +14,7 @@ const { JSDOM } = require('jsdom');
     <p id="transaction">Movimento del 14/11/2026: <span class="amount-cell">-1.234,56 €</span></p>
     <p id="currency">Totale € 99,90</p>
     <p id="date">Documento 14/11/2026 · codice 123456</p>
+    <p id="report">Confronto 2025 · variazione +12,3% · scostamento +45,90 €</p>
     <input id="editable" value="1234.56">
     <canvas id="chart"></canvas>
   </body>`, { pretendToBeVisual: true });
@@ -29,7 +30,7 @@ const { JSDOM } = require('jsdom');
   context.setupPrivacyControls();
   const doc = dom.window.document, toggle = doc.querySelector('#privacyToggle');
   const amount = doc.querySelector('.amount-cell'), currency = doc.querySelector('#currency');
-  const date = doc.querySelector('#date'), input = doc.querySelector('#editable');
+  const date = doc.querySelector('#date'), report = doc.querySelector('#report'), input = doc.querySelector('#editable');
 
   assert.equal(toggle.checked, false, 'Lo switch deve partire OFF');
   assert.equal(amount.textContent, '-1.234,56 €');
@@ -53,6 +54,7 @@ const { JSDOM } = require('jsdom');
   assert.equal(currency.textContent, 'Totale € 99,90');
   assert.equal(dynamic.textContent, '-45,90 €', 'OFF deve ripristinare anche i contenuti dinamici');
   assert.equal(date.textContent, 'Documento 14/11/2026 · codice 123456');
+  assert.equal(report.textContent, 'Confronto 2025 · variazione +12,3% · scostamento +45,90 €');
   assert.equal(input.value, '1234.56');
   console.log('OK: switch privacy OFF/ON, importi statici e dinamici, date/codici e campi modificabili.');
   dom.window.close();
