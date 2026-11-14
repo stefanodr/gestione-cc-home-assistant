@@ -1,3 +1,15 @@
+## [1.1.2] - 2026-11-14
+
+### Diagnostica
+- Aggiunti log per distinguere errori di CA, autenticazione, risposta HTTP, risposta API non valida e problemi di rete/TLS/timeout durante la configurazione.
+- I log non includono token Bearer, intestazioni di autenticazione o dati inseriti nel modulo.
+- Mantenute obbligatorie la verifica TLS e la CA privata; nessuna modifica all'autenticazione o agli endpoint.
+
+### Diagnostics
+- Added logs to distinguish CA, authentication, HTTP response, invalid API response, and network/TLS/timeout failures during setup.
+- Logs never include the Bearer token, authentication headers, or form-submitted credentials.
+- TLS verification and the private CA remain mandatory; authentication and API endpoints are unchanged.
+
 ## [1.1.1] - In sviluppo / In development
 
 ### Correzioni
