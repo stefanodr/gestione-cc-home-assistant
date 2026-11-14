@@ -1632,6 +1632,22 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_json(405, {"error":"Metodo non consentito"})
 
+def peer_is_integration_only(peer_address, allowed_network, integration_network):
+    try:
+        address = ipaddress.ip_address(peer_address)
+        return address in integration_network and address not in allowed_network
+    except ValueError:
+        return False
+
+
+def peer_is_allowed(peer_address, allowed_network, integration_network):
+    try:
+        address = ipaddress.ip_address(peer_address)
+        return address in allowed_network or address in integration_network
+    except ValueError:
+        return False
+
+
 class LANOnlyHTTPServer(ThreadingHTTPServer):
     """Allow the home LAN plus a narrowly scoped Home Assistant Core peer."""
     def __init__(self, server_address, RequestHandlerClass, allowed_network, integration_network):
@@ -1640,18 +1656,10 @@ class LANOnlyHTTPServer(ThreadingHTTPServer):
         super().__init__(server_address, RequestHandlerClass)
 
     def is_integration_only_peer(self, peer_address):
-        try:
-            address = ipaddress.ip_address(peer_address)
-            return address in self.integration_network and address not in self.allowed_network
-        except ValueError:
-            return False
+        return peer_is_integration_only(peer_address, self.allowed_network, self.integration_network)
 
     def verify_request(self, request, client_address):
-        try:
-            address = ipaddress.ip_address(client_address[0])
-            return address in self.allowed_network or address in self.integration_network
-        except ValueError:
-            return False
+        return peer_is_allowed(client_address[0], self.allowed_network, self.integration_network)
 
 
 if __name__ == "__main__":
