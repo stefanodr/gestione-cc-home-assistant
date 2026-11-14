@@ -715,7 +715,14 @@ def integration_status(path):
 ACCESS_LOG_RETENTION_SECONDS = 30 * 24 * 60 * 60
 
 def access_db():
+    is_new = not ACCESS_LOG_DB_PATH.exists()
     connection = sqlite3.connect(ACCESS_LOG_DB_PATH, timeout=15)
+    if is_new:
+        try:
+            os.chmod(ACCESS_LOG_DB_PATH, 0o600)
+        except OSError:
+            connection.close()
+            raise
     connection.row_factory = sqlite3.Row
     connection.execute("CREATE TABLE IF NOT EXISTS access_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL, outcome TEXT NOT NULL, session_ref TEXT, ip_address TEXT NOT NULL)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_access_log_at ON access_log(at DESC)")
