@@ -1644,7 +1644,7 @@
   }
   function isReportExpenseAccount(account) {
     return Boolean(account && (account.type === 'EXPENSE' ||
-      (account.classification === 'Patrimoniale' && (account.includeInBudget === true || account.mortgage === true))));
+      (account.classification === 'Patrimoniale' && (account.includeInBudget === true || isMortgageAccount(account)))));
   }
   function cashFlowTotals(transactions) {
     let income = 0, expense = 0, transfers = 0;
