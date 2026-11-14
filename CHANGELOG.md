@@ -1,3 +1,11 @@
+## [1.1.4] - 2026-11-14
+
+### Correzioni
+- Aggiunta l'icona locale dell'integrazione in `custom_components/gestione_cc/brand/icon.png`, riutilizzando l'immagine dell'add-on. Home Assistant 2026.3 o successivo la carica direttamente dall'integrazione.
+
+### Fixes
+- Added the integration's local brand icon at `custom_components/gestione_cc/brand/icon.png`, reusing the add-on image. Home Assistant 2026.3 or newer loads it directly from the integration.
+
 ## [1.1.3] - 2026-11-14
 
 ### Correzioni
