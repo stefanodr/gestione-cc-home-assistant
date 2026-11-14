@@ -1,0 +1,22 @@
+name: Integration API security tests
+
+on:
+  push:
+    branches:
+      - feature/ha-integration-v1.1-foundation
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  integration-api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run restricted DTO and privacy tests
+        run: python -m unittest tests.test_integration_api -v
