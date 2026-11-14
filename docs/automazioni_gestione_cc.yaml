@@ -27,7 +27,7 @@
   description: "Avvisa se l'ultimo controllo del database segnala un problema."
   triggers:
     - trigger: state
-      entity_id: binary_sensor.gestione_cc_database_integro
+      entity_id: binary_sensor.gestione_cc_database_integrity
       to: "off"
   actions:
     - action: notify.notify
@@ -41,7 +41,7 @@
   description: "Avvisa quando lo spazio libero scende sotto 2 GB."
   triggers:
     - trigger: numeric_state
-      entity_id: sensor.gestione_cc_spazio_libero
+      entity_id: sensor.gestione_cc_storage_free
       below: 2147483648
   actions:
     - action: notify.notify
@@ -55,7 +55,7 @@
   description: "Avvisa quando viene rilevato almeno un errore OCR."
   triggers:
     - trigger: numeric_state
-      entity_id: sensor.gestione_cc_ocr_in_errore
+      entity_id: sensor.gestione_cc_ocr_failed
       above: 0
   actions:
     - action: notify.notify
