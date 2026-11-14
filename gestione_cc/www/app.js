@@ -762,6 +762,7 @@
     $('#importAccountsExcel')?.addEventListener('click', () => $('#accountFile').click());
     $('#accountFile')?.addEventListener('change', importAccountsFromExcel);
     $('#downloadAccountTemplate')?.addEventListener('click', downloadAccountTemplate);
+    $('#exportAccountsPdf')?.addEventListener('click', exportAccountsPdf);
     $('#view-transactions').addEventListener('change', onAccountSelection);
     window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { drawFlowChart(); drawReportChart(); }, 120); });
   }
@@ -1392,15 +1393,15 @@
     const accounts=forecastSelectedAccounts(),ids=new Set(accounts.map(a=>a.id)),today=localDateKey(new Date()),currentMonth=today.slice(0,7);
     const txs=state.transactions.filter(t=>t.status==='confirmed'&&t.date<=today&&t.status!=='duplicate'&&
       (ids.has(t.bankAccountId)||ids.has(t.counterpartAccountId)||(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.some(sp=>ids.has(sp.accountId)))));
-    const primaryAccountId=state.bankAccountId;
-    const opening=ids.has(primaryAccountId)?(Number(state.openingBalance)||0):0;
-    // The archive stores one opening balance (for the configured primary account).
-    // Other selected accounts can only be reconstructed from the transactions available.
-    const openingBalanceUnknown=accounts.filter(account=>account.id!==primaryAccountId);
     const lastClosedMonth=shiftMonthKey(currentMonth,-1);
     const cutoff=lastClosedMonth+'-'+String(new Date(Number(lastClosedMonth.slice(0,4)),Number(lastClosedMonth.slice(5,7)),0).getDate()).padStart(2,'0');
-    const closedTxs=txs.filter(tx=>String(tx.date||'')<=cutoff);
-    const openingBalance=opening+closedTxs.reduce((sum,tx)=>sum+forecastTransactionFlow(tx,ids),0);
+    // Match the Overview balance at the end of the latest closed month for the selected account scope.
+    const liquidIds=new Set(state.accounts.filter(isLiquidAccount).map(account=>account.id));
+    const allLiquidSelected=liquidIds.size>0&&[...liquidIds].every(id=>ids.has(id));
+    const openingBase=allLiquidSelected||ids.has(state.bankAccountId)?Number(state.openingBalance)||0:0;
+    const openingTransactions=state.transactions.filter(tx=>String(tx.date||'')<=cutoff&&tx.status!=='duplicate'&&(allLiquidSelected||ids.has(tx.bankAccountId)));
+    const openingBalance=Math.round((openingBase+openingTransactions.reduce((sum,tx)=>sum+(Number(tx.amount)||0),0)+Number.EPSILON)*100)/100;
+    const openingBalanceUnknown=[];
     const categories=state.accounts.filter(a=>a.hierarchyType!=='Mastro'&&
       (['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))));
     // Use up to 24 closed months so each projected month can follow its own
@@ -2730,7 +2731,23 @@
     event.target.value='';
   }
   function downloadAccountTemplate() {
-    downloadXlsx('Modello-piano-dei-conti.xlsx',[{name:'Piano dei conti',rows:[['Percorso conto','Tipo GnuCash','Classificazione'],['Attività','ASSET','Patrimoniale'],['Attività:Conto corrente','BANK','Patrimoniale'],['Uscite','EXPENSE','Economica'],['Uscite:Casa','EXPENSE','Economica'],['Entrate','INCOME','Economica']],widths:[42,22,24]}]);
+    const accounts=state.accounts.filter(account=>account.type!=='ROOT').slice().sort((a,b)=>String(a.path||'').localeCompare(String(b.path||''),'it'));
+    const rows=[['Percorso conto','Tipo GnuCash','Classificazione'],...accounts.map(account=>[account.path||account.name||'',account.type||'ASSET',account.classification||classifyType(account.type||'ASSET')])];
+    downloadXlsx('Modello-piano-dei-conti-completo.xlsx',[{name:'Piano dei conti',rows,widths:[52,22,24],headerRow:0,autoFilter:true}]);
+  }
+  function exportAccountsPdf() {
+    const accounts=state.accounts.filter(account=>account.type!=='ROOT').slice().sort((a,b)=>String(a.path||'').localeCompare(String(b.path||''),'it'));
+    const rows=accounts.map(account=>{
+      const txCount=state.transactions.filter(tx=>tx.counterpartAccountId===account.id||tx.bankAccountId===account.id||(Array.isArray(tx.counterpartSplits)&&tx.counterpartSplits.some(split=>split.accountId===account.id))).length;
+      const parent=account.parentId?accountById(account.parentId):null;
+      const tags=Array.isArray(account.tags)?account.tags.join(', '):'';
+      const history=Array.isArray(account.nameHistory)?account.nameHistory.map(item=>[item.path,item.from?'dal '+formatDate(item.from):'',item.to?'al '+formatDate(item.to):''].filter(Boolean).join(' ')).join(' · '):'';
+      return '<tr><td>'+safeText(account.id||'—')+'</td><td>'+safeText(account.path||account.name||'')+'</td><td>'+safeText(account.type||'—')+'</td><td>'+safeText(account.classification||'—')+'</td><td>'+safeText(account.hierarchyType||'—')+' · '+(account.hierarchyTypeSource==='manuale'?'manuale':'automatico')+'</td><td>'+safeText(parent?.path||'—')+'</td><td class="num">'+txCount+'</td><td>'+(account.includeInBudget===true?'Sì':'No')+'</td><td>'+safeText(account.hasChildren?'Sì':'No')+'</td><td>'+safeText(account.validFrom?formatDate(account.validFrom):'—')+'</td><td>'+safeText(tags||'—')+'</td><td>'+safeText(history||'—')+'</td></tr>';
+    }).join('');
+    const summary=[['Patrimoniale',accounts.filter(a=>a.classification==='Patrimoniale').length],['Economica',accounts.filter(a=>a.classification==='Economica').length],['Tecnica',accounts.filter(a=>a.classification==='Tecnica').length]];
+    const summaryHtml=summary.map(item=>'<div>Conti '+item[0].toLowerCase()+'<strong>'+item[1]+'</strong></div>').join('');
+    const content='<h1>Piano dei conti</h1><div class="sub">Esportazione completa · '+accounts.length+' conti · '+new Date().toLocaleDateString('it-IT')+'</div><div class="summary">'+summaryHtml+'</div><table><thead><tr><th>ID</th><th>Percorso conto</th><th>Tipo GnuCash</th><th>Classificazione</th><th>Gerarchia</th><th>Conto padre</th><th class="num">Movimenti</th><th>Nel budget</th><th>Ha sottoconti</th><th>Decorrenza nome</th><th>Tag</th><th>Storico denominazioni</th></tr></thead><tbody>'+(rows||'<tr><td colspan="12">Nessun conto presente.</td></tr>')+'</tbody></table><p class="foot">Il documento include i conti e i metadati attualmente presenti nell’archivio. I movimenti non sono esportati.</p>';
+    printHtml('Piano-dei-conti',content,{reportToolbar:true,toolbarTitle:'Piano dei conti · esportazione PDF'});
   }
   function openAddAccount() {
     $('#accountNameInput').value = '';
@@ -3368,17 +3385,17 @@
   function printHtml(title, content, options = {}) {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { showNotice('Finestra di stampa bloccata', 'Consenti l’apertura della finestra del report e riprova.'); return; }
-    const reportToolbar = options.reportToolbar ? `<div class="report-toolbar"><div><strong>${safeText(options.toolbarTitle || 'Report Gestione C/C')}</strong><span>Anteprima del documento</span></div><div class="report-toolbar-actions"><button type="button" id="reportPrintAction">STAMPA/ESPORTA PDF</button></div></div>` : '';
-    const reportScript = options.reportToolbar ? '' : `<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250));</script>`;
+    const showToolbar = options.reportToolbar !== false;
+    const reportToolbar = showToolbar ? '<div class="report-toolbar"><div class="report-toolbar-actions"><button type="button" id="reportPrintAction">STAMPA/ESPORTA PDF</button><button type="button" id="reportCloseAction">CHIUDI SCHEDA</button></div><div class="report-toolbar-title"><strong>'+safeText(options.toolbarTitle || 'Report Gestione C/C')+'</strong><span>Anteprima del documento</span></div></div>' : '';
+    const reportScript = showToolbar ? '' : `<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250));</script>`;
     printWindow.document.open();
-    printWindow.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeText(title)}</title><style>@page{size:A4;margin:15mm}*{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#213330;margin:0}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:20px 0 8px}.sub{color:#667772;margin-bottom:18px}.summary{display:flex;gap:12px;margin:14px 0}.summary div{border:1px solid #dce5e2;padding:10px;flex:1}.summary strong{display:block;font-size:15px;margin-top:5px}.summary span{display:block;font-size:9px;color:#63736f;margin-top:4px}.chart{width:100%;margin:8px 0 18px;break-inside:avoid}.chart svg{display:block;width:100%;height:auto;max-height:100mm}table{width:100%;border-collapse:collapse;font-size:10px;margin:8px 0 16px}th,td{border-bottom:1px solid #dce5e2;text-align:left;padding:6px 5px}th{background:#f0f5f3;font-weight:700}td.num,th.num{text-align:right}.foot{font-size:9px;color:#647570;margin-top:16px}.report-toolbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 18px;margin:0 0 22px;background:#f3f7f5;border-bottom:1px solid #dce5e2;font-family:Arial,sans-serif}.report-toolbar strong{display:block;font-size:13px}.report-toolbar span{display:block;margin-top:3px;color:#71817c;font-size:10px}.report-toolbar-actions{display:flex;gap:8px}.report-toolbar button{border:1px solid #cbdad5;border-radius:7px;background:#fff;color:#294d45;padding:9px 13px;font-size:12px;font-weight:650;cursor:pointer}.report-toolbar button:hover{background:#e6f1ed;border-color:#8eafa4}.report-document{max-width:1100px;margin:0 auto;padding:0 22px 28px}@media print{thead{display:table-header-group}table{width:100%;border-collapse:collapse;break-inside:auto;page-break-inside:auto}tr{break-inside:avoid;page-break-inside:avoid}td,th{padding:5px 4px}.statement-opening{break-inside:avoid;page-break-inside:avoid;margin:12px 0 18px;padding:10px 12px;border:1px solid #dce5e2;font-size:12px}.statement-opening strong{margin-left:12px;font-size:15px}.statement-ending{break-inside:avoid;page-break-inside:avoid;margin-top:18px}.statement-ending .summary{display:flex;gap:10px}.statement-ending .summary div{flex:1}.report-toolbar{display:none!important}.report-document{max-width:none;margin:0;padding:0}}@media(max-width:600px){.report-toolbar{align-items:flex-start;flex-direction:column}.report-toolbar-actions{width:100%}.report-toolbar button{flex:1}}.statement-opening{margin:12px 0 18px;padding:10px 12px;border:1px solid #dce5e2;border-radius:6px}.statement-opening strong{margin-left:12px;font-size:15px}.statement-ending{margin-top:20px}.statement-ending .summary{display:flex;gap:10px}.statement-ending .summary div{flex:1}</style></head><body>${reportToolbar}<main class="report-document">${content}<p class="foot">Creato da Gestione C/C · ${new Date().toLocaleString('it-IT')}</p></main>${reportScript}</body></html>`);
+    printWindow.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeText(title)}</title><style>@page{size:A4;margin:15mm}*{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#213330;margin:0}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:20px 0 8px}.sub{color:#667772;margin-bottom:18px}.summary{display:flex;gap:12px;margin:14px 0}.summary div{border:1px solid #dce5e2;padding:10px;flex:1}.summary strong{display:block;font-size:15px;margin-top:5px}.summary span{display:block;font-size:9px;color:#63736f;margin-top:4px}.chart{width:100%;margin:8px 0 18px;break-inside:avoid}.chart svg{display:block;width:100%;height:auto;max-height:100mm}table{width:100%;border-collapse:collapse;font-size:10px;margin:8px 0 16px}th,td{border-bottom:1px solid #dce5e2;text-align:left;padding:6px 5px}th{background:#f0f5f3;font-weight:700}td.num,th.num{text-align:right}.foot{font-size:9px;color:#647570;margin-top:16px}.report-toolbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:flex-start;gap:18px;padding:13px 18px;margin:0 0 22px;background:#f3f7f5;border-bottom:1px solid #dce5e2;font-family:Arial,sans-serif}.report-toolbar-title strong{display:block;font-size:13px}.report-toolbar-title span{display:block;margin-top:3px;color:#71817c;font-size:10px}.report-toolbar-actions{display:flex;gap:8px;flex-shrink:0}.report-toolbar button{border:1px solid #cbdad5;border-radius:7px;background:#fff;color:#294d45;padding:9px 13px;font-size:12px;font-weight:650;cursor:pointer}.report-toolbar button:hover{background:#e6f1ed;border-color:#8eafa4}.report-document{max-width:1100px;margin:0 auto;padding:0 22px 28px}@media print{thead{display:table-header-group}table{width:100%;border-collapse:collapse;break-inside:auto;page-break-inside:auto}tr{break-inside:avoid;page-break-inside:avoid}td,th{padding:5px 4px}.statement-opening{break-inside:avoid;page-break-inside:avoid;margin:12px 0 18px;padding:10px 12px;border:1px solid #dce5e2;font-size:12px}.statement-opening strong{margin-left:12px;font-size:15px}.statement-ending{break-inside:avoid;page-break-inside:avoid;margin-top:18px}.statement-ending .summary{display:flex;gap:10px}.statement-ending .summary div{flex:1}.report-toolbar{display:none!important}.report-document{max-width:none;margin:0;padding:0}}@media(max-width:600px){.report-toolbar{align-items:flex-start;flex-direction:column}.report-toolbar-actions{width:100%}.report-toolbar button{flex:1}}.statement-opening{margin:12px 0 18px;padding:10px 12px;border:1px solid #dce5e2;border-radius:6px}.statement-opening strong{margin-left:12px;font-size:15px}.statement-ending{margin-top:20px}.statement-ending .summary{display:flex;gap:10px}.statement-ending .summary div{flex:1}</style></head><body>${reportToolbar}<main class="report-document">${content}<p class="foot">Creato da Gestione C/C · ${new Date().toLocaleString('it-IT')}</p></main>${reportScript}</body></html>`);
     printWindow.document.close();
-    if (options.reportToolbar) {
+    if (showToolbar) {
       const printButton = printWindow.document.getElementById('reportPrintAction');
-      if (printButton) printButton.addEventListener('click', () => {
-        printWindow.focus();
-        printWindow.print();
-      });
+      if (printButton) printButton.addEventListener('click', () => { printWindow.focus(); printWindow.print(); });
+      const closeButton = printWindow.document.getElementById('reportCloseAction');
+      if (closeButton) closeButton.addEventListener('click', () => printWindow.close());
     }
   }
   function statementContext() {
