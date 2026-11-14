@@ -804,6 +804,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/api/integration/token/status":
+            item = self.require_auth()
+            if not item: return
+            self.send_json(200, {"configured": bool(integration_setting("integration_token_sha256"))})
+            return
         if path.startswith("/api/integration/v1/"):
             if not self.require_integration_auth(): return
             result = integration_status(path)
