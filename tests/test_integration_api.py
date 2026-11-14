@@ -138,6 +138,7 @@ class IntegrationApiDtoTest(unittest.TestCase):
         raw_session = "private-session-cookie-value"
         NAMESPACE["record_access_event"]("login", "success", "192.168.1.42", raw_session)
         connection = NAMESPACE["access_db"]()
+        self.assertEqual(connection.execute("PRAGMA secure_delete").fetchone()[0], 1)
         row = connection.execute("SELECT event,outcome,session_ref,ip_address FROM access_log").fetchone()
         connection.close()
         self.assertEqual(row[0:2], ("login", "success"))
