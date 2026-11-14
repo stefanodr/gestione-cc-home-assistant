@@ -1,4 +1,5 @@
 import ast
+from contextlib import contextmanager
 import hashlib
 import ipaddress
 import os
@@ -14,9 +15,10 @@ from unittest.mock import patch
 
 SERVER = Path(__file__).resolve().parents[1] / "gestione_cc" / "server.py"
 TREE = ast.parse(SERVER.read_text(encoding="utf-8"))
-TARGETS = {"integration_token_digest", "integration_setting", "integration_job_counts", "integration_status", "access_db", "record_access_event", "cleanup_access_log"}
+TARGETS = {"integration_token_digest", "integration_setting", "integration_job_counts", "integration_status", "access_db", "record_access_event", "cleanup_access_log", "access_db_connection"}
 NAMESPACE = {
     "hashlib": hashlib,
+    "contextmanager": contextmanager,
     "sqlite3": sqlite3,
     "ACCESS_LOG_RETENTION_SECONDS": 30 * 24 * 60 * 60,
     "ipaddress": ipaddress,
@@ -145,6 +147,44 @@ class IntegrationApiDtoTest(unittest.TestCase):
         self.assertEqual(row[2], hashlib.sha256(raw_session.encode()).hexdigest()[:20])
         self.assertEqual(row[3], "192.168.1.42")
         self.assertNotIn(raw_session, str(row))
+
+    def test_access_log_connection_is_always_closed(self):
+        class FakeConnection:
+            def __init__(self):
+                self.commits = 0
+                self.rollbacks = 0
+                self.closed = False
+            def commit(self):
+                self.commits += 1
+            def rollback(self):
+                self.rollbacks += 1
+            def close(self):
+                self.closed = True
+        connection = FakeConnection()
+        with patch.dict(NAMESPACE, {"access_db": lambda: connection}):
+            with NAMESPACE["access_db_connection"]() as opened:
+                self.assertIs(opened, connection)
+        self.assertEqual(connection.commits, 1)
+        self.assertTrue(connection.closed)
+
+    def test_access_log_connection_rolls_back_and_closes_on_error(self):
+        class FakeConnection:
+            def __init__(self):
+                self.rollbacks = 0
+                self.closed = False
+            def commit(self):
+                raise AssertionError("commit must not be called")
+            def rollback(self):
+                self.rollbacks += 1
+            def close(self):
+                self.closed = True
+        connection = FakeConnection()
+        with patch.dict(NAMESPACE, {"access_db": lambda: connection}):
+            with self.assertRaises(RuntimeError):
+                with NAMESPACE["access_db_connection"]():
+                    raise RuntimeError("test")
+        self.assertEqual(connection.rollbacks, 1)
+        self.assertTrue(connection.closed)
 
     def test_access_log_failure_does_not_block_application_flow(self):
         def fail_open():
