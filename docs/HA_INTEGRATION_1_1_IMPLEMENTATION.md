@@ -36,7 +36,7 @@ Comandi POST consentiti (implementazione iniziale):
 - `/api/integration/v1/commands/google-drive-backup`: avvia backup Drive se collegato.
 - `/api/integration/v1/commands/integrity-check`: esegue `PRAGMA integrity_check` in modo controllato.
 
-Endpoint amministrativo browser, non utilizzabile dal token HA: `/api/integration/token`, protetto dalla sessione PIN e da CSRF. Supporta creazione e revoca; la creazione mostra il token una sola volta. La UI dedicata per gestire questa credenziale sarà completata in una fase successiva.
+Endpoint amministrativi browser, non utilizzabili dal token HA: `/api/integration/token/status` e `/api/integration/token`, protetti dalla sessione PIN; le operazioni di creazione/revoca richiedono anche CSRF. La UI Impostazioni ora mostra se il token è configurato, permette di generarlo/rinnovarlo e revocarlo. Il token in chiaro è mostrato una sola volta e cancellato dall'interfaccia quando viene nascosto.
 
 Le risposte devono essere DTO espliciti con allowlist di campi. Non serializzare direttamente righe SQLite, eccezioni, oggetti di configurazione, risultati Drive o record dei job. Errori esterni normalizzati in codici generici. I comandi restituiscono solo stato e risultato tecnico sintetico, mai file, URL di download, percorsi, nomi, ID o contenuti. La prima implementazione esegue i comandi in modo sincrono e serializza le operazioni con un lock; la gestione asincrona con job status aggregato resta da completare.
 
