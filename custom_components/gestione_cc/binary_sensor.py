@@ -23,6 +23,7 @@ class GestioneCCBinarySensor(CoordinatorEntity, BinarySensorEntity):
         self._field = field
         self._attr_name = f"Gestione C/C {name}"
         self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_suggested_object_id = f"gestione_cc_{key}"
         self._attr_icon = icon
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
