@@ -59,6 +59,7 @@ class IntegrationApiDtoTest(unittest.TestCase):
             INSERT INTO background_jobs(id,kind,status) VALUES ('secret-job-id', 'document_ocr', 'queued');
             INSERT INTO background_jobs(id,kind,status) VALUES ('secret-job-id-2', 'document_ocr', 'failed');
             INSERT INTO background_jobs(id,kind,status) VALUES ('secret-drive-job', 'drive_session_backup', 'done');
+            INSERT INTO background_jobs(id,kind,status) VALUES ('secret-integration-job', 'integration_google_drive_backup', 'running');
             INSERT INTO background_jobs(id,kind,status) VALUES ('unrelated-job', 'internal_task', 'failed');
             INSERT INTO attachments VALUES ('secret-document-id', 'estratto-conto.pdf', 1234, X'0102');
         """)
@@ -122,9 +123,10 @@ class IntegrationApiDtoTest(unittest.TestCase):
     def test_jobs_dto_contains_only_aggregate_counts(self):
         result = NAMESPACE["integration_status"]("/api/integration/v1/jobs/status")
         self.assertEqual(set(result), {"queued", "running", "done", "failed"})
-        self.assertEqual(result, {"queued": 1, "running": 0, "done": 1, "failed": 1})
+        self.assertEqual(result, {"queued": 1, "running": 1, "done": 1, "failed": 1})
         self.assertNotIn("secret-job-id", str(result))
         self.assertNotIn("unrelated-job", str(result))
+        self.assertNotIn("secret-integration-job", str(result))
 
     def test_integration_command_is_queued_without_exposing_job_id(self):
         result = NAMESPACE["enqueue_integration_job"]("local_backup")
