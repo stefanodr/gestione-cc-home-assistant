@@ -59,7 +59,6 @@ class IntegrationApiDtoTest(unittest.TestCase):
             INSERT INTO background_jobs(id,kind,status) VALUES ('secret-job-id', 'document_ocr', 'queued');
             INSERT INTO background_jobs(id,kind,status) VALUES ('secret-job-id-2', 'document_ocr', 'failed');
             INSERT INTO background_jobs(id,kind,status) VALUES ('secret-drive-job', 'drive_session_backup', 'done');
-            INSERT INTO background_jobs(id,kind,status) VALUES ('secret-integration-job', 'integration_google_drive_backup', 'running');
             INSERT INTO background_jobs(id,kind,status) VALUES ('unrelated-job', 'internal_task', 'failed');
             INSERT INTO attachments VALUES ('secret-document-id', 'estratto-conto.pdf', 1234, X'0102');
         """)
@@ -121,6 +120,10 @@ class IntegrationApiDtoTest(unittest.TestCase):
         self.assertEqual(result, {"count": 1, "bytes": 1234})
 
     def test_jobs_dto_contains_only_aggregate_counts(self):
+        connection = sqlite3.connect(self.db_path)
+        connection.execute("INSERT INTO background_jobs(id,kind,status) VALUES ('secret-integration-job', 'integration_google_drive_backup', 'running')")
+        connection.commit()
+        connection.close()
         result = NAMESPACE["integration_status"]("/api/integration/v1/jobs/status")
         self.assertEqual(set(result), {"queued", "running", "done", "failed"})
         self.assertEqual(result, {"queued": 1, "running": 1, "done": 1, "failed": 1})
