@@ -83,9 +83,9 @@ Eventi: login riuscito/fallito, logout, scadenza sessione e blocco temporaneo. C
 
 ### 6. PWA e collegamento Companion
 
-PWA come modalità primaria: manifest, icone, display standalone e installazione da Chrome su dispositivi compatibili. Nessun caching di API, HTML autenticato, database, documenti o risposte contabili; service worker, se presente, deve applicare una strategia conservativa e non conservare dati sensibili. PIN e scadenza sessione restano obbligatori.
+Prima implementazione PWA: manifest con display standalone e icona SVG del brand, servito con MIME dedicato. Non viene installato un service worker e non viene abilitata cache offline; le risposte server restano no-store. PIN e scadenza sessione restano obbligatori.
 
-Home Assistant Companion come accesso secondario tramite link LAN dedicato in dashboard o notifica. Nessun PIN/token nell'URL o nella notifica. L'URL non deve diventare pubblico. Non realizzare un'estensione Chrome.
+Collegamento Companion documentato tramite scheda Pulsante Lovelace con azione URL verso l'host LAN. Nessun PIN/token nell'URL o nella notifica. L'URL non deve diventare pubblico. Non realizzare un'estensione Chrome.
 
 ### 7. Dashboard e automazioni
 
