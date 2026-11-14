@@ -23,6 +23,18 @@
 | ![Panoramica Gestione C/C](docs/screenshots/panoramica.png) | ![Movimenti Gestione C/C](docs/screenshots/movimenti.png) | ![Report Gestione C/C](docs/screenshots/report.png) |
 | Entrate, uscite, saldi e andamento. | Consultazione e classificazione dei movimenti. | Analisi dei flussi e confronti tra periodi. |
 
+## Funzionalità principali
+
+- **Migrazione da GnuCash:** importa piano dei conti, movimenti e regole da un libro GnuCash in formato XML, anche compresso con GZIP, mantenendo i dati già presenti. [Dettagli sull'importazione](gestione_cc/DOCS.md#6-dati-importazione-e-compatibilità).
+- **Importazione del piano dei conti:** carica conti e sottoconti da file Excel `.xlsx` o `.csv`, utilizzando il modello disponibile nell'app. [Dettagli](gestione_cc/DOCS.md#6-dati-importazione-e-compatibilità).
+- **Importazione dei movimenti:** supporta `.qif`, `.txt` con struttura QIF, `.ofx`, `.csv` e `.xlsx`. [Dettagli e compatibilità](gestione_cc/DOCS.md#6-dati-importazione-e-compatibilità).
+- **Ripartizione dei movimenti:** suddivide un'operazione tra più conti o categorie e conserva lo storico delle modifiche. [Registro movimenti](#registro-movimenti).
+- **Allegati e archivio documentale:** associa PDF, JPEG/JPG e PNG ai movimenti oppure archivia documenti autonomi; OCR, indicizzazione, ricerca e modifica dei metadati. Massimo 5 MB per file e 15 MB per movimento; avviso al raggiungimento di 100 MB complessivi, senza bloccare i caricamenti. [Dettagli](gestione_cc/DOCS.md#allegati-e-storico-dei-movimenti).
+- **Ricerca avanzata:** filtra i movimenti per testo, periodo, importo, conto e stato, con possibilità di salvare i filtri. [Registro movimenti](#registro-movimenti).
+- **Budget e previsioni:** gestisce i budget e stima l'andamento futuro delle entrate e delle uscite. [Budget e previsioni](#budget-e-previsioni).
+- **Report:** analisi mensili, trimestrali, semestrali e annuali, confronti tra periodi, scostamenti per categoria ed esportazione in XLSX o PDF. [Sezione Report](#report).
+- **Backup e ripristino:** backup JSON e SQLite, copie automatiche locali e backup facoltativo su Google Drive. [Guida backup e ripristino](gestione_cc/DOCS.md#7-backup-e-ripristino) · [Guida Google Drive](docs/GOOGLE_DRIVE_BACKUP.md).
+
 ---
 
 ## Indice / Contents
@@ -71,22 +83,28 @@ L'applicazione permette di consultare in un unico ambiente entrate, uscite, sald
 - Selezione del conto e del periodo di analisi.
 
 ### Registro movimenti
-- Consultazione, ricerca e filtraggio dei movimenti.
-- Inserimento manuale e importazione dei movimenti supportati.
+- Consultazione, ricerca avanzata e filtraggio dei movimenti per testo, periodo, importo, conto e stato; possibilità di salvare i filtri.
+- Inserimento manuale e importazione di movimenti da QIF, TXT (struttura QIF), OFX, CSV e XLSX.
+- Importazione del piano dei conti da Excel XLSX o CSV tramite il modello previsto.
 - Classificazione e ripartizione di una singola operazione tra più conti o categorie.
-- Allegati PDF, JPEG e PNG associabili ai movimenti: massimo 10 MB per file e 80 MB complessivi.
+- Allegati PDF, JPEG/JPG e PNG associabili ai movimenti e archivio documentale autonomo: massimo 5 MB per file e 15 MB complessivi per movimento; avviso informativo al raggiungimento di 100 MB nell'archivio, senza bloccare ulteriori caricamenti.
+- OCR locale, indicizzazione e ricerca nell'archivio documentale; modifica dei metadati riconosciuti.
 - Storico append-only delle creazioni, modifiche e cancellazioni, con data/ora e valori precedenti e nuovi.
 
 ### Piano dei conti e classificazione
 - Struttura gerarchica di conti e sottoconti.
+- Importazione del piano dei conti da GnuCash e da file Excel XLSX o CSV.
 - Compatibilità con i conti importati da GnuCash.
 - Suggerimenti e regole locali basati sulle classificazioni confermate.
 
-### Budget, previsioni e report
+### Budget e previsioni
 - Gestione dei budget e confronto tra valori previsti ed effettivi.
+- Previsioni future basate sullo storico e sui movimenti programmati.
+
+### Report
 - Analisi mensile, trimestrale, semestrale e annuale.
 - Confronti storici e analisi degli scostamenti per categoria.
-- Esportazione dei report in XLSX e anteprima PDF stampabile; il browser consente di salvare il documento come PDF.
+- Esportazione dei report in XLSX e PDF tramite la funzione di stampa del browser.
 
 ### Archivio e protezione
 - Database SQLite persistente sul server Home Assistant.
@@ -214,16 +232,23 @@ It is designed for personal use on a local network and does not require an exter
 - Transaction browsing, search and filters.
 - Manual entry and import of supported transaction files.
 - Classification and split transactions across multiple accounts or categories.
-- PDF, JPEG and PNG attachments linked to transactions: 10 MB per file and 80 MB total.
+- Advanced transaction search by text, date range, amount, account and status, with saved filters.
+- Import of transaction files in QIF, TXT (QIF structure), OFX, CSV and XLSX formats.
+- Chart-of-accounts import from XLSX or CSV using the supplied template.
+- PDF, JPEG/JPG and PNG attachments linked to transactions and a standalone document archive: 5 MB per file and 15 MB per transaction; an informational warning appears at 100 MB total archive usage without blocking further uploads.
+- Local OCR, indexing and search across the document archive, with editable extracted metadata.
 - Append-only history of transaction creation, edits and deletion, including timestamps and before/after values.
 
 ### Chart of accounts and classification
 - Hierarchical accounts and subaccounts.
+- Import of chart of accounts from GnuCash, XLSX or CSV.
 - Compatibility with accounts imported from GnuCash.
 - Local suggestions and rules based on confirmed classifications.
 
-### Budgets, forecasts and reports
-- Budget management and planned-versus-actual comparisons.
+### Budgets and forecasts
+- Budget management, future forecasts and planned-versus-actual comparisons.
+
+### Reports
 - Monthly, quarterly, half-yearly and annual analysis.
 - Historical comparisons and category variance analysis.
 - XLSX report exports and printable PDF preview; use the browser's print dialog to save as PDF.
