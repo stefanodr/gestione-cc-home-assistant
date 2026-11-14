@@ -578,33 +578,58 @@ def background_job_worker():
         job_id = job["id"]
         payload = {}
         try:
-            payload = json.loads(job["result_json"] or "{}") if job["kind"] == "document_ocr" else {}
-            result = process_document_ocr(str(payload.get("attachment_id", ""))) if job["kind"] == "document_ocr" else drive_session_backup()
+            kind = job["kind"]
+            payload = json.loads(job["result_json"] or "{}") if kind == "document_ocr" else {}
+            if kind == "document_ocr":
+                result = process_document_ocr(str(payload.get("attachment_id", "")))
+            elif kind == "drive_session_backup":
+                result = drive_session_backup()
+            elif kind == "integration_local_backup":
+                create_sqlite_backup("integration")
+                result = {"status": "completed"}
+            elif kind == "integration_google_drive_backup":
+                drive_nightly_backup()
+                result = {"status": "completed"}
+            elif kind == "integration_integrity_check":
+                with db() as connection:
+                    integrity_result = connection.execute("PRAGMA integrity_check").fetchone()[0]
+                integrity_ok = integrity_result == "ok"
+                integration_set_setting("integration_last_integrity_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+                integration_set_setting("integration_last_integrity_ok", "1" if integrity_ok else "0")
+                if not integrity_ok:
+                    raise RuntimeError("integrity_check_failed")
+                result = {"status": "completed"}
+            else:
+                raise RuntimeError("unsupported_background_job")
             with db() as connection:
                 connection.execute(
                     "UPDATE background_jobs SET status='done', result_json=?, error=NULL, updated_at=datetime('now') WHERE id=?",
                     (json.dumps(result, ensure_ascii=False), job_id)
                 )
-            if job["kind"] == "drive_session_backup":
+            if kind == "drive_session_backup":
                 cfg = drive_read_config()
                 cfg["last_session_job"] = {"status": "done", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "result": result}
                 drive_write_config(cfg)
         except Exception as error:
-            message = str(error)[:500]
-            print("GestioneCC: job " + str(job["kind"]) + " non riuscito: " + message)
+            kind = job["kind"]
+            message = type(error).__name__ if kind.startswith("integration_") else str(error)[:500]
+            print("GestioneCC: job " + str(kind) + " non riuscito: " + message)
             with db() as connection:
                 connection.execute(
                     "UPDATE background_jobs SET status='failed', error=?, updated_at=datetime('now') WHERE id=?",
                     (message, job_id)
                 )
-            if job["kind"] == "document_ocr":
+            if kind == "document_ocr":
                 attachment_id = str(payload.get("attachment_id", ""))
                 with db() as connection:
                     connection.execute("UPDATE document_index SET status='failed',error=?,updated_at=datetime('now') WHERE attachment_id=?", (message, attachment_id))
-            else:
+            elif kind == "drive_session_backup":
                 cfg = drive_read_config()
                 cfg["last_session_job"] = {"status": "failed", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "error": message}
                 drive_write_config(cfg)
+            elif kind == "integration_integrity_check":
+                integration_set_setting("integration_last_integrity_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+                integration_set_setting("integration_last_integrity_ok", "0")
 
 
 def drive_nightly_backup():
