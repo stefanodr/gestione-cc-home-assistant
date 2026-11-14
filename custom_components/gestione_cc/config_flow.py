@@ -26,7 +26,7 @@ def _valid_local_https_url(value: str) -> bool:
         return host in ("localhost", "homeassistant.local") or host.endswith((".local", ".lan", ".home", ".internal"))
 
 
-class GestioneCCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
