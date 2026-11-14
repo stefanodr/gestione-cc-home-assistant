@@ -18,7 +18,7 @@ Questa è la prima versione di sviluppo della custom integration. Non è ancora 
 Il token è conservato nei dati di configurazione Home Assistant, che non costituiscono un vault cifrato: proteggi backup e accesso amministrativo. La verifica TLS è obbligatoria: l'integrazione non disabilita la verifica del certificato e non accetta HTTP o URL pubblici. Per ruotare il token in questa prima versione: generare il nuovo token nell'app, rimuovere e aggiungere nuovamente l'integrazione in Home Assistant con il nuovo token, quindi revocare il vecchio. Non revocare il vecchio prima di aver completato la riconfigurazione.
 
 ## Sensori e comandi
-La prima bozza espone disponibilità app, versioni app/add-on, uptime, dimensione/ultima modifica DB, backup, spazio, conteggio allegati e conteggi aggregati dei processi. Sono previsti tre pulsanti: backup locale, backup Google Drive e controllo integrità.
+La prima bozza espone disponibilità app, versioni app/add-on, uptime, dimensione/ultima modifica DB, backup, spazio, conteggio allegati, conteggi aggregati dei processi e contatori OCR separati (coda, in elaborazione, errori). I conteggi coprono gli ultimi 7 giorni. Sono previsti tre pulsanti: backup locale, backup Google Drive e controllo integrità.
 
 Non vengono creati sensori finanziari e non vengono trasferiti conti, saldi, movimenti, descrizioni o contenuti documentali.
 
@@ -49,3 +49,8 @@ Il link non contiene PIN o token. L'app richiede comunque il PIN all'apertura qu
 - L'installazione HACS e il test end-to-end saranno abilitati solo dopo il collaudo della rete e del certificato.
 
 **Non installare questa versione di sviluppo sul sistema operativo Home Assistant principale.**
+
+
+## Dashboard e automazioni di esempio
+
+Sono disponibili esempi YAML in `docs/dashboard_gestione_cc.yaml` e `docs/automazioni_gestione_cc.yaml`. Prima di importarli, verificare gli entity_id effettivi creati da Home Assistant e sostituire `notify.notify` con il servizio di notifica desiderato. Nella dashboard, sostituire `homeassistant.local` con il nome host LAN configurato nell'add-on, se diverso.
