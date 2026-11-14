@@ -18,17 +18,16 @@
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode(node) {
       const parent = node.parentElement;
       if (!parent || parent.closest('script,style,input,textarea,select,.privacy-toggle,.privacy-money-mask,[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
-      const amountContainer = parent.closest('.amount-cell,.amount-in,.amount-out,.pending-amount,.category-amount,.privacy-balance,.metric-value,.report-value,.delta-positive,.delta-negative,[data-money]');
       const value = node.nodeValue || '';
-      return (amountContainer ? /\d/.test(value) : /€/.test(value)) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      return (/€/.test(value) || parent.closest('[data-money]')) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }});
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     for (const node of nodes) {
       const value = node.nodeValue || '';
       const parent = node.parentElement;
-      const amountContainer = parent?.closest('.amount-cell,.amount-in,.amount-out,.pending-amount,.category-amount,.privacy-balance,.metric-value,.report-value,.delta-positive,.delta-negative,[data-money]');
-      const pattern = amountContainer ? /[-+]?\d[\d.,]*/g : /(?:€\s*[-+]?\d[\d.,]*|[-+]?\d[\d.,]*\s*€)/g;
+      const explicitMoney = parent?.closest('[data-money]');
+      const pattern = explicitMoney ? /[-+]?\d[\d.,]*/g : /(?:€\s*[-+]?\d[\d.,]*|[-+]?\d[\d.,]*\s*€)/g;
       const fragment = document.createDocumentFragment();
       let last = 0, match;
       while ((match = pattern.exec(value))) {
