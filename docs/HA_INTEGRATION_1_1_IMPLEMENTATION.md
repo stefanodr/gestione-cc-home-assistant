@@ -99,7 +99,7 @@ Dashboard tecnica opzionale con soli stati tecnici, sensori e pulsanti autorizza
 3. **Comandi e job** — backup locale, backup Drive e integrity check; stato aggregato senza ID o output sensibili.
 4. **Registro accessi** — migrazione schema non distruttiva, retention 30 giorni e IP; UI protetta e test.
 5. **HACS integration** — config flow, coordinator, sensori, binary sensor, pulsanti, test e documentazione.
-6. **PWA + Companion** — manifest, service worker conservativo, link LAN e istruzioni di installazione.
+6. **PWA + Companion** — manifest e icona installabile, senza service worker e senza cache offline; link LAN e istruzioni di installazione.
 7. **Dashboard, automazioni, documentazione IT/EN**.
 8. **Collaudo sicurezza e regressione** — solo dopo tutti i test si valuterà la versione finale e la pubblicazione.
 
