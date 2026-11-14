@@ -1729,6 +1729,16 @@ def peer_is_allowed(peer_address, allowed_network, integration_network):
         return False
 
 
+def integration_peer_can_access(peer_address, allowed_network, integration_network, method, path):
+    """Restrict the extra Home Assistant Core peer to exact technical API routes."""
+    if not peer_is_integration_only(peer_address, allowed_network, integration_network):
+        return True
+    if method == "GET":
+        return path in {"/api/integration/v1/health", "/api/integration/v1/database/status", "/api/integration/v1/backups/status", "/api/integration/v1/storage/status", "/api/integration/v1/documents/status", "/api/integration/v1/jobs/status"}
+    if method == "POST":
+        return path in {"/api/integration/v1/commands/local-backup", "/api/integration/v1/commands/google-drive-backup", "/api/integration/v1/commands/integrity-check"}
+    return False
+
 class LANOnlyHTTPServer(ThreadingHTTPServer):
     """Allow the home LAN plus a narrowly scoped Home Assistant Core peer."""
     def __init__(self, server_address, RequestHandlerClass, allowed_network, integration_network):
