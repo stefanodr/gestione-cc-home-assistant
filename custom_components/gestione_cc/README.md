@@ -43,7 +43,7 @@ Il link non contiene PIN o token. L'app richiede comunque il PIN all'apertura qu
 
 ## Stato e limitazioni note
 - Config flow, coordinator, sensori, binary sensor e pulsanti sono in fase iniziale.
-- Polling corrente: 2 minuti per tutti gli endpoint.
+- Polling differenziato: health ogni 60 secondi; database, backup e storage ogni 5 minuti; allegati e processi ogni 2 minuti. Dopo un comando viene forzato un aggiornamento.
 - I comandi sono sincroni e hanno timeout esteso; la gestione job asincrona sarà migliorata.
 - L'add-on mantiene la LAN autorizzata e aggiunge una sola eccezione /32 per Home Assistant Core (`172.30.32.1/32`, rete interna documentata di Home Assistant OS). Quel peer può chiamare esclusivamente gli endpoint tecnici e i tre comandi: non può accedere a login, interfaccia, API contabili o gestione token. Il valore /32 va comunque confermato nel collaudo reale; non viene usato `host_network` e non si apre l'accesso WAN.
 - L'installazione HACS e il test end-to-end saranno abilitati solo dopo il collaudo della rete e del certificato.
