@@ -28,6 +28,7 @@ DB_PATH = DATA / "gestione_cc.sqlite3"
 OPTIONS_FILE = Path(os.environ.get("ADDON_OPTIONS_FILE", "/data/options.json"))
 SSL_DIR = Path(os.environ.get("SSL_DIR", "/data/tls"))
 BACKUP_DIR = DATA / "backups"
+ACCESS_LOG_DB_PATH = DATA / "access_log.sqlite3"
 MAX_BODY = 512 * 1024 * 1024  # Large JSON restores may include base64-encoded document files.
 SESSION_SECONDS = 8 * 60 * 60
 sessions = {}
@@ -59,8 +60,6 @@ def init_db():
             c.execute("ALTER TABLE app_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
         c.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, salt BLOB NOT NULL, password_hash BLOB NOT NULL, iterations INTEGER NOT NULL)")
         c.execute("CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL)")
-        c.execute("CREATE TABLE IF NOT EXISTS access_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL, outcome TEXT NOT NULL, session_ref TEXT, ip_address TEXT NOT NULL)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_access_log_at ON access_log(at DESC)")
         c.execute("CREATE TABLE IF NOT EXISTS transaction_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, transaction_id TEXT NOT NULL, event TEXT NOT NULL, changes_json TEXT NOT NULL)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
         c.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
@@ -715,9 +714,16 @@ def integration_status(path):
 
 ACCESS_LOG_RETENTION_SECONDS = 30 * 24 * 60 * 60
 
+def access_db():
+    connection = sqlite3.connect(ACCESS_LOG_DB_PATH, timeout=15)
+    connection.row_factory = sqlite3.Row
+    connection.execute("CREATE TABLE IF NOT EXISTS access_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL, outcome TEXT NOT NULL, session_ref TEXT, ip_address TEXT NOT NULL)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_access_log_at ON access_log(at DESC)")
+    return connection
+
 def cleanup_access_log():
     cutoff = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - ACCESS_LOG_RETENTION_SECONDS))
-    with db() as connection:
+    with access_db() as connection:
         connection.execute("DELETE FROM access_log WHERE at < ?", (cutoff,))
 
 def record_access_event(event, outcome, ip_address, session_token=None):
@@ -728,7 +734,7 @@ def record_access_event(event, outcome, ip_address, session_token=None):
     except ValueError:
         ip_value = "unknown"
     at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    with db() as connection:
+    with access_db() as connection:
         connection.execute("INSERT INTO access_log(at,event,outcome,session_ref,ip_address) VALUES(?,?,?,?,?)",
                            (at, str(event)[:32], str(outcome)[:16], session_ref, ip_value))
         connection.execute("DELETE FROM access_log WHERE at < ?",
@@ -843,7 +849,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/security/access-log":
             item = self.require_auth()
             if not item: return
-            with db() as connection:
+            with access_db() as connection:
                 rows = connection.execute("SELECT at,event,outcome,session_ref,ip_address FROM access_log ORDER BY id DESC LIMIT 200").fetchall()
             self.send_json(200, {"items": [dict(row) for row in rows], "retention_days": 30})
             return
