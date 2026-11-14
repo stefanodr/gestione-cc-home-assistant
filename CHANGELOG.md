@@ -1,14 +1,14 @@
 ## [1.0.39] - 2026-11-14
 
 ### Italiano
-- Corretto il calcolo del saldo iniziale delle Previsioni: vengono sommati i flussi storici dei soli conti liquidi selezionati; i trasferimenti interni al perimetro selezionato non alterano il saldo complessivo.
+- Corretto il calcolo del saldo iniziale delle Previsioni: vengono sommati i flussi storici dei soli conti liquidi selezionati; i trasferimenti interni al perimetro selezionato non alterano il saldo complessivo. Il saldo di apertura configurato resta quello del conto principale; per gli altri conti il valore è ricostruito dalla cronologia disponibile e viene segnalato come potenzialmente incompleto.
 - Limitate le entrate e le uscite stimate ai movimenti registrati sui conti liquidi selezionati.
 - Ripartiti i budget di categoria nelle Previsioni in base alla quota storica attribuibile ai conti selezionati; i budget restano mensili e non riportano residui.
 - Aggiunta l'esportazione dell'intera guida in PDF nella lingua selezionata, con copertina, indice e numerazione delle pagine.
 - Aggiornata la versione dell'add-on a 1.0.39. La versione dell'app inclusa resta 1.7.13.
 
 ### English
-- Fixed the Forecast opening balance calculation: historical cash flows are summed only for selected liquid accounts; transfers within the selected scope do not change the combined balance.
+- Fixed the Forecast opening balance calculation: historical cash flows are summed only for selected liquid accounts; transfers within the selected scope do not change the combined balance. The configured opening balance remains the one for the primary account; other accounts are reconstructed from available history and flagged as potentially incomplete.
 - Restricted estimated income and expenses to transactions recorded on the selected liquid accounts.
 - Allocated category budgets in Forecast according to the historical share attributable to selected accounts; budgets remain monthly with no carryover.
 - Added export of the complete guide to PDF in the selected language, including a cover, contents page and page numbering.
