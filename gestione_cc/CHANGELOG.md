@@ -1,3 +1,11 @@
+## [1.0.41] - 2026-11-14
+
+### Corretto
+- Corretto il footer dell'interfaccia: ora mostra la versione add-on 1.0.41, coerente con la versione installabile.
+
+### Fixed
+- Fixed the application footer to display add-on version 1.0.41, matching the installable add-on version.
+
 ## [1.0.40] - 2026-11-14
 
 ### Corretto e migliorato
