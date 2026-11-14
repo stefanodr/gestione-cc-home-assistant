@@ -1,8 +1,9 @@
 import asyncio
+import logging
 import ssl
-from datetime import timedelta
 
 import aiohttp
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import API_ENDPOINTS, COMMANDS, DEFAULT_SCAN_INTERVAL, DOMAIN
@@ -13,12 +14,10 @@ class GestioneCCCoordinator(DataUpdateCoordinator):
         self.base_url = entry.data["url"].rstrip("/")
         self.token = entry.data["token"]
         self.ssl_context = ssl.create_default_context(cafile=entry.data["ca_cert_path"])
-        self.session = __import__(
-            "homeassistant.helpers.aiohttp_client", fromlist=["async_get_clientsession"]
-        ).async_get_clientsession(hass)
+        self.session = async_get_clientsession(hass)
         super().__init__(
             hass,
-            logger=__import__("logging").getLogger(__name__),
+            logger=logging.getLogger(__name__),
             name=DOMAIN,
             update_interval=DEFAULT_SCAN_INTERVAL,
         )
