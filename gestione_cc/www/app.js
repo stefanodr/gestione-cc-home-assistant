@@ -1446,6 +1446,8 @@
     return {accounts,currentBalance:openingBalance,forecast,minimum,historyCount,estimatedNet:forecast.reduce((sum,row)=>sum+row.estimateIncome-row.estimateExpense,0),estimates:{source},openingBalanceUnknown,lastClosedMonth};
   }
   async function renderForecastSelection() {
+    const renderId = (renderForecastSelection._requestId || 0) + 1;
+    renderForecastSelection._requestId = renderId;
     const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
     const count=forecastSelectedAccounts().length;
     const status=$('#forecastStatus');if(status)status.textContent='Conti inclusi: '+count+'. Selezione vuota = tutti i conti liquidi.';
@@ -1457,8 +1459,9 @@
     const progress=$('#forecastProgress'),progressBar=$('#forecastProgressBar'),progressText=$('#forecastProgressText');
     if(progress)progress.hidden=false; if(progressBar)progressBar.style.width='0%'; if(progressText)progressText.textContent='0%';
     let result;
-    try { result=await buildForecast(value=>{if(progressBar)progressBar.style.width=value+'%';if(progressText)progressText.textContent=Math.round(value)+'%';}); }
-    finally { if(progress)progress.hidden=true; }
+    try { result=await buildForecast(value=>{if(renderForecastSelection._requestId===renderId){if(progressBar)progressBar.style.width=value+'%';if(progressText)progressText.textContent=Math.round(value)+'%';}}); }
+    finally { if(renderForecastSelection._requestId===renderId&&progress)progress.hidden=true; }
+    if(renderForecastSelection._requestId!==renderId)return;
     $('#forecastOpening').textContent=euro.format(result.currentBalance);
     $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
     $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
@@ -1469,7 +1472,7 @@
     const dueSchedules=result.forecast.reduce((sum,row)=>sum+forecastRecurringItems(row.key,new Set(result.accounts.map(account=>account.id))).length,0);
     if(status)status.textContent+=' Impegni attivi: '+activeSchedules.length+' · occorrenze programmate nei prossimi 12 mesi: '+dueSchedules+'.';
     $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
-    document.querySelectorAll('#forecastBody td:nth-child(2),#forecastBody td:nth-child(7)').forEach(cell=>cell.classList.add('privacy-balance'));
+    document.querySelectorAll('#forecastBody td:nth-child(2),#forecastBody td:nth-child(7)').forEach(cell=>{cell.classList.add('privacy-balance');cell.classList.toggle('privacy-hidden',privacyMode==='2'||privacyMode==='3');});
   }
 
   function navigate(view) {
