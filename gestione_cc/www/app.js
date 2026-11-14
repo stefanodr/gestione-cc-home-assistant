@@ -509,7 +509,7 @@
     setupControls();
     setupPrivacyControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.38</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.39</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -1394,7 +1394,7 @@
       (ids.has(t.bankAccountId)||ids.has(t.counterpartAccountId)||(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.some(sp=>ids.has(sp.accountId)))));
     const primaryAccountId=state.bankAccountId;
     const opening=ids.has(primaryAccountId)?(Number(state.openingBalance)||0):0;
-    const openingBalanceUnknown=accounts.filter(account=>account.id!==primaryAccountId);
+    const openingBalanceReconstructed=accounts.filter(account=>account.id!==primaryAccountId);
     const lastClosedMonth=shiftMonthKey(currentMonth,-1);
     const cutoff=lastClosedMonth+'-'+String(new Date(Number(lastClosedMonth.slice(0,4)),Number(lastClosedMonth.slice(5,7)),0).getDate()).padStart(2,'0');
     const closedTxs=txs.filter(tx=>String(tx.date||'')<=cutoff);
@@ -1404,35 +1404,46 @@
     // Use up to 24 closed months so each projected month can follow its own
     // calendar-month profile instead of repeating one annual median.
     const historyMonths=Array.from({length:24},(_,i)=>shiftMonthKey(lastClosedMonth,-23+i));
-    const categoryMonthly=(accountId,month)=>{
+    const categoryMonthly=(accountId,month,scopeIds)=>{
       let total=0;
-      for(const tx of txs){
-        if(String(tx.date||'').slice(0,7)!==month)continue;
+      for(const tx of state.transactions){
+        if(tx.status!=='confirmed'||String(tx.date||'').slice(0,7)!==month||!isLiquidAccount(accountById(tx.bankAccountId)))continue;
+        if(scopeIds&&!scopeIds.has(String(tx.bankAccountId)))continue;
         if(tx.counterpartSplits?.length){for(const split of tx.counterpartSplits)if(split.accountId===accountId)total+=Math.abs(Number(split.value)||0);}
         else if(tx.counterpartAccountId===accountId)total+=Math.abs(Number(tx.amount)||0);
       }
-      return total;
+      return Math.round((total+Number.EPSILON)*100)/100;
     };
     const recurringMonthly=(accountId,month)=>{
       const due=state.recurringRules.filter(rule=>rule.active&&rule.categoryId===accountId&&recurringOccursInMonth(rule,month));
       return due.reduce((sum,rule)=>sum+Math.abs(Number(rule.amount)||0),0);
     };
+    const budgetAccountShare=(account,month)=>{
+      const liquidAccounts=state.accounts.filter(isLiquidAccount);
+      if(ids.size>=liquidAccounts.length)return 1;
+      const seasonalMonths=historyMonths.filter(key=>key.slice(5,7)===String(month).slice(5,7));
+      const sampleMonths=seasonalMonths.length?seasonalMonths:historyMonths;
+      const selectedActual=sampleMonths.reduce((sum,key)=>sum+categoryMonthly(account.id,key,ids),0);
+      const allActual=sampleMonths.reduce((sum,key)=>sum+categoryMonthly(account.id,key,null),0);
+      return allActual>0?Math.max(0,Math.min(1,selectedActual/allActual)):0;
+    };
     const budgetFor=(account,month)=>{
-      // A budget is applied only to the month for which it was saved.
-      // Carrying the latest snapshot into every future month creates a flat
-      // forecast and masks the month-by-month historical profile.
+      // Budgets remain monthly. For a partial account selection, use the
+      // category's historical share attributable to the selected accounts.
       const snapshot=activeBudgetSnapshot(month);
       const lines=account.type==='INCOME'?(snapshot?.incomeLines||[]):(snapshot?.lines||[]);
       const line=lines.find(item=>item.accountId===account.id);
       const value=Number(line?.budget);
-      return Number.isFinite(value)&&value>0?{amount:value,source:'budget'}:null;
+      if(!Number.isFinite(value)||value<=0)return null;
+      const scopedValue=value*budgetAccountShare(account,month);
+      return scopedValue>0?{amount:Math.round(scopedValue*100)/100,source:'budget'}:null;
     };
     const historyEstimate=(account,month)=>{
-      const values=historyMonths.map(key=>categoryMonthly(account.id,key));
+      const values=historyMonths.map(key=>categoryMonthly(account.id,key,ids));
       const active=values.filter(value=>value>0);
       const byCalendarMonth=Array.from({length:12},(_,index)=>historyMonths
         .filter(key=>Number(key.slice(5,7))===index+1)
-        .map(key=>categoryMonthly(account.id,key)).filter(value=>value>0));
+        .map(key=>categoryMonthly(account.id,key,ids)).filter(value=>value>0));
       const repeatedSeasonalMonths=byCalendarMonth.filter(items=>items.length>=2).length;
       // A category is not sporadic if it is regularly active through the year,
       // or if it repeats in at least two calendar months across different
@@ -1478,7 +1489,7 @@
     const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:openingBalance,key:currentMonth});
     const source=sources.size>1?'budget e storico misti':sources.has('budget')?'budget':sources.has('anno_precedente')?'anno precedente':'anno corrente';
     const historyCount=historyMonths.filter(key=>txs.some(tx=>String(tx.date||'').slice(0,7)===key)).length;
-    return {accounts,currentBalance:openingBalance,forecast,minimum,historyCount,estimatedNet:forecast.reduce((sum,row)=>sum+row.estimateIncome-row.estimateExpense,0),estimates:{source},openingBalanceUnknown,lastClosedMonth};
+    return {accounts,currentBalance:openingBalance,forecast,minimum,historyCount,estimatedNet:forecast.reduce((sum,row)=>sum+row.estimateIncome-row.estimateExpense,0),estimates:{source},openingBalanceReconstructed,lastClosedMonth};
   }
   async function renderForecastSelection() {
     const renderId = (renderForecastSelection._requestId || 0) + 1;
@@ -1501,8 +1512,7 @@
     $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
     $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
     $('#forecastEnding').textContent=euro.format(result.forecast.at(-1)?.balance??result.currentBalance);
-    $('#forecastReliability').textContent='Saldo al '+monthLabel(result.lastClosedMonth)+' · base '+result.estimates.source+' · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale non configurato per '+result.openingBalanceUnknown.length+' conto/i':''); 
-    if(status&&result.openingBalanceUnknown.length)status.textContent+=' ATTENZIONE: il saldo iniziale è disponibile solo per '+(accountById(state.bankAccountId)?.path||'il conto principale')+'. Per gli altri conti selezionati il saldo storico potrebbe essere incompleto.';
+    $('#forecastReliability').textContent='Saldo al '+monthLabel(result.lastClosedMonth)+' · base '+result.estimates.source+(result.openingBalanceReconstructed.length?' · altri saldi ricostruiti dai movimenti':'')+' · stima indicativa';
     const activeSchedules=(Array.isArray(state.recurringRules)?state.recurringRules:[]).filter(rule=>rule.active!==false);
     const dueSchedules=result.forecast.reduce((sum,row)=>sum+forecastRecurringItems(row.key,new Set(result.accounts.map(account=>account.id))).length,0);
     if(status)status.textContent+=' Impegni attivi: '+activeSchedules.length+' · occorrenze programmate nei prossimi 12 mesi: '+dueSchedules+'.';
