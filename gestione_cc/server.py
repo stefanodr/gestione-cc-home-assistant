@@ -16,6 +16,7 @@ import subprocess
 import tempfile
 import time
 import urllib.error
+from contextlib import contextmanager
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -738,9 +739,23 @@ def access_db():
     connection.execute("CREATE INDEX IF NOT EXISTS idx_access_log_at ON access_log(at DESC)")
     return connection
 
+@contextmanager
+def access_db_connection():
+    """Commit or roll back and always close the separate security-log database."""
+    connection = access_db()
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
 def cleanup_access_log():
     cutoff = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - ACCESS_LOG_RETENTION_SECONDS))
-    with access_db() as connection:
+    with access_db_connection() as connection:
         connection.execute("DELETE FROM access_log WHERE at < ?", (cutoff,))
 
 def record_access_event(event, outcome, ip_address, session_token=None):
