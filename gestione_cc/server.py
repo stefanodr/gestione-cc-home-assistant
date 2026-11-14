@@ -58,6 +58,8 @@ def init_db():
             c.execute("ALTER TABLE app_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
         c.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, salt BLOB NOT NULL, password_hash BLOB NOT NULL, iterations INTEGER NOT NULL)")
         c.execute("CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL)")
+        c.execute("CREATE TABLE IF NOT EXISTS access_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL, outcome TEXT NOT NULL, session_ref TEXT, ip_address TEXT NOT NULL)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_access_log_at ON access_log(at DESC)")
         c.execute("CREATE TABLE IF NOT EXISTS transaction_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, transaction_id TEXT NOT NULL, event TEXT NOT NULL, changes_json TEXT NOT NULL)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_transaction_audit_tx ON transaction_audit(transaction_id,id DESC)")
         c.execute("CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, transaction_id TEXT, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)")
@@ -709,6 +711,37 @@ def integration_status(path):
         return integration_job_counts()
     return None
 
+
+ACCESS_LOG_RETENTION_SECONDS = 30 * 24 * 60 * 60
+
+def cleanup_access_log():
+    cutoff = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - ACCESS_LOG_RETENTION_SECONDS))
+    with db() as connection:
+        connection.execute("DELETE FROM access_log WHERE at < ?", (cutoff,))
+
+def record_access_event(event, outcome, ip_address, session_token=None):
+    # Store only a pseudonymous digest of the session token, never the token itself.
+    session_ref = hashlib.sha256(session_token.encode("utf-8")).hexdigest()[:20] if session_token else None
+    try:
+        ip_value = str(ipaddress.ip_address(ip_address))
+    except ValueError:
+        ip_value = "unknown"
+    at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    with db() as connection:
+        connection.execute("INSERT INTO access_log(at,event,outcome,session_ref,ip_address) VALUES(?,?,?,?,?)",
+                           (at, str(event)[:32], str(outcome)[:16], session_ref, ip_value))
+        connection.execute("DELETE FROM access_log WHERE at < ?",
+                           (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - ACCESS_LOG_RETENTION_SECONDS)),))
+
+def access_log_cleanup_worker():
+    while True:
+        time.sleep(3600)
+        try:
+            cleanup_access_log()
+        except Exception as error:
+            print("GestioneCC: pulizia registro accessi non riuscita: " + type(error).__name__)
+
+
 def valid_state(state):
     if not isinstance(state, dict): return False
     accounts, transactions, rules = state.get('accounts'), state.get('transactions'), state.get('rules', [])
@@ -775,7 +808,9 @@ class Handler(BaseHTTPRequestHandler):
         item = sessions.get(token) if token else None
         if not item: return None
         if item["expires"] < time.time():
-            sessions.pop(token, None); return None
+            sessions.pop(token, None)
+            record_access_event("session_expired", "expired", self.client_address[0], token)
+            return None
         item["expires"] = time.time() + SESSION_SECONDS
         return item
 
@@ -804,6 +839,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/api/security/access-log":
+            item = self.require_auth()
+            if not item: return
+            with db() as connection:
+                rows = connection.execute("SELECT at,event,outcome,session_ref,ip_address FROM access_log ORDER BY id DESC LIMIT 200").fetchall()
+            self.send_json(200, {"items": [dict(row) for row in rows], "retention_days": 30})
+            return
         if path == "/api/integration/token/status":
             item = self.require_auth()
             if not item: return
@@ -1415,14 +1457,17 @@ class Handler(BaseHTTPRequestHandler):
             recent = [stamp for stamp in login_failures.get(peer, []) if now - stamp < LOGIN_WINDOW]
             login_failures[peer] = recent
             if len(recent) >= LOGIN_MAX:
+                record_access_event("temporary_lockout", "blocked", peer)
                 self.send_json(429, {"error":"Troppi tentativi. Riprova tra alcuni minuti."}); return
             username = verify_pin(pin) if valid_pin(pin) else None
             if not username:
                 recent.append(now); login_failures[peer] = recent
+                record_access_event("login", "failed", peer)
                 self.send_json(401, {"error":"PIN non corretto"}); return
             login_failures.pop(peer, None)
             token = secrets.token_urlsafe(32); csrf = secrets.token_urlsafe(24)
             sessions[token] = {"username":username,"csrf":csrf,"expires":time.time()+SESSION_SECONDS}
+            record_access_event("login", "success", peer, token)
             self.send_json(200, {"ok":True,"csrf":csrf}, {"Set-Cookie":f"cc_session={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={SESSION_SECONDS}"})
             return
         if path == "/api/change-pin":
@@ -1452,7 +1497,9 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as error:
                 self.send_json(500, {"error":"Impossibile accodare il backup; la sessione resta aperta: " + str(error)})
                 return
-            sessions.pop(self.cookie_token(), None)
+            session_token = self.cookie_token()
+            record_access_event("logout", "success", self.client_address[0], session_token)
+            sessions.pop(session_token, None)
             self.send_json(202, {"ok":True,"job_id":job_id,"backup_status":"queued"},
                            {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
             return
@@ -1578,6 +1625,8 @@ class LANOnlyHTTPServer(ThreadingHTTPServer):
 
 if __name__ == "__main__":
     init_db()
+    cleanup_access_log()
+    __import__("threading").Thread(target=access_log_cleanup_worker, daemon=True, name="access-log-cleanup").start()
     cert_file = SSL_DIR / "server.crt"
     key_file = SSL_DIR / "server.key"
     if not cert_file.is_file() or not key_file.is_file():
