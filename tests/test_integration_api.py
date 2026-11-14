@@ -12,9 +12,10 @@ from unittest.mock import patch
 
 SERVER = Path(__file__).resolve().parents[1] / "gestione_cc" / "server.py"
 TREE = ast.parse(SERVER.read_text(encoding="utf-8"))
-TARGETS = {"integration_token_digest", "integration_setting", "integration_job_counts", "integration_status", "record_access_event", "cleanup_access_log"}
+TARGETS = {"integration_token_digest", "integration_setting", "integration_job_counts", "integration_status", "access_db", "record_access_event", "cleanup_access_log"}
 NAMESPACE = {
     "hashlib": hashlib,
+    "sqlite3": sqlite3,
     "ACCESS_LOG_RETENTION_SECONDS": 30 * 24 * 60 * 60,
     "ipaddress": ipaddress,
     "time": time,
@@ -31,13 +32,13 @@ class IntegrationApiDtoTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.db_path = self.root / "test.sqlite3"
+        self.access_log_path = self.root / "access_log.sqlite3"
         self.backup_dir = self.root / "backups"
         self.backup_dir.mkdir()
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
         connection.executescript("""
             CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-            CREATE TABLE access_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL, outcome TEXT NOT NULL, session_ref TEXT, ip_address TEXT NOT NULL);
             CREATE TABLE app_state (id INTEGER PRIMARY KEY, updated_at TEXT);
             INSERT INTO app_state VALUES (1, '2026-11-14T18:00:00Z');
             CREATE TABLE background_jobs (id TEXT, kind TEXT, status TEXT);
@@ -59,6 +60,7 @@ class IntegrationApiDtoTest(unittest.TestCase):
         NAMESPACE.update({
             "db": open_db,
             "DB_PATH": self.db_path,
+            "ACCESS_LOG_DB_PATH": self.access_log_path,
             "BACKUP_DIR": self.backup_dir,
             "DATA": self.root,
             "SERVER_STARTED_AT": time.time() - 15,
@@ -114,7 +116,7 @@ class IntegrationApiDtoTest(unittest.TestCase):
     def test_access_log_stores_ip_and_pseudonymous_session_reference(self):
         raw_session = "private-session-cookie-value"
         NAMESPACE["record_access_event"]("login", "success", "192.168.1.42", raw_session)
-        connection = sqlite3.connect(self.db_path)
+        connection = NAMESPACE["access_db"]()
         row = connection.execute("SELECT event,outcome,session_ref,ip_address FROM access_log").fetchone()
         connection.close()
         self.assertEqual(row[0:2], ("login", "success"))
@@ -125,13 +127,13 @@ class IntegrationApiDtoTest(unittest.TestCase):
     def test_access_log_retention_removes_records_older_than_30_days(self):
         old = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 31 * 86400))
         recent = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        connection = sqlite3.connect(self.db_path)
+        connection = NAMESPACE["access_db"]()
         connection.execute("INSERT INTO access_log(at,event,outcome,ip_address) VALUES(?,?,?,?)", (old, "login", "failed", "192.168.1.10"))
         connection.execute("INSERT INTO access_log(at,event,outcome,ip_address) VALUES(?,?,?,?)", (recent, "login", "success", "192.168.1.10"))
         connection.commit()
         connection.close()
         NAMESPACE["cleanup_access_log"]()
-        connection = sqlite3.connect(self.db_path)
+        connection = NAMESPACE["access_db"]()
         rows = connection.execute("SELECT at FROM access_log").fetchall()
         connection.close()
         self.assertEqual(len(rows), 1)
