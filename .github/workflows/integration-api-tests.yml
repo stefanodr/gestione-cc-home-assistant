@@ -23,6 +23,6 @@ jobs:
       - name: Validate integration JSON files
         run: |
           python -c "import json,pathlib; [json.loads(p.read_text(encoding='utf-8')) for p in pathlib.Path('custom_components/gestione_cc').rglob('*.json')]"
-          python -c "import json; json.loads(pathlib.Path('hacs.json').read_text(encoding='utf-8'))"
+          python -c "import json,pathlib; json.loads(pathlib.Path('hacs.json').read_text(encoding='utf-8'))"
       - name: Run restricted DTO and privacy tests
         run: python -m unittest discover -s tests -p 'test_integration_api.py' -v
