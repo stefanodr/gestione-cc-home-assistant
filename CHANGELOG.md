@@ -1,3 +1,15 @@
+## [1.1.6] - 2026-11-14
+
+### Correzioni
+- Impostata esplicitamente l'unità suggerita MB per i cinque sensori di dimensione dati.
+- Aggiornate al nuovo valore suggerito le opzioni iniziali già memorizzate da Home Assistant per le entità esistenti, senza sovrascrivere un'eventuale unità personalizzata scelta dall'utente.
+- Mantenuta la conversione da byte a MB decimali e la precisione di due cifre.
+
+### Fixes
+- Explicitly set MB as the suggested unit for all five data-size sensors.
+- Refreshed Home Assistant's stored initial options for existing entities, without overriding a custom unit explicitly selected by the user.
+- Kept decimal byte-to-MB conversion and two-digit precision.
+
 ## [1.1.5] - 2026-11-14
 
 ### Miglioramenti
