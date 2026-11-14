@@ -6,7 +6,7 @@
 - Barra di avanzamento del calcolo Previsioni, aggiornata durante l'elaborazione dei 12 mesi.
 
 ### Corretto
-- La versione dell'add-on è aggiornata a 1.0.31 nei metadati Home Assistant; rimossa dall'interfaccia la dicitura add-on fissata a una versione precedente.
+- La versione dell'add-on è aggiornata a 1.0.31 nei metadati Home Assistant e nel piè di pagina dell'applicazione.
 
 ### Added
 - Staged archive-loading progress bar after sign-in.
@@ -14,7 +14,7 @@
 - Forecast calculation progress bar updated while the 12-month projection is processed.
 
 ### Fixed
-- Updated the Home Assistant add-on metadata to version 1.0.31 and removed the stale hard-coded add-on version from the application footer.
+- Updated the Home Assistant add-on metadata and application footer to version 1.0.31.
 
 ## [1.0.30] - 2026-11-13
 
