@@ -1,3 +1,17 @@
+## [1.0.40] - 2026-11-14
+
+### Corretto e migliorato
+- Allineato il saldo iniziale delle Previsioni alla regola di calcolo della Panoramica, usando il saldo alla fine dell'ultimo mese chiuso e il perimetro dei conti selezionati.
+- Spostato a sinistra il comando STAMPA/ESPORTA PDF nelle anteprime dei report e aggiunto CHIUDI SCHEDA.
+- Aggiunta l'esportazione PDF completa del Piano dei conti, con classificazione, gerarchia, conto padre, conteggio movimenti, inclusione nel budget, tag e storico delle denominazioni.
+- Reso dinamico il modello Excel del Piano dei conti: include tutti i conti presenti nell'archivio anziché cinque righe di esempio.
+
+### Fixed and improved
+- Aligned the Forecast opening balance with the Overview calculation rule, using the balance at the end of the latest closed month and the selected account scope.
+- Moved the PRINT/EXPORT PDF action to the left in report previews and added a CLOSE TAB button.
+- Added a complete Chart of Accounts PDF export, including classification, hierarchy, parent account, transaction count, budget inclusion, tags and account-name history.
+- Made the Chart of Accounts Excel template dynamic: it now includes every account in the archive instead of only five sample rows.
+
 ## [1.0.38] - 2026-11-14
 
 ### Migliorato
