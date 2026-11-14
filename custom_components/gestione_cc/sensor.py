@@ -5,21 +5,29 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 
 
+DATA_SIZE_SENSORS = {
+    "database_size",
+    "storage_total",
+    "storage_free",
+    "storage_used",
+    "documents_bytes",
+}
+
 SENSORS = [
     ("app_version", "health", "app_version", "Versione applicazione", "mdi:tag-outline", None, None),
     ("addon_version", "health", "addon_version", "Versione add-on", "mdi:puzzle-outline", None, None),
     ("uptime", "health", "uptime_seconds", "Tempo attività", "mdi:timer-outline", None, SensorStateClass.MEASUREMENT),
-    ("database_size", "database", "size_bytes", "Dimensione database", "mdi:database", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
+    ("database_size", "database", "size_bytes", "Dimensione database", "mdi:database", UnitOfInformation.MEGABYTES, SensorStateClass.MEASUREMENT),
     ("database_last_write", "database", "last_write_at", "Ultima modifica database", "mdi:database-clock", None, None),
     ("database_last_check", "database", "last_check_at", "Ultimo controllo integrità", "mdi:database-check", None, None),
     ("backup_local_count", "backups", "local_count", "Copie backup locali", "mdi:backup-restore", None, SensorStateClass.MEASUREMENT),
     ("backup_local_last", "backups", "local_last_at", "Ultimo backup locale", "mdi:clock-check-outline", None, None),
     ("backup_drive_last", "backups", "drive_last_at", "Ultimo backup Google Drive", "mdi:cloud-check-outline", None, None),
-    ("storage_total", "storage", "total_bytes", "Spazio totale", "mdi:harddisk", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
-    ("storage_free", "storage", "free_bytes", "Spazio libero", "mdi:harddisk", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
-    ("storage_used", "storage", "used_bytes", "Spazio utilizzato", "mdi:database", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
+    ("storage_total", "storage", "total_bytes", "Spazio totale", "mdi:harddisk", UnitOfInformation.MEGABYTES, SensorStateClass.MEASUREMENT),
+    ("storage_free", "storage", "free_bytes", "Spazio libero", "mdi:harddisk", UnitOfInformation.MEGABYTES, SensorStateClass.MEASUREMENT),
+    ("storage_used", "storage", "used_bytes", "Spazio utilizzato", "mdi:database", UnitOfInformation.MEGABYTES, SensorStateClass.MEASUREMENT),
     ("documents_count", "documents", "count", "Numero allegati", "mdi:file-multiple-outline", None, SensorStateClass.MEASUREMENT),
-    ("documents_bytes", "documents", "bytes", "Dimensione allegati", "mdi:file-document-outline", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
+    ("documents_bytes", "documents", "bytes", "Dimensione allegati", "mdi:file-document-outline", UnitOfInformation.MEGABYTES, SensorStateClass.MEASUREMENT),
     ("jobs_queued", "jobs", "queued", "Processi in coda", "mdi:progress-clock", None, SensorStateClass.MEASUREMENT),
     ("jobs_running", "jobs", "running", "Processi in esecuzione", "mdi:progress-wrench", None, SensorStateClass.MEASUREMENT),
     ("jobs_done", "jobs", "done", "Processi completati", "mdi:check-circle-outline", None, SensorStateClass.MEASUREMENT),
@@ -47,6 +55,9 @@ class GestioneCCSensor(CoordinatorEntity, SensorEntity):
         self._attr_icon = icon
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = state_class
+        if key in DATA_SIZE_SENSORS:
+            self._attr_device_class = SensorDeviceClass.DATA_SIZE
+            self._attr_suggested_display_precision = 2
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
             "name": "Gestione C/C",
@@ -57,4 +68,12 @@ class GestioneCCSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         data = self.coordinator.data or {}
-        return data.get(self._section, {}).get(self._field)
+        value = data.get(self._section, {}).get(self._field)
+        if value is None:
+            return None
+        if self._key in DATA_SIZE_SENSORS:
+            try:
+                return round(float(value) / 1_000_000, 2)
+            except (TypeError, ValueError):
+                return None
+        return value
