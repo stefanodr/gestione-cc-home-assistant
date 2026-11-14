@@ -23,7 +23,7 @@ Integrare l'add-on con Home Assistant per esporre esclusivamente lo stato tecnic
 
 Prefisso versionato: `/api/integration/v1/`.
 
-Endpoint di sola lettura:
+Endpoint di sola lettura (prefisso `/api/integration/v1/`):
 - `health`: disponibilità, versione, uptime e latenza calcolata dal client.
 - `database/status`: esito dell'ultimo controllo, data ultimo controllo, dimensione tecnica e data ultima scrittura; nessun contenuto o schema.
 - `backups/status`: stato collegamento Drive, data/esito ultimo backup locale e Drive, conteggio copie locali (mai nomi o percorsi).
@@ -31,12 +31,14 @@ Endpoint di sola lettura:
 - `documents/status`: solo conteggio e byte aggregati degli allegati.
 - `jobs/status`: conteggi aggregati OCR/background (queued/running/failed); nessun ID, payload, errore grezzo o riferimento a documenti.
 
-Comandi POST consentiti:
-- `backups/local`: avvia una copia SQLite locale.
-- `backups/google-drive`: avvia backup Drive se collegato.
-- `database/integrity-check`: esegue `PRAGMA integrity_check` in modo controllato.
+Comandi POST consentiti (implementazione iniziale):
+- `/api/integration/v1/commands/local-backup`: avvia una copia SQLite locale.
+- `/api/integration/v1/commands/google-drive-backup`: avvia backup Drive se collegato.
+- `/api/integration/v1/commands/integrity-check`: esegue `PRAGMA integrity_check` in modo controllato.
 
-Le risposte devono essere DTO espliciti con allowlist di campi. Non serializzare direttamente righe SQLite, eccezioni, oggetti di configurazione, risultati Drive o record dei job. Errori esterni normalizzati in codici generici. I comandi restituiscono solo stato e risultato tecnico sintetico, mai file, URL di download, percorsi, nomi, ID o contenuti.
+Endpoint amministrativo browser, non utilizzabile dal token HA: `/api/integration/token`, protetto dalla sessione PIN e da CSRF. Supporta creazione e revoca; la creazione mostra il token una sola volta. La UI dedicata per gestire questa credenziale sarà completata in una fase successiva.
+
+Le risposte devono essere DTO espliciti con allowlist di campi. Non serializzare direttamente righe SQLite, eccezioni, oggetti di configurazione, risultati Drive o record dei job. Errori esterni normalizzati in codici generici. I comandi restituiscono solo stato e risultato tecnico sintetico, mai file, URL di download, percorsi, nomi, ID o contenuti. La prima implementazione esegue i comandi in modo sincrono e serializza le operazioni con un lock; la gestione asincrona con job status aggregato resta da completare.
 
 ### 2. Token di integrazione
 
