@@ -6,7 +6,7 @@ import unittest
 
 SERVER = Path(__file__).resolve().parents[1] / "gestione_cc" / "server.py"
 TREE = ast.parse(SERVER.read_text(encoding="utf-8"))
-TARGETS = {"peer_is_allowed", "peer_is_integration_only"}
+TARGETS = {"peer_is_allowed", "peer_is_integration_only", "integration_peer_can_access"}
 NAMESPACE = {"ipaddress": ipaddress}
 for node in TREE.body:
     if isinstance(node, ast.FunctionDef) and node.name in TARGETS:
@@ -36,6 +36,28 @@ class IntegrationNetworkScopeTest(unittest.TestCase):
     def test_invalid_peer_is_rejected(self):
         self.assertFalse(NAMESPACE["peer_is_allowed"]("not-an-ip", self.lan, self.core))
         self.assertFalse(NAMESPACE["peer_is_integration_only"]("not-an-ip", self.lan, self.core))
+    def test_core_peer_get_is_limited_to_exact_status_allowlist(self):
+        check = NAMESPACE["integration_peer_can_access"]
+        self.assertTrue(check("172.30.32.1", self.lan, self.core, "GET", "/api/integration/v1/health"))
+        self.assertFalse(check("172.30.32.1", self.lan, self.core, "GET", "/api/security/access-log"))
+        self.assertFalse(check("172.30.32.1", self.lan, self.core, "GET", "/api/integration/v1/private/export"))
+        self.assertFalse(check("172.30.32.1", self.lan, self.core, "GET", "/api/integration/v1/health/"))
+
+    def test_core_peer_post_is_limited_to_exact_maintenance_commands(self):
+        check = NAMESPACE["integration_peer_can_access"]
+        self.assertTrue(check("172.30.32.1", self.lan, self.core, "POST", "/api/integration/v1/commands/local-backup"))
+        self.assertFalse(check("172.30.32.1", self.lan, self.core, "POST", "/api/integration/token"))
+        self.assertFalse(check("172.30.32.1", self.lan, self.core, "POST", "/api/integration/v1/commands/private-export"))
+
+    def test_core_peer_cannot_use_other_http_methods(self):
+        check = NAMESPACE["integration_peer_can_access"]
+        for method in ("PUT", "PATCH", "DELETE", "OPTIONS"):
+            self.assertFalse(check("172.30.32.1", self.lan, self.core, method, "/api/integration/v1/health"))
+
+    def test_regular_lan_peer_keeps_existing_app_access(self):
+        check = NAMESPACE["integration_peer_can_access"]
+        self.assertTrue(check("192.168.1.42", self.lan, self.core, "GET", "/api/security/access-log"))
+        self.assertTrue(check("192.168.1.42", self.lan, self.core, "POST", "/api/integration/token"))
 
 
 if __name__ == "__main__":
