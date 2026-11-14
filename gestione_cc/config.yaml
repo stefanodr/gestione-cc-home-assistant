@@ -1,7 +1,7 @@
 name: "Gestione C/C"
 slug: "gestione_cc"
 description: "Gestione C/C privata, con archivio centralizzato e accesso LAN autenticato"
-version: "1.1.1"
+version: "1.1.2"
 backup_exclude:
   - access_log.sqlite3*
 url: "https://github.com/stefanodr/gestione-cc-home-assistant"
@@ -21,7 +21,7 @@ ports_description:
 options:
   admin_username: "admin"
   bootstrap_pin: ""
-  hostname: "homeassistant.local"
+  hostname: "192.168.1.27"
   lan_network: "192.168.1.0/24"
   # Solo Home Assistant Core sulla rete interna Supervisor; API-only e /32.
   integration_network: "172.30.32.1/32"
