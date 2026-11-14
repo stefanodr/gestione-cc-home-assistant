@@ -688,7 +688,10 @@ def integration_status(path):
             size, exists = 0, False
         check_at = integration_setting("integration_last_integrity_at")
         check_ok = integration_setting("integration_last_integrity_ok")
-        return {"exists": exists, "size_bytes": int(size), "last_check_at": check_at, "last_check_ok": check_ok == "1" if check_ok is not None else None}
+        with db() as connection:
+            row = connection.execute("SELECT updated_at FROM app_state WHERE id=1").fetchone()
+        last_write = row["updated_at"] if row else None
+        return {"exists": exists, "size_bytes": int(size), "last_write_at": last_write, "last_check_at": check_at, "last_check_ok": check_ok == "1" if check_ok is not None else None}
     if path == "/api/integration/v1/backups/status":
         BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         local_files = [p for p in BACKUP_DIR.glob("*.sqlite3") if p.is_file()]
