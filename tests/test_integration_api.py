@@ -114,6 +114,11 @@ class IntegrationApiDtoTest(unittest.TestCase):
         self.assertNotIn("private-backup-name", serialized)
         self.assertNotIn("refresh-token", serialized)
 
+    def test_storage_dto_contains_only_technical_capacity_values(self):
+        result = NAMESPACE["integration_status"]("/api/integration/v1/storage/status")
+        self.assertEqual(set(result), {"total_bytes", "used_bytes", "free_bytes"})
+        self.assertGreater(result["total_bytes"], 0)
+        self.assertNotIn("path", str(result))
     def test_documents_dto_is_aggregate_only(self):
         result = NAMESPACE["integration_status"]("/api/integration/v1/documents/status")
         self.assertEqual(set(result), {"count", "bytes"})
