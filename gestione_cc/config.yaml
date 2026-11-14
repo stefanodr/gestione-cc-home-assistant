@@ -21,6 +21,7 @@ options:
   bootstrap_pin: ""
   hostname: "homeassistant.local"
   lan_network: "192.168.1.0/24"
+  # Solo Home Assistant Core sulla rete interna Supervisor; API-only e /32.
   integration_network: "172.30.32.1/32"
 schema:
   admin_username: str
