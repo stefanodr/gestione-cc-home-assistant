@@ -18,7 +18,7 @@ Questa è la prima versione di sviluppo della custom integration. Non è ancora 
 La verifica TLS è obbligatoria: l'integrazione non disabilita la verifica del certificato e non accetta HTTP o URL pubblici.
 
 ## Sensori e comandi
-La prima bozza espone disponibilità app, uptime, dimensione/ultima modifica DB, backup, spazio, conteggio allegati e conteggi aggregati dei processi. Sono previsti tre pulsanti: backup locale, backup Google Drive e controllo integrità.
+La prima bozza espone disponibilità app, versioni app/add-on, uptime, dimensione/ultima modifica DB, backup, spazio, conteggio allegati e conteggi aggregati dei processi. Sono previsti tre pulsanti: backup locale, backup Google Drive e controllo integrità.
 
 Non vengono creati sensori finanziari e non vengono trasferiti conti, saldi, movimenti, descrizioni o contenuti documentali.
 
