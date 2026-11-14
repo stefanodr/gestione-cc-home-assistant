@@ -14,8 +14,9 @@
 <body>
   <div id="appLoading" class="app-loading" role="status" aria-live="polite">
     <div class="app-loading-card">
-      <span class="app-loading-spinner" aria-hidden="true"></span>
-      <strong id="appLoadingTitle">Caricamento archivio in corso.....</strong>
+      
+      <strong id="appLoadingTitle">Caricamento in corso</strong>
+      <div class="app-progress" id="appProgress"><div class="app-progress-track"><span id="appProgressBar"></span></div><span id="appProgressText">0%</span></div>
       <span id="appLoadingText" hidden></span>
       <button id="retryAppLoading" class="button button-outline" type="button" hidden>Riprova</button>
     </div>
@@ -45,6 +46,7 @@
       <header class="topbar">
         <div class="breadcrumbs"><span>Finanze personali</span><span class="crumb-sep">/</span><strong id="currentSection">Panoramica</strong></div>
         <div class="top-actions">
+          <div class="privacy-control" role="group" aria-label="Modalità privacy"><span>Privacy</span><button type="button" data-privacy-mode="1" aria-pressed="true">1 · Tutto visibile</button><button type="button" data-privacy-mode="2" aria-pressed="false">2 · Saldi nascosti</button><button type="button" data-privacy-mode="3" aria-pressed="false">3 · Tutto nascosto</button></div>
           <button class="button button-quiet" id="importGnucash"><span>＋</span> Importa GnuCash</button>
           <button class="button button-primary" id="importBank"><span>＋</span> Importa movimenti</button>
           <button class="icon-button" id="exportBackup" title="Esporta archivio locale" aria-label="Esporta archivio locale">⇧</button>
@@ -62,7 +64,7 @@
           <article class="metric-card"><div class="metric-head"><span>Flussi in entrata</span><span class="metric-icon green">↗</span></div><strong id="incomeMetric">—</strong><small id="incomeCompare">nel periodo selezionato</small></article>
           <article class="metric-card"><div class="metric-head"><span>Flussi in uscita</span><span class="metric-icon coral">↘</span></div><strong id="expenseMetric">—</strong><small id="expenseCompare">nel periodo selezionato</small></article>
           <article class="metric-card"><div class="metric-head"><span>Saldo netto del periodo</span><span class="metric-icon blue">∑</span></div><strong id="netMetric">—</strong><small>movimenti in entrata meno uscita</small></article>
-          <article class="metric-card"><div class="metric-head"><span>Saldo conto</span><span class="metric-icon blue">€</span></div><strong id="balanceMetric">—</strong><small id="balanceFootnote">saldo ricostruito dai movimenti</small></article>
+          <article class="metric-card"><div class="metric-head"><span>Saldo conto</span><span class="metric-icon blue">€</span></div><strong id="balanceMetric" class="privacy-balance">—</strong><small id="balanceFootnote">saldo ricostruito dai movimenti</small></article>
           <article class="metric-card"><div class="metric-head"><span>Da classificare</span><span class="metric-icon amber">✦</span></div><strong id="pendingMetric">—</strong><small id="pendingHint">conferma per insegnare una regola</small></article>
         </div>
 
@@ -144,8 +146,8 @@
       </section>
       <section class="content-view" id="view-forecast">
         <div class="page-heading"><div><p class="eyebrow">PIANIFICAZIONE</p><h1>Previsioni liquidità</h1><p class="subtitle">Orizzonte 12 mesi. I dati effettivi, gli impegni e le stime saranno mantenuti distinti.</p></div></div>
-        <article class="panel" style="padding:18px"><h2>Selezione dei conti</h2><p class="panel-subtitle">Seleziona tutti i conti liquidi oppure uno o più conti. La selezione viene salvata nell'archivio.</p><label style="display:flex;gap:9px;align-items:center;margin:14px 0"><input type="checkbox" id="forecastAllAccounts" checked> Tutti i conti liquidi</label><div id="forecastAccountChoices"></div><p id="forecastStatus" class="panel-subtitle" style="margin-top:16px"></p></article>
-        <div class="metric-grid" style="margin-top:16px"><article class="metric-card"><div class="metric-head"><span>Saldo ultimo mese chiuso</span></div><strong id="forecastOpening">—</strong></article><article class="metric-card"><div class="metric-head"><span>Saldo minimo previsto</span></div><strong id="forecastMinimum">—</strong><small id="forecastMinimumMonth"></small></article><article class="metric-card"><div class="metric-head"><span>Saldo a 12 mesi</span></div><strong id="forecastEnding">—</strong><small id="forecastReliability"></small></article></div>
+        <article class="panel" style="padding:18px"><div id="forecastProgress" class="forecast-progress" hidden><strong>Attendere completamento del calcolo</strong><div class="app-progress-track"><span id="forecastProgressBar"></span></div><span id="forecastProgressText">0%</span></div><h2>Selezione dei conti</h2><p class="panel-subtitle">Seleziona tutti i conti liquidi oppure uno o più conti. La selezione viene salvata nell'archivio.</p><label style="display:flex;gap:9px;align-items:center;margin:14px 0"><input type="checkbox" id="forecastAllAccounts" checked> Tutti i conti liquidi</label><div id="forecastAccountChoices"></div><p id="forecastStatus" class="panel-subtitle" style="margin-top:16px"></p></article>
+        <div class="metric-grid" style="margin-top:16px"><article class="metric-card"><div class="metric-head"><span>Saldo ultimo mese chiuso</span></div><strong id="forecastOpening" class="privacy-balance">—</strong></article><article class="metric-card"><div class="metric-head"><span>Saldo minimo previsto</span></div><strong id="forecastMinimum" class="privacy-balance">—</strong><small id="forecastMinimumMonth"></small></article><article class="metric-card"><div class="metric-head"><span>Saldo a 12 mesi</span></div><strong id="forecastEnding" class="privacy-balance">—</strong><small id="forecastReliability"></small></article></div>
         <article class="panel table-panel" style="margin-top:16px"><div class="panel-heading" style="padding:16px 18px"><h2>Andamento previsto mese per mese</h2><span class="panel-subtitle">Solo impegni programmati e stime future; i movimenti effettivi non sono riportati in questa proiezione.</span></div><div class="table-scroll"><table class="data-table"><thead><tr><th>Mese</th><th>Saldo iniziale previsto</th><th>Entrate programmate</th><th>Uscite programmate</th><th>Entrate stimate</th><th>Uscite stimate</th><th>Saldo finale previsto</th></tr></thead><tbody id="forecastBody"></tbody></table></div></article>
         <article class="panel" style="padding:18px;margin-top:16px"><h2>Ricorrenze e impegni</h2><p class="panel-subtitle">Le ricorrenze confermate alimentano la previsione, ma non vengono registrate come movimenti contabili.</p>
           <div class="manual-fields"><label>Descrizione<input id="recDescription" maxlength="100" placeholder="Es. stipendio, affitto"></label><label>Importo (€)<input id="recAmount" type="number" step="0.01" placeholder="Positivo entrata, negativo uscita"></label><label>Conto liquido<select id="recBankAccount"></select></label><label>Categoria / contropartita<select id="recCategory"></select></label><label>Frequenza<select id="recFrequency"><option value="once">Una tantum</option><option value="weekly">Settimanale</option><option value="biweekly">Quindicinale</option><option value="monthly">Mensile</option><option value="bimonthly">Bimestrale</option><option value="quarterly">Trimestrale</option><option value="fourmonthly">Quadrimestrale</option><option value="halfyearly">Semestrale</option><option value="yearly">Annuale</option></select></label><label>Giorno previsto<input id="recDay" type="number" min="1" max="31" value="1"></label><label>Prima occorrenza<input id="recStart" type="date"></label><label>Ultima occorrenza (facoltativa)<input id="recEnd" type="date"></label></div>

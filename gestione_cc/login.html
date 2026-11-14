@@ -17,6 +17,7 @@
 <div class="pin-entry"><input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" aria-label="PIN di 6 cifre" required autofocus></div>
 <p id="error" role="alert" aria-live="polite"></p>
 <button type="submit" id="submit">Accedi</button>
+<div id="loginProgress" class="login-progress" hidden role="status" aria-live="polite"><div class="login-progress-track"><span id="loginProgressBar"></span></div><span id="loginProgressText">Accesso in corso… 0%</span></div>
 </form>
 <p class="certificate-help"><a href="/ca.crt" download>Scarica il certificato CA per questo dispositivo</a></p>
 </main>

@@ -1,3 +1,21 @@
+## [1.0.31] - 2026-11-14
+
+### Aggiunto
+- Barra di avanzamento con fasi di caricamento dell'archivio dopo l'accesso.
+- Selettore privacy comune a tutte le pagine: visualizzazione normale, saldi oscurati e cifre oscurate.
+- Barra di avanzamento del calcolo Previsioni, aggiornata durante l'elaborazione dei 12 mesi.
+
+### Corretto
+- La versione dell'add-on è aggiornata a 1.0.31 nei metadati Home Assistant e nel piè di pagina dell'applicazione.
+
+### Added
+- Staged archive-loading progress bar after sign-in.
+- Global privacy selector: normal display, account balances hidden, and numeric values hidden.
+- Forecast calculation progress bar updated while the 12-month projection is processed.
+
+### Fixed
+- Updated the Home Assistant add-on metadata and application footer to version 1.0.31.
+
 ## [1.0.30] - 2026-11-13
 
 ### Corretto

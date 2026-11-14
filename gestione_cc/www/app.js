@@ -2,6 +2,54 @@
   'use strict';
 
   const APP_VERSION = '1.7.13';
+  let privacyMode = '1';
+  let privacyObserver = null;
+  function setAppProgress(value, label) {
+    const percent = Math.max(0, Math.min(100, Math.round(value)));
+    const bar = $('#appProgressBar'), text = $('#appProgressText');
+    if (bar) bar.style.width = percent + '%';
+    if (text) text.textContent = (label ? label + ' · ' : '') + percent + '%';
+  }
+  function maskNumericText(root) {
+    if (privacyMode !== '3' || !root) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent || parent.closest('script,style,input,textarea,select,.privacy-control,.privacy-digit-mask,[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
+      return /\d/.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }});
+    const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
+    for (const node of nodes) {
+      const fragment=document.createDocumentFragment();
+      for (const part of node.nodeValue.split(/(\d+(?:[.,]\d+)?)/g)) {
+        if (!part) continue;
+        if (/^\d/.test(part)) { const span=document.createElement('span'); span.className='privacy-digit-mask'; span.textContent='*'.repeat(Math.max(3,part.length)); span.dataset.original=part; fragment.append(span); }
+        else fragment.append(document.createTextNode(part));
+      }
+      node.replaceWith(fragment);
+    }
+  }
+  function applyPrivacyMode(mode) {
+    privacyMode = ['1','2','3'].includes(String(mode)) ? String(mode) : '1';
+    document.body.dataset.privacy = privacyMode;
+    document.querySelectorAll('.privacy-digit-mask').forEach(span=>span.replaceWith(document.createTextNode(span.dataset.original || '')));
+    document.querySelectorAll('.privacy-balance').forEach(el=>el.classList.toggle('privacy-hidden',privacyMode==='2'||privacyMode==='3'));
+    document.querySelectorAll('[data-privacy-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.privacyMode===privacyMode)));
+    if (privacyObserver) privacyObserver.disconnect();
+    if (privacyMode==='3') maskNumericText(document.body);
+    if (privacyObserver) privacyObserver.observe(document.body,{childList:true,subtree:true});
+  }
+  function setupPrivacyControls() {
+    document.querySelectorAll('[data-privacy-mode]').forEach(button=>button.addEventListener('click',()=>applyPrivacyMode(button.dataset.privacyMode)));
+    if (privacyObserver) privacyObserver.disconnect();
+    privacyObserver = new MutationObserver(records=>{
+      if (privacyMode!=='3') return;
+      privacyObserver.disconnect();
+      for (const record of records) for (const node of record.addedNodes) if (node.nodeType===Node.TEXT_NODE) maskNumericText(node.parentNode); else if (node.nodeType===Node.ELEMENT_NODE) maskNumericText(node);
+      privacyObserver.observe(document.body,{childList:true,subtree:true});
+    });
+    privacyObserver.observe(document.body,{childList:true,subtree:true});
+    applyPrivacyMode('1');
+  }
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
   const DB_STORE = 'app';
@@ -385,6 +433,7 @@
   }
   async function initialize() {
     const retryButton = $('#retryAppLoading');
+    setAppProgress(8, 'Connessione al database');
     retryButton?.addEventListener('click', () => {
       if (retryButton.disabled) return;
       retryButton.disabled = true;
@@ -404,6 +453,7 @@
       } finally {
         window.clearTimeout(loadingTimeout);
       }
+      setAppProgress(38, 'Archivio ricevuto');
       csrfToken = archive.csrf || '';
       stateRevision = Number.isInteger(archive.revision) ? archive.revision : 0;
       state = archive.state;
@@ -423,22 +473,26 @@
       $('#saveStatus').textContent = 'Server non raggiungibile';
       return;
     }
+    setAppProgress(58, 'Preparazione dei dati');
     if (normalizeState()) needsSave = true;
     reportMode = ['monthly', 'quarterly', 'halfyearly', 'annual'].includes(state.reportMode) ? state.reportMode : 'monthly';
     $('#reportPeriodMode').value = reportMode;
     setupControls();
+    setupPrivacyControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.30</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.31</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
     if (state.selectedMonth !== selectedMonth) { state.selectedMonth = selectedMonth; needsSave = true; }
     $('#monthPicker').value = selectedMonth;
     syncReportPeriodPicker(selectedMonth);
-    if (needsSave) await saveState();
+    if (needsSave) { setAppProgress(72, 'Salvataggio iniziale'); await saveState(); }
+    setAppProgress(88, 'Apertura delle schermate');
     
     $('#welcomeDate').textContent = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()).toUpperCase();
     document.body.classList.add('app-ready');
+    setAppProgress(100, 'Completato');
     $('#appLoading')?.classList.add('hidden');
     navigate('overview');
     void refreshStorageInfo();
@@ -1299,7 +1353,7 @@
     if(editingRecurringId){const existing=state.recurringRules.find(rule=>rule.id===editingRecurringId);if(existing)Object.assign(existing,{description,amount,bankAccountId,categoryId:categoryId||null,frequency,day,startDate,endDate:endDate||null});editingRecurringId=null;}else state.recurringRules.push({id:uid('r'),description,amount,bankAccountId,categoryId:categoryId||null,frequency,day,startDate,endDate:endDate||null,active:true,createdAt:new Date().toISOString(),source:'manuale'});
     saveState();['recDescription','recAmount','recEnd'].forEach(id=>$('#'+id).value='');$('#addRecurringRule').textContent='Aggiungi impegno manuale';renderForecastSelection();
   }
-  function buildForecast() {
+  async function buildForecast(onProgress = () => {}) {
     const accounts=forecastSelectedAccounts(),ids=new Set(accounts.map(a=>a.id)),today=localDateKey(new Date()),currentMonth=today.slice(0,7);
     const txs=state.transactions.filter(t=>t.status==='confirmed'&&t.date<=today&&t.status!=='duplicate'&&
       (ids.has(t.bankAccountId)||ids.has(t.counterpartAccountId)||(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.some(sp=>ids.has(sp.accountId)))));
@@ -1383,13 +1437,17 @@
       balance=Math.round((balance+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
       forecast.push({key,openingBalance:opening,programmedIncome,programmedExpense,estimateIncome,estimateExpense,
         programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
+      onProgress((i+1)/12*100);
+      await new Promise(resolve=>requestAnimationFrame(resolve));
     }
     const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:openingBalance,key:currentMonth});
     const source=sources.size>1?'budget e storico misti':sources.has('budget')?'budget':sources.has('anno_precedente')?'anno precedente':'anno corrente';
     const historyCount=historyMonths.filter(key=>txs.some(tx=>String(tx.date||'').slice(0,7)===key)).length;
     return {accounts,currentBalance:openingBalance,forecast,minimum,historyCount,estimatedNet:forecast.reduce((sum,row)=>sum+row.estimateIncome-row.estimateExpense,0),estimates:{source},openingBalanceUnknown,lastClosedMonth};
   }
-  function renderForecastSelection() {
+  async function renderForecastSelection() {
+    const renderId = (renderForecastSelection._requestId || 0) + 1;
+    renderForecastSelection._requestId = renderId;
     const ids=Array.isArray(state.forecastSettings?.accountIds)?state.forecastSettings.accountIds:[];
     const count=forecastSelectedAccounts().length;
     const status=$('#forecastStatus');if(status)status.textContent='Conti inclusi: '+count+'. Selezione vuota = tutti i conti liquidi.';
@@ -1398,7 +1456,12 @@
     if(bank){const prior=bank.value;bank.innerHTML=liquid.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if(liquid.some(a=>a.id===prior))bank.value=prior;}
     if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
     renderRecurringRules();
-    const result=buildForecast();
+    const progress=$('#forecastProgress'),progressBar=$('#forecastProgressBar'),progressText=$('#forecastProgressText');
+    if(progress)progress.hidden=false; if(progressBar)progressBar.style.width='0%'; if(progressText)progressText.textContent='0%';
+    let result;
+    try { result=await buildForecast(value=>{if(renderForecastSelection._requestId===renderId){if(progressBar)progressBar.style.width=value+'%';if(progressText)progressText.textContent=Math.round(value)+'%';}}); }
+    finally { if(renderForecastSelection._requestId===renderId&&progress)progress.hidden=true; }
+    if(renderForecastSelection._requestId!==renderId)return;
     $('#forecastOpening').textContent=euro.format(result.currentBalance);
     $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
     $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
@@ -1409,6 +1472,7 @@
     const dueSchedules=result.forecast.reduce((sum,row)=>sum+forecastRecurringItems(row.key,new Set(result.accounts.map(account=>account.id))).length,0);
     if(status)status.textContent+=' Impegni attivi: '+activeSchedules.length+' · occorrenze programmate nei prossimi 12 mesi: '+dueSchedules+'.';
     $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
+    document.querySelectorAll('#forecastBody td:nth-child(2),#forecastBody td:nth-child(7)').forEach(cell=>{cell.classList.add('privacy-balance');cell.classList.toggle('privacy-hidden',privacyMode==='2'||privacyMode==='3');});
   }
 
   function navigate(view) {

@@ -2,3 +2,5 @@
 .mark-logo{display:block;width:76px;height:76px;object-fit:contain;filter:drop-shadow(0 5px 12px #0005)}
 
 .pin-entry input{width:100%;text-align:center;letter-spacing:.55em;font-size:25px;font-weight:750;font-variant-numeric:tabular-nums;padding:15px 12px 15px 22px}
+
+.login-progress{margin-top:16px;display:grid;gap:8px;color:#aebdce;font-size:12px;text-align:center}.login-progress[hidden]{display:none}.login-progress-track{height:9px;border-radius:20px;background:#2b3b50;overflow:hidden}.login-progress-track span{display:block;width:0;height:100%;border-radius:20px;background:#69c5a6;transition:width .2s ease}

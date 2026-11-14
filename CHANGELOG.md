@@ -1,3 +1,15 @@
+## [1.0.31] - 2026-11-14
+
+### Aggiunto
+- Barra di avanzamento all'accesso e durante il calcolo delle Previsioni.
+- Selettore privacy globale a tre modalità.
+- Versione add-on aggiornata a 1.0.31.
+
+### Added
+- Sign-in and forecast progress indicators.
+- Global three-mode privacy selector.
+- Add-on version updated to 1.0.31.
+
 ## [1.0.19] - 2026-11-13
 
 ### Italiano
