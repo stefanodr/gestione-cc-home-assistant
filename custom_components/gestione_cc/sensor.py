@@ -24,6 +24,9 @@ SENSORS = [
     ("jobs_running", "jobs", "running", "Processi in esecuzione", "mdi:progress-wrench", None, SensorStateClass.MEASUREMENT),
     ("jobs_done", "jobs", "done", "Processi completati", "mdi:check-circle-outline", None, SensorStateClass.MEASUREMENT),
     ("jobs_failed", "jobs", "failed", "Processi in errore", "mdi:alert-circle-outline", None, SensorStateClass.MEASUREMENT),
+    ("ocr_queued", "jobs", "ocr_queued", "OCR in coda", "mdi:text-box-search-outline", None, SensorStateClass.MEASUREMENT),
+    ("ocr_running", "jobs", "ocr_running", "OCR in elaborazione", "mdi:text-box-check-outline", None, SensorStateClass.MEASUREMENT),
+    ("ocr_failed", "jobs", "ocr_failed", "OCR in errore", "mdi:text-box-remove-outline", None, SensorStateClass.MEASUREMENT),
 ]
 
 
