@@ -733,6 +733,7 @@ def access_db():
             connection.close()
             raise
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA secure_delete=ON")
     connection.execute("CREATE TABLE IF NOT EXISTS access_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL, outcome TEXT NOT NULL, session_ref TEXT, ip_address TEXT NOT NULL)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_access_log_at ON access_log(at DESC)")
     return connection
