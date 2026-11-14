@@ -692,13 +692,24 @@ def integration_token_digest(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 def integration_job_counts():
-    allowed = {"document_ocr", "drive_session_backup", "integration_local_backup", "integration_google_drive_backup", "integration_integrity_check"}
-    counts = {"queued": 0, "running": 0, "done": 0, "failed": 0}
+    counts = {
+        "queued": 0, "running": 0, "done": 0, "failed": 0,
+        "ocr_queued": 0, "ocr_running": 0, "ocr_failed": 0,
+    }
     with db() as connection:
-        rows = connection.execute("SELECT kind,status,COUNT(*) AS total FROM background_jobs WHERE created_at >= datetime('now','-7 days') GROUP BY kind,status").fetchall()
+        rows = connection.execute(
+            "SELECT kind,status,COUNT(*) AS total FROM background_jobs "
+            "WHERE created_at >= datetime('now','-7 days') GROUP BY kind,status"
+        ).fetchall()
     for row in rows:
-        if row["kind"] in allowed and row["status"] in counts:
-            counts[row["status"]] += int(row["total"])
+        kind, status, total = row["kind"], row["status"], int(row["total"])
+        if status not in ("queued", "running", "done", "failed"):
+            continue
+        if kind in ("document_ocr", "drive_session_backup", "integration_local_backup",
+                    "integration_google_drive_backup", "integration_integrity_check"):
+            counts[status] += total
+        if kind == "document_ocr" and status in ("queued", "running", "failed"):
+            counts["ocr_" + status] += total
     return counts
 
 def enqueue_integration_job(operation):
