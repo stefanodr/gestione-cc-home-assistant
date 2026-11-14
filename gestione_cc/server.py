@@ -16,6 +16,7 @@ import subprocess
 import tempfile
 import time
 import urllib.error
+from contextlib import contextmanager
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -28,10 +29,12 @@ DB_PATH = DATA / "gestione_cc.sqlite3"
 OPTIONS_FILE = Path(os.environ.get("ADDON_OPTIONS_FILE", "/data/options.json"))
 SSL_DIR = Path(os.environ.get("SSL_DIR", "/data/tls"))
 BACKUP_DIR = DATA / "backups"
+ACCESS_LOG_DB_PATH = DATA / "access_log.sqlite3"
 MAX_BODY = 512 * 1024 * 1024  # Large JSON restores may include base64-encoded document files.
 SESSION_SECONDS = 8 * 60 * 60
 sessions = {}
 login_failures = {}
+login_lockout_logged = {}
 last_auto_backup = 0.0
 LOGIN_WINDOW = 300
 LOGIN_MAX = 5
@@ -575,33 +578,58 @@ def background_job_worker():
         job_id = job["id"]
         payload = {}
         try:
-            payload = json.loads(job["result_json"] or "{}") if job["kind"] == "document_ocr" else {}
-            result = process_document_ocr(str(payload.get("attachment_id", ""))) if job["kind"] == "document_ocr" else drive_session_backup()
+            kind = job["kind"]
+            payload = json.loads(job["result_json"] or "{}") if kind == "document_ocr" else {}
+            if kind == "document_ocr":
+                result = process_document_ocr(str(payload.get("attachment_id", "")))
+            elif kind == "drive_session_backup":
+                result = drive_session_backup()
+            elif kind == "integration_local_backup":
+                create_sqlite_backup("integration")
+                result = {"status": "completed"}
+            elif kind == "integration_google_drive_backup":
+                drive_nightly_backup()
+                result = {"status": "completed"}
+            elif kind == "integration_integrity_check":
+                with db() as connection:
+                    integrity_result = connection.execute("PRAGMA integrity_check").fetchone()[0]
+                integrity_ok = integrity_result == "ok"
+                integration_set_setting("integration_last_integrity_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+                integration_set_setting("integration_last_integrity_ok", "1" if integrity_ok else "0")
+                if not integrity_ok:
+                    raise RuntimeError("integrity_check_failed")
+                result = {"status": "completed"}
+            else:
+                raise RuntimeError("unsupported_background_job")
             with db() as connection:
                 connection.execute(
                     "UPDATE background_jobs SET status='done', result_json=?, error=NULL, updated_at=datetime('now') WHERE id=?",
                     (json.dumps(result, ensure_ascii=False), job_id)
                 )
-            if job["kind"] == "drive_session_backup":
+            if kind == "drive_session_backup":
                 cfg = drive_read_config()
                 cfg["last_session_job"] = {"status": "done", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "result": result}
                 drive_write_config(cfg)
         except Exception as error:
-            message = str(error)[:500]
-            print("GestioneCC: job " + str(job["kind"]) + " non riuscito: " + message)
+            kind = job["kind"]
+            message = type(error).__name__ if kind.startswith("integration_") else str(error)[:500]
+            print("GestioneCC: job " + str(kind) + " non riuscito: " + message)
             with db() as connection:
                 connection.execute(
                     "UPDATE background_jobs SET status='failed', error=?, updated_at=datetime('now') WHERE id=?",
                     (message, job_id)
                 )
-            if job["kind"] == "document_ocr":
+            if kind == "document_ocr":
                 attachment_id = str(payload.get("attachment_id", ""))
                 with db() as connection:
                     connection.execute("UPDATE document_index SET status='failed',error=?,updated_at=datetime('now') WHERE attachment_id=?", (message, attachment_id))
-            else:
+            elif kind == "drive_session_backup":
                 cfg = drive_read_config()
                 cfg["last_session_job"] = {"status": "failed", "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "error": message}
                 drive_write_config(cfg)
+            elif kind == "integration_integrity_check":
+                integration_set_setting("integration_last_integrity_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+                integration_set_setting("integration_last_integrity_ok", "0")
 
 
 def drive_nightly_backup():
@@ -642,6 +670,173 @@ def drive_backup_scheduler():
             print("GestioneCC: backup notturno Google Drive completato")
         except Exception as error:
             print("GestioneCC: backup notturno Google Drive non riuscito: " + str(error))
+
+
+
+# Home Assistant integration API: deliberately restricted to technical metadata.
+SERVER_STARTED_AT = time.time()
+
+def integration_setting(key, default=None):
+    with db() as connection:
+        row = connection.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    return row["value"] if row else default
+
+def integration_set_setting(key, value):
+    with db() as connection:
+        if value is None:
+            connection.execute("DELETE FROM settings WHERE key=?", (key,))
+        else:
+            connection.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, str(value)))
+
+def integration_token_digest(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+def integration_job_counts():
+    counts = {
+        "queued": 0, "running": 0, "done": 0, "failed": 0,
+        "ocr_queued": 0, "ocr_running": 0, "ocr_failed": 0,
+    }
+    with db() as connection:
+        rows = connection.execute(
+            "SELECT kind,status,COUNT(*) AS total FROM background_jobs "
+            "WHERE created_at >= datetime('now','-7 days') GROUP BY kind,status"
+        ).fetchall()
+    for row in rows:
+        kind, status, total = row["kind"], row["status"], int(row["total"])
+        if status not in ("queued", "running", "done", "failed"):
+            continue
+        if kind in ("document_ocr", "drive_session_backup", "integration_local_backup",
+                    "integration_google_drive_backup", "integration_integrity_check"):
+            counts[status] += total
+        if kind == "document_ocr" and status in ("queued", "running", "failed"):
+            counts["ocr_" + status] += total
+    return counts
+
+def enqueue_integration_job(operation):
+    kinds = {
+        "local_backup": "integration_local_backup",
+        "google_drive_backup": "integration_google_drive_backup",
+        "integrity_check": "integration_integrity_check",
+    }
+    kind = kinds.get(operation)
+    if not kind:
+        raise ValueError("unsupported_operation")
+    with BACKGROUND_JOBS_LOCK:
+        with db() as connection:
+            active = connection.execute("SELECT 1 FROM background_jobs WHERE kind LIKE 'integration_%' AND status IN ('queued','running') LIMIT 1").fetchone()
+            if active:
+                raise RuntimeError("operation_busy")
+            job_id = secrets.token_urlsafe(24)
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            connection.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at) VALUES(?,?,'queued',?,?)", (job_id, kind, now, now))
+    return {"status": "queued", "operation": operation}
+
+def integration_status(path):
+    now = time.time()
+    if path == "/api/integration/v1/health":
+        app_version = addon_version = None
+        try:
+            script = (WWW / "app.js").read_text(encoding="utf-8")
+            app_match = re.search(r"const APP_VERSION = '([^']+)'", script)
+            addon_match = re.search(r"const ADDON_VERSION = '([^']+)'", script)
+            app_version = app_match.group(1) if app_match else None
+            addon_version = addon_match.group(1) if addon_match else None
+        except OSError:
+            pass
+        return {"available": True, "app_version": app_version, "addon_version": addon_version, "uptime_seconds": max(0, int(now - SERVER_STARTED_AT))}
+    if path == "/api/integration/v1/database/status":
+        try:
+            stat = DB_PATH.stat()
+            wal = Path(str(DB_PATH) + "-wal")
+            size = stat.st_size + (wal.stat().st_size if wal.is_file() else 0)
+            exists = True
+        except FileNotFoundError:
+            size, exists = 0, False
+        check_at = integration_setting("integration_last_integrity_at")
+        check_ok = integration_setting("integration_last_integrity_ok")
+        with db() as connection:
+            row = connection.execute("SELECT updated_at FROM app_state WHERE id=1").fetchone()
+        last_write = row["updated_at"] if row else None
+        return {"exists": exists, "size_bytes": int(size), "last_write_at": last_write, "last_check_at": check_at, "last_check_ok": check_ok == "1" if check_ok is not None else None}
+    if path == "/api/integration/v1/backups/status":
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        local_files = [p for p in BACKUP_DIR.glob("*.sqlite3") if p.is_file()]
+        latest = max((p.stat().st_mtime for p in local_files), default=0)
+        cfg = drive_read_config()
+        return {"local_count": len(local_files), "local_last_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(latest)) if latest else None, "drive_connected": bool(cfg.get("token", {}).get("refresh_token")), "drive_last_at": cfg.get("last_nightly_backup")}
+    if path == "/api/integration/v1/storage/status":
+        usage = shutil.disk_usage(DATA)
+        return {"total_bytes": int(usage.total), "used_bytes": int(usage.used), "free_bytes": int(usage.free)}
+    if path == "/api/integration/v1/documents/status":
+        with db() as connection:
+            row = connection.execute("SELECT COUNT(*) AS total, COALESCE(SUM(size),0) AS bytes FROM attachments").fetchone()
+        return {"count": int(row["total"]), "bytes": int(row["bytes"])}
+    if path == "/api/integration/v1/jobs/status":
+        return integration_job_counts()
+    return None
+
+
+ACCESS_LOG_RETENTION_SECONDS = 30 * 24 * 60 * 60
+
+def access_db():
+    try:
+        descriptor = os.open(ACCESS_LOG_DB_PATH, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+        os.close(descriptor)
+    except FileExistsError:
+        pass
+    connection = sqlite3.connect(ACCESS_LOG_DB_PATH, timeout=15)
+    os.chmod(ACCESS_LOG_DB_PATH, 0o600)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA secure_delete=ON")
+    connection.execute("CREATE TABLE IF NOT EXISTS access_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL, outcome TEXT NOT NULL, session_ref TEXT, ip_address TEXT NOT NULL)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_access_log_at ON access_log(at DESC)")
+    return connection
+
+@contextmanager
+def access_db_connection():
+    """Commit or roll back and always close the separate security-log database."""
+    connection = access_db()
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def cleanup_access_log():
+    cutoff = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - ACCESS_LOG_RETENTION_SECONDS))
+    with access_db_connection() as connection:
+        connection.execute("DELETE FROM access_log WHERE at < ?", (cutoff,))
+
+def record_access_event(event, outcome, ip_address, session_token=None):
+    # Store only a pseudonymous digest of the session token, never the token itself.
+    session_ref = hashlib.sha256(session_token.encode("utf-8")).hexdigest()[:20] if session_token else None
+    try:
+        ip_value = str(ipaddress.ip_address(ip_address))
+    except ValueError:
+        ip_value = "unknown"
+    at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    try:
+        with access_db_connection() as connection:
+            connection.execute("INSERT INTO access_log(at,event,outcome,session_ref,ip_address) VALUES(?,?,?,?,?)",
+                               (at, str(event)[:32], str(outcome)[:16], session_ref, ip_value))
+            connection.execute("DELETE FROM access_log WHERE at < ?",
+                               (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - ACCESS_LOG_RETENTION_SECONDS)),))
+    except Exception as error:
+        # Security logging must not lock the accounting application out if its
+        # separate log volume is unavailable; never print IPs or session tokens.
+        print("GestioneCC: scrittura registro accessi non riuscita: " + type(error).__name__)
+
+def access_log_cleanup_worker():
+    while True:
+        time.sleep(300)
+        try:
+            cleanup_access_log()
+        except Exception as error:
+            print("GestioneCC: pulizia registro accessi non riuscita: " + type(error).__name__)
 
 
 def valid_state(state):
@@ -710,7 +905,9 @@ class Handler(BaseHTTPRequestHandler):
         item = sessions.get(token) if token else None
         if not item: return None
         if item["expires"] < time.time():
-            sessions.pop(token, None); return None
+            sessions.pop(token, None)
+            record_access_event("session_expired", "expired", self.client_address[0], token)
+            return None
         item["expires"] = time.time() + SESSION_SECONDS
         return item
 
@@ -724,8 +921,46 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return item
 
+    def require_integration_auth(self):
+        header = str(self.headers.get("Authorization", ""))
+        scheme, _, token = header.partition(" ")
+        if scheme.lower() != "bearer" or not token or len(token) > 256:
+            self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+            return False
+        expected = integration_setting("integration_token_sha256")
+        actual = integration_token_digest(token)
+        if not expected or not hmac.compare_digest(actual, expected):
+            self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+            return False
+        return True
+
     def do_GET(self):
         path = urlparse(self.path).path
+        if not integration_peer_can_access(
+            self.client_address[0], self.server.allowed_network, self.server.integration_network, "GET", path
+        ):
+            self.send_json(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
+            return
+        if path == "/api/security/access-log":
+            item = self.require_auth()
+            if not item: return
+            with access_db_connection() as connection:
+                rows = connection.execute("SELECT at,event,outcome,session_ref,ip_address FROM access_log ORDER BY id DESC LIMIT 200").fetchall()
+            self.send_json(200, {"items": [dict(row) for row in rows], "retention_days": 30})
+            return
+        if path == "/api/integration/token/status":
+            item = self.require_auth()
+            if not item: return
+            self.send_json(200, {"configured": bool(integration_setting("integration_token_sha256"))})
+            return
+        if path.startswith("/api/integration/v1/"):
+            if not self.require_integration_auth(): return
+            result = integration_status(path)
+            if result is None:
+                self.send_json(404, {"error": "not_found"})
+            else:
+                self.send_json(200, result)
+            return
         if path == "/api/transactions/audit":
             item = self.require_auth()
             if not item: return
@@ -944,7 +1179,7 @@ class Handler(BaseHTTPRequestHandler):
         if not str(candidate).startswith(str(WWW.resolve()) + os.sep) or not candidate.is_file():
             self.send_error(404); return
         data = candidate.read_bytes()
-        mime = {".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8" ,".svg":"image/svg+xml",".json":"application/json"}.get(candidate.suffix, "application/octet-stream")
+        mime = {".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8" ,".svg":"image/svg+xml",".json":"application/json",".webmanifest":"application/manifest+json; charset=utf-8"}.get(candidate.suffix, "application/octet-stream")
         self.send_response(200)
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
@@ -956,13 +1191,66 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if not integration_peer_can_access(
+            self.client_address[0], self.server.allowed_network, self.server.integration_network, "POST", path
+        ):
+            self.send_json(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
+            return
         payload = {}
         raw_body = None
-        if path not in ("/api/sqlite-restore", "/api/attachments/upload"):
+        if path.startswith("/api/integration/"):
+            try:
+                raw = self.body()
+                if len(raw) > 4096:
+                    self.send_json(413, {"error": "request_too_large"}); return
+                payload = json.loads(raw or b"{}")
+                if not isinstance(payload, dict):
+                    self.send_json(400, {"error": "invalid_payload"}); return
+            except Exception:
+                self.send_json(400, {"error": "invalid_json"})
+                return
+        elif path not in ("/api/sqlite-restore", "/api/attachments/upload"):
             try: payload = json.loads(self.body() or b"{}")
             except Exception:
                 self.send_json(400, {"error":"JSON non valido"})
                 return
+        if path == "/api/integration/token":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            action = payload.get("action")
+            if action == "revoke":
+                integration_set_setting("integration_token_sha256", None)
+                self.send_json(200, {"ok": True, "revoked": True})
+                return
+            if action != "create":
+                self.send_json(400, {"error": "invalid_action"}); return
+            token = secrets.token_urlsafe(48)
+            integration_set_setting("integration_token_sha256", integration_token_digest(token))
+            self.send_json(200, {"ok": True, "token": token, "shown_once": True})
+            return
+        if path.startswith("/api/integration/v1/commands/"):
+            if not self.require_integration_auth(): return
+            command = path.rsplit("/", 1)[-1]
+            operations = {
+                "local-backup": "local_backup",
+                "google-drive-backup": "google_drive_backup",
+                "integrity-check": "integrity_check",
+            }
+            operation = operations.get(command)
+            if operation is None:
+                self.send_json(404, {"error": "not_found"})
+                return
+            if operation == "google_drive_backup" and not drive_read_config().get("token", {}).get("refresh_token"):
+                self.send_json(409, {"status": "unavailable", "code": "drive_not_connected"})
+                return
+            try:
+                result = enqueue_integration_job(operation)
+                self.send_json(202, result)
+            except RuntimeError:
+                self.send_json(409, {"status": "busy"})
+            except Exception:
+                self.send_json(500, {"status": "failed", "code": "operation_failed"})
+            return
         if path == "/api/attachments/upload":
             item = self.require_auth(csrf=True)
             if not item: return
@@ -1270,14 +1558,19 @@ class Handler(BaseHTTPRequestHandler):
             recent = [stamp for stamp in login_failures.get(peer, []) if now - stamp < LOGIN_WINDOW]
             login_failures[peer] = recent
             if len(recent) >= LOGIN_MAX:
+                if now - login_lockout_logged.get(peer, 0) >= LOGIN_WINDOW:
+                    record_access_event("temporary_lockout", "blocked", peer)
+                    login_lockout_logged[peer] = now
                 self.send_json(429, {"error":"Troppi tentativi. Riprova tra alcuni minuti."}); return
             username = verify_pin(pin) if valid_pin(pin) else None
             if not username:
                 recent.append(now); login_failures[peer] = recent
+                record_access_event("login", "failed", peer)
                 self.send_json(401, {"error":"PIN non corretto"}); return
             login_failures.pop(peer, None)
             token = secrets.token_urlsafe(32); csrf = secrets.token_urlsafe(24)
             sessions[token] = {"username":username,"csrf":csrf,"expires":time.time()+SESSION_SECONDS}
+            record_access_event("login", "success", peer, token)
             self.send_json(200, {"ok":True,"csrf":csrf}, {"Set-Cookie":f"cc_session={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={SESSION_SECONDS}"})
             return
         if path == "/api/change-pin":
@@ -1307,7 +1600,9 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as error:
                 self.send_json(500, {"error":"Impossibile accodare il backup; la sessione resta aperta: " + str(error)})
                 return
-            sessions.pop(self.cookie_token(), None)
+            session_token = self.cookie_token()
+            record_access_event("logout", "success", self.client_address[0], session_token)
+            sessions.pop(session_token, None)
             self.send_json(202, {"ok":True,"job_id":job_id,"backup_status":"queued"},
                            {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
             return
@@ -1418,21 +1713,53 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_json(405, {"error":"Metodo non consentito"})
 
+def peer_is_integration_only(peer_address, allowed_network, integration_network):
+    try:
+        address = ipaddress.ip_address(peer_address)
+        return address in integration_network and address not in allowed_network
+    except ValueError:
+        return False
+
+
+def peer_is_allowed(peer_address, allowed_network, integration_network):
+    try:
+        address = ipaddress.ip_address(peer_address)
+        return address in allowed_network or address in integration_network
+    except ValueError:
+        return False
+
+
+def integration_peer_can_access(peer_address, allowed_network, integration_network, method, path):
+    """Restrict the extra Home Assistant Core peer to exact technical API routes."""
+    if not peer_is_integration_only(peer_address, allowed_network, integration_network):
+        return True
+    if method == "GET":
+        return path in {"/api/integration/v1/health", "/api/integration/v1/database/status", "/api/integration/v1/backups/status", "/api/integration/v1/storage/status", "/api/integration/v1/documents/status", "/api/integration/v1/jobs/status"}
+    if method == "POST":
+        return path in {"/api/integration/v1/commands/local-backup", "/api/integration/v1/commands/google-drive-backup", "/api/integration/v1/commands/integrity-check"}
+    return False
+
 class LANOnlyHTTPServer(ThreadingHTTPServer):
-    """Accept connections only from the configured home LAN subnet."""
-    def __init__(self, server_address, RequestHandlerClass, allowed_network):
+    """Allow the home LAN plus a narrowly scoped Home Assistant Core peer."""
+    def __init__(self, server_address, RequestHandlerClass, allowed_network, integration_network):
         self.allowed_network = allowed_network
+        self.integration_network = integration_network
         super().__init__(server_address, RequestHandlerClass)
 
+    def is_integration_only_peer(self, peer_address):
+        return peer_is_integration_only(peer_address, self.allowed_network, self.integration_network)
+
     def verify_request(self, request, client_address):
-        try:
-            return ipaddress.ip_address(client_address[0]) in self.allowed_network
-        except ValueError:
-            return False
+        return peer_is_allowed(client_address[0], self.allowed_network, self.integration_network)
 
 
 if __name__ == "__main__":
     init_db()
+    try:
+        cleanup_access_log()
+    except Exception as error:
+        print("GestioneCC: pulizia iniziale registro accessi non riuscita: " + type(error).__name__)
+    __import__("threading").Thread(target=access_log_cleanup_worker, daemon=True, name="access-log-cleanup").start()
     cert_file = SSL_DIR / "server.crt"
     key_file = SSL_DIR / "server.key"
     if not cert_file.is_file() or not key_file.is_file():
@@ -1443,11 +1770,12 @@ if __name__ == "__main__":
     options = read_options()
     try:
         allowed_network = ipaddress.ip_network(str(options.get("lan_network", "192.168.1.0/24")), strict=False)
+        integration_network = ipaddress.ip_network(str(options.get("integration_network", "172.30.32.1/32")), strict=False)
     except ValueError as error:
-        raise RuntimeError("lan_network non valida: usare una rete IPv4/IPv6 in formato CIDR.") from error
+        raise RuntimeError("Rete LAN o rete integrazione non valida: usare una rete IPv4/IPv6 in formato CIDR.") from error
     __import__("threading").Thread(target=drive_backup_scheduler, daemon=True, name="drive-backup-scheduler").start()
     __import__("threading").Thread(target=background_job_worker, daemon=True, name="background-job-worker").start()
-    httpd = LANOnlyHTTPServer(("0.0.0.0", 8443), Handler, allowed_network)
+    httpd = LANOnlyHTTPServer(("0.0.0.0", 8443), Handler, allowed_network, integration_network)
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     print("Gestione C/C HTTPS in ascolto sulla porta 8443")
     httpd.serve_forever()

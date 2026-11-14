@@ -1,0 +1,62 @@
+# Integrazione Home Assistant — Gestione C/C
+
+Questa è la prima versione di sviluppo della custom integration. Non è ancora pronta per l'installazione in un'istanza Home Assistant di produzione.
+
+## Requisiti
+- Add-on Gestione C/C con API integrazione abilitata.
+- Home Assistant Core in grado di raggiungere l'add-on attraverso la rete locale.
+- Certificato CA privata dell'add-on installato in un percorso leggibile da Home Assistant Core.
+- Token dedicato generato da Gestione C/C → Impostazioni → Integrazione Home Assistant.
+
+## Installazione tramite HACS (repository personalizzato)
+1. Aprire **HACS → Integrazioni**.
+2. Aprire il menu in alto a destra e scegliere **Repository personalizzati**.
+3. Inserire `https://github.com/stefanodr/gestione-cc-home-assistant` e selezionare la categoria **Integrazione**.
+4. Aggiungere il repository e installare **Gestione C/C**.
+5. Riavviare Home Assistant.
+6. Dalla pagina Impostazioni → Sicurezza di Gestione C/C, scaricare il certificato CA. Copiarlo nella cartella `/ssl` di Home Assistant (con nome `gestione-cc-ca.crt`) e verificare che Home Assistant Core possa leggerlo.
+7. Aggiungere **Gestione C/C** da Impostazioni → Dispositivi e servizi.
+8. Inserire URL HTTPS locale, token (campo mascherato) e percorso `/ssl/gestione-cc-ca.crt`. Il nome host o l'indirizzo IP nell'URL deve coincidere con il valore `hostname` configurato nell'add-on: il certificato server viene emesso con SAN DNS oppure IP in base a tale valore.
+
+### Installazione manuale per sviluppo
+In alternativa, copiare la directory `custom_components/gestione_cc` in `/config/custom_components/gestione_cc`, quindi seguire i passaggi 5–8. La distribuzione prevista per gli utenti è tramite HACS.
+
+Il token è conservato nei dati di configurazione Home Assistant, che non costituiscono un vault cifrato: proteggi backup e accesso amministrativo. La verifica TLS è obbligatoria: l'integrazione non disabilita la verifica del certificato e non accetta HTTP o URL pubblici. Per ruotare il token in questa prima versione: generare il nuovo token nell'app (l'operazione sostituisce immediatamente il precedente), copiarlo e poi rimuovere e aggiungere nuovamente l'integrazione in Home Assistant con il nuovo token. Durante la riconfigurazione l'integrazione resterà temporaneamente non disponibile. La funzione di riconfigurazione senza rimozione verrà valutata in una fase successiva.
+
+## Sensori e comandi
+La prima bozza espone disponibilità app, versioni app/add-on, uptime, dimensione/ultima modifica DB, backup, spazio, conteggio allegati, conteggi aggregati dei processi e contatori OCR separati (coda, in elaborazione, errori). I conteggi coprono gli ultimi 7 giorni. Sono previsti tre pulsanti: backup locale, backup Google Drive e controllo integrità.
+
+Non vengono creati sensori finanziari e non vengono trasferiti conti, saldi, movimenti, descrizioni o contenuti documentali.
+
+## PWA e collegamento Home Assistant Companion
+
+L'add-on serve un manifest PWA con apertura `standalone`. Non viene installato un service worker e non viene abilitata alcuna cache offline: le risposte HTML/API restano `no-store` per evitare la persistenza di dati contabili sul dispositivo.
+
+Da Chrome, aprire Gestione C/C e scegliere **Installa Gestione C/C** dal menu del browser.
+
+Per un accesso dalla Companion App, aggiungere alla dashboard Home Assistant una scheda Pulsante con azione URL (sostituire l'host se diverso):
+
+```yaml
+type: button
+name: Apri Gestione C/C
+icon: mdi:bank
+tap_action:
+  action: url
+  url_path: https://homeassistant.local:8443/
+```
+
+Il link non contiene PIN o token. L'app richiede comunque il PIN all'apertura quando la sessione non è valida.
+
+## Stato e limitazioni note
+- Config flow, coordinator, sensori, binary sensor e pulsanti sono in fase iniziale.
+- Polling differenziato: health ogni 60 secondi; database, backup e storage ogni 5 minuti; allegati e processi ogni 2 minuti. Dopo un comando viene forzato un aggiornamento.
+- I comandi sono accodati al worker dell'add-on e restituiscono subito `queued`; un solo comando di manutenzione può essere attivo alla volta. Il sensore dei processi mostra conteggi aggregati degli ultimi 7 giorni, senza identificativi o dettagli.
+- L'add-on mantiene la LAN autorizzata e aggiunge una sola eccezione /32 per Home Assistant Core (`172.30.32.1/32`, rete interna documentata di Home Assistant OS). Quel peer può chiamare esclusivamente gli endpoint tecnici e i tre comandi: non può accedere a login, interfaccia, API contabili o gestione token. Il valore /32 va comunque confermato nel collaudo reale; non viene usato `host_network` e non si apre l'accesso WAN.
+- L'installazione HACS e il test end-to-end saranno abilitati solo dopo il collaudo della rete e del certificato.
+
+**Non installare questa versione di sviluppo sul sistema operativo Home Assistant principale.**
+
+
+## Dashboard e automazioni di esempio
+
+Sono disponibili esempi YAML in `docs/dashboard_gestione_cc.yaml` e `docs/automazioni_gestione_cc.yaml`. Prima di importarli, verificare gli entity_id effettivi creati da Home Assistant e sostituire `notify.notify` con il servizio di notifica desiderato. Nella dashboard, sostituire `homeassistant.local` con il nome host LAN configurato nell'add-on, se diverso.

@@ -1,3 +1,27 @@
+## [1.1.0] - 2026-11-14
+
+### Aggiunto
+- Prima versione dell'integrazione Home Assistant Gestione C/C per il monitoraggio tecnico dell'app e l'avvio delle operazioni di manutenzione.
+- Aggiunti esempi di dashboard e automazioni per gli stati tecnici.
+
+### Sicurezza
+- L'integrazione riceve esclusivamente stati tecnici e non accede ai dati contabili, al registro accessi o ai file di backup.
+- Accesso di Home Assistant Core limitato a percorsi API e comandi di manutenzione esplicitamente autorizzati.
+- Mantenute verifica HTTPS, CA dedicata e restrizione LAN.
+
+### Added
+- First release of the Gestione C/C Home Assistant integration for technical monitoring and maintenance commands.
+- Added dashboard and automation examples for technical status.
+
+### Security
+- The integration receives technical status only and cannot access accounting data, the access log or backup files.
+- Home Assistant Core access is restricted to explicitly allowed API paths and maintenance commands.
+- HTTPS verification, dedicated CA and LAN restrictions remain enabled.
+
+### Versioni / Versions
+- Versione add-on / Add-on version: 1.1.0.
+- Versione app inclusa / Bundled application version: 1.7.14.
+
 ## [1.0.43] - 2026-11-14
 
 ### Correzioni

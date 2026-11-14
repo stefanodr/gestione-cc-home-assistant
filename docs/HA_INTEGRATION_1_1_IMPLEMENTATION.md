@@ -1,0 +1,127 @@
+# Gestione C/C HA 1.1 — Piano tecnico di implementazione
+
+> Versione di lavoro: **1.1**. La decisione finale tra 1.1 e 2.0 sarà presa soltanto dopo implementazione, collaudo e valutazione dell'impatto complessivo.
+
+## Obiettivo e regola di sicurezza
+
+Integrare l'add-on con Home Assistant per esporre esclusivamente lo stato tecnico dell'applicazione e consentire tre operazioni controllate (backup locale, backup Google Drive, controllo integrità).
+
+**Home Assistant non deve poter conoscere il contenuto di Gestione C/C.** L'integrazione non legge il database, non esegue SQL, non accede al filesystem dell'add-on e non può scaricare database, backup o allegati.
+
+## Stato iniziale verificato
+
+- Il server applicativo è `gestione_cc/server.py`, basato su `ThreadingHTTPServer`, HTTPS e filtro IP `lan_network`.
+- Il database SQLite e i backup sono gestiti dal server sotto `/data`.
+- L'autenticazione web attuale usa PIN, session cookie HttpOnly/Secure/SameSite=Strict, CSRF e rate limiting per IP.
+- Esistono già backup SQLite locali, backup Google Drive notturni, worker OCR e tabella `background_jobs`.
+- Gli endpoint web esistenti per backup e restore restituiscono o scaricano dati completi: **non devono essere riutilizzati dall'integrazione**.
+- Il repository corrente è quello dell'add-on. La custom integration HACS sarà aggiunta in una directory distinta `custom_components/gestione_cc`; non si deve alterare il repository Windows standalone.
+
+## Architettura prevista
+
+### 1. API tecnica dedicata
+
+Prefisso versionato: `/api/integration/v1/`.
+
+Endpoint di sola lettura (prefisso `/api/integration/v1/`):
+- `health`: disponibilità, versione, uptime e latenza calcolata dal client.
+- `database/status`: esito dell'ultimo controllo, data ultimo controllo, dimensione tecnica e data ultima scrittura; nessun contenuto o schema.
+- `backups/status`: stato collegamento Drive, data/esito ultimo backup locale e Drive, conteggio copie locali (mai nomi o percorsi).
+- `storage/status`: capacità, occupazione e spazio libero del volume dati, senza percorsi.
+- `documents/status`: solo conteggio e byte aggregati degli allegati.
+- `jobs/status`: conteggi aggregati dei processi degli ultimi 7 giorni e contatori OCR separati (coda, elaborazione, errori); nessun ID, payload, errore grezzo o riferimento a documenti.
+
+Comandi POST consentiti (implementazione iniziale):
+- `/api/integration/v1/commands/local-backup`: avvia una copia SQLite locale.
+- `/api/integration/v1/commands/google-drive-backup`: avvia backup Drive se collegato.
+- `/api/integration/v1/commands/integrity-check`: esegue `PRAGMA integrity_check` in modo controllato.
+
+Endpoint amministrativi browser, non utilizzabili dal token HA: `/api/integration/token/status` e `/api/integration/token`, protetti dalla sessione PIN; le operazioni di creazione/revoca richiedono anche CSRF. La UI Impostazioni ora mostra se il token è configurato, permette di generarlo/rinnovarlo e revocarlo. Il token in chiaro è mostrato una sola volta e cancellato dall'interfaccia quando viene nascosto.
+
+### Registro accessi — implementazione server iniziale
+Il registro usa un archivio SQLite tecnico separato (`/data/access_log.sqlite3`), distinto dal database contabile e quindi escluso dai backup contabili SQLite/Google Drive. Il file è anche escluso dai backup Supervisor dell'add-on tramite `backup_exclude`, così la retention di 30 giorni non viene aggirata dalle copie HA. Registra login riusciti/falliti, blocchi temporanei (un solo evento per finestra di blocco), logout e scadenza sessione. Memorizza l'IP peer effettivo e un riferimento di sessione pseudonimo (digest, non cookie). Pulizia all'avvio, dopo ogni evento e ogni 5 minuti; `secure_delete` SQLite attivo per sovrascrivere le righe eliminate; file con permessi `0600` ed esclusione dalle snapshot Supervisor. API di consultazione protetta da sessione PIN, mai esposta all'integrazione.
+
+Le risposte devono essere DTO espliciti con allowlist di campi. Non serializzare direttamente righe SQLite, eccezioni, oggetti di configurazione, risultati Drive o record dei job. Errori esterni normalizzati in codici generici. I comandi restituiscono solo stato e risultato tecnico sintetico, mai file, URL di download, percorsi, nomi, ID o contenuti. I comandi vengono accodati nel worker già presente e restituiscono subito lo stato `queued`; un solo comando di manutenzione può essere attivo alla volta. Il sensore `jobs/status` mostra conteggi aggregati degli ultimi 7 giorni, senza ID o risultati dettagliati.
+
+### 2. Token di integrazione
+
+- Credenziale dedicata, indipendente dal PIN e dalle sessioni browser.
+- Generazione e revoca disponibili soltanto dopo autenticazione PIN nella UI Gestione C/C.
+- Token casuale ad alta entropia, mostrato una sola volta al momento della creazione.
+- Persistenza lato server del solo hash del token (con confronto a tempo costante); permessi fissi: lettura stati tecnici + avvio dei tre comandi.
+- Nessun endpoint di esportazione o lettura contabile accessibile al token.
+- La UI deve permettere revoca e rigenerazione. Non registrare mai il token nei log.
+- L'integrazione memorizza la credenziale tramite il meccanismo di configurazione di Home Assistant; documentare che i file di configurazione HA non equivalgono a un vault cifrato.
+
+### 3. Rete e TLS
+
+- Mantenere HTTPS, verifica del certificato e filtro LAN. Il certificato server deve includere un SAN coerente con l'host usato da HA: DNS SAN per hostname locale, IP SAN per IPv4 privato; il config flow verifica la CA e la corrispondenza TLS.
+- Nessun port forwarding, ingress pubblico, Nabu Casa o accesso WAN.
+- Home Assistant OS documenta la rete interna app/Supervisor `172.30.32.0/23` e l'indirizzo di Home Assistant Core `172.30.32.1`. È stata quindi introdotta un'eccezione configurabile e predefinita limitata a `172.30.32.1/32`, separata dalla LAN dell'utente.
+- Il peer `172.30.32.1` è autorizzato esclusivamente su GET `/api/integration/v1/*` e POST `/api/integration/v1/commands/*`; non può aprire login, UI, endpoint contabili o gestione token. La LAN configurata conserva il comportamento attuale.
+- Il valore /32 deve essere confermato sul sistema Home Assistant reale durante il collaudo; non usare `host_network`, non allargare la LAN e non indebolire TLS.
+
+### 4. Integrazione HACS
+
+Directory `custom_components/gestione_cc` con:
+- `manifest.json`, `config_flow.py`, `const.py`, `coordinator.py`, `sensor.py`, `binary_sensor.py`, `button.py`, `strings.json`, traduzioni e test.
+- Configurazione guidata: URL HTTPS locale, token, verifica connessione.
+- Polling differenziato: health 60 s; stato DB/backup/storage 5 min; OCR/jobs/documenti 2 min.
+- Gestione timeout, errori TLS, token revocato, rate limiting e stato unavailable.
+- Pulsanti con conferma e feedback stato; nessun comando distruttivo.
+
+### 5. Registro accessi applicativo
+
+Sezione protetta da PIN: **Impostazioni → Sicurezza → Registro accessi**.
+
+Eventi: login riuscito/fallito, logout, scadenza sessione e blocco temporaneo. Campi: timestamp UTC, tipo evento, esito, identificativo sessione pseudonimo e IP di provenienza. Non registrare PIN, password, cookie, token, dati contabili o contenuto delle richieste.
+
+- Retention confermata: **30 giorni**.
+- IP: **sì**, conservato per lo stesso periodo massimo di 30 giorni, solo per sicurezza; nessuna geolocalizzazione o arricchimento esterno.
+- Cancellazione automatica dei record scaduti.
+- Registro consultabile solo nell'app dopo PIN; mai esposto all'API di integrazione né inviato a Home Assistant.
+- Considerare proxy e indirizzi inoltrati non attendibili: usare l'IP del peer TCP effettivo, salvo futura configurazione esplicita di proxy fidato.
+
+### 6. PWA e collegamento Companion
+
+Prima implementazione PWA: manifest con display standalone e icona SVG del brand, servito con MIME dedicato. Non viene installato un service worker e non viene abilitata cache offline; le risposte server restano no-store. PIN e scadenza sessione restano obbligatori.
+
+Collegamento Companion documentato tramite scheda Pulsante Lovelace con azione URL verso l'host LAN. Nessun PIN/token nell'URL o nella notifica. L'URL non deve diventare pubblico. Non realizzare un'estensione Chrome.
+
+### 7. Dashboard e automazioni
+
+Dashboard tecnica opzionale con soli stati tecnici, sensori e pulsanti autorizzati. Esempi di automazioni per app non disponibile, database non integro, backup fallito/scaduto, spazio sotto soglia, backlog OCR e processi in errore. Notifiche generiche, senza dati finanziari, nomi di documenti o dettagli interni.
+
+## Piano di lavoro e gate
+
+1. **Audit e baseline** — verificare route, storage, TLS, filtro LAN, worker e test esistenti.
+2. **Fondazione server sicura** — token hash/revoca, DTO allowlist, API health/status e test negativi che dimostrino l'assenza di campi sensibili.
+3. **Comandi e job** — backup locale, backup Drive e integrity check; stato aggregato senza ID o output sensibili.
+4. **Registro accessi** — migrazione schema non distruttiva, retention 30 giorni e IP; UI protetta e test.
+5. **HACS integration** — config flow, coordinator, sensori, binary sensor, pulsanti, test e documentazione.
+6. **PWA + Companion** — manifest e icona installabile, senza service worker e senza cache offline; link LAN e istruzioni di installazione.
+7. **Dashboard, automazioni, documentazione IT/EN**.
+8. **Collaudo sicurezza e regressione** — solo dopo tutti i test si valuterà la versione finale e la pubblicazione.
+
+## Criteri di accettazione obbligatori
+
+- Token integrazione rifiutato da ogni endpoint contabile e da ogni endpoint non esplicitamente consentito.
+- Nessuna risposta API contiene conti, movimenti, saldi, categorie, nomi file, percorsi, contenuti, ID documenti/job, SQL o eccezioni grezze.
+- Nessun accesso diretto al DB o al filesystem dal codice custom integration.
+- Test che verificano i campi esatti delle risposte (allowlist), non solo la presenza dei campi attesi.
+- Test per token errato/revocato, CSRF, rate limiting, timeout, certificato non attendibile e rete non autorizzata.
+- Verifica retention IP/log: 30 giorni.
+- Nessuna modifica al PIN, ai dati esistenti o al comportamento di backup/restore senza test di regressione.
+- Test PWA per assicurare che dati autenticati e API sensibili non siano memorizzati in cache.
+- Collaudo finale nell'ambiente Home Assistant reale prima di qualsiasi aggiornamento dell'add-on.
+
+### Dashboard e automazioni di esempio
+
+Sono stati aggiunti `docs/dashboard_gestione_cc.yaml` e `docs/automazioni_gestione_cc.yaml`. La dashboard mostra esclusivamente stati tecnici, backup, spazio, allegati aggregati, OCR e pulsanti manutentivi; include un collegamento Companion all'URL LAN configurato. Le automazioni di esempio avvisano per app offline, integrità non superata, spazio libero sotto 2 GB ed errori OCR. Prima dell'uso vanno verificati gli entity_id generati e sostituito `notify.notify` con il servizio notifiche dell'utente.
+
+## Vincoli operativi
+
+- Nessuna modifica al repository Windows `stefanodr/gestione-cc`.
+- Nessuna installazione, aggiornamento o modifica del database nell'istanza Home Assistant dell'utente durante lo sviluppo.
+- Tutte le modifiche passano da branch e pull request; niente commit diretti su `main`.
+- Nessun tag, release o scelta 1.1/2.0 prima della chiusura dei test e della valutazione finale.
