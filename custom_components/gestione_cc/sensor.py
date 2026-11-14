@@ -1,5 +1,6 @@
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfInformation
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -38,8 +39,39 @@ SENSORS = [
 ]
 
 
+def _refresh_existing_data_size_units(hass, entry):
+    """Refresh the initial display unit for existing data-size sensors.
+
+    Home Assistant stores the initially suggested sensor unit in the entity
+    registry. The refresh flag asks SensorEntity to recalculate that stored
+    suggestion using _attr_suggested_unit_of_measurement below.
+    """
+    registry = er.async_get(hass)
+    for registry_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if registry_entry.domain != "sensor" or registry_entry.platform != DOMAIN:
+            continue
+        if not any(registry_entry.unique_id.endswith(f"_{key}") for key in DATA_SIZE_SENSORS):
+            continue
+
+        # Respect an explicit unit selected by the user in the entity options.
+        user_options = registry_entry.options.get("sensor", {})
+        if "unit_of_measurement" in user_options:
+            continue
+
+        private_options = registry_entry.options.get("sensor.private", {})
+        if private_options.get("suggested_unit_of_measurement") == UnitOfInformation.MEGABYTES:
+            continue
+
+        registry.async_update_entity_options(
+            registry_entry.entity_id,
+            "sensor.private",
+            {"refresh_initial_entity_options": True},
+        )
+
+
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
+    _refresh_existing_data_size_units(hass, entry)
     async_add_entities(GestioneCCSensor(coordinator, entry, *description) for description in SENSORS)
 
 
@@ -57,6 +89,7 @@ class GestioneCCSensor(CoordinatorEntity, SensorEntity):
         self._attr_state_class = state_class
         if key in DATA_SIZE_SENSORS:
             self._attr_device_class = SensorDeviceClass.DATA_SIZE
+            self._attr_suggested_unit_of_measurement = UnitOfInformation.MEGABYTES
             self._attr_suggested_display_precision = 2
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
