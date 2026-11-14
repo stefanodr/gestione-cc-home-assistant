@@ -11,15 +11,18 @@ SENSORS = [
     ("uptime", "health", "uptime_seconds", "Tempo attività", "mdi:timer-outline", None, SensorStateClass.MEASUREMENT),
     ("database_size", "database", "size_bytes", "Dimensione database", "mdi:database", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
     ("database_last_write", "database", "last_write_at", "Ultima modifica database", "mdi:database-clock", None, None),
+    ("database_last_check", "database", "last_check_at", "Ultimo controllo integrità", "mdi:database-check", None, None),
     ("backup_local_count", "backups", "local_count", "Copie backup locali", "mdi:backup-restore", None, SensorStateClass.MEASUREMENT),
     ("backup_local_last", "backups", "local_last_at", "Ultimo backup locale", "mdi:clock-check-outline", None, None),
     ("backup_drive_last", "backups", "drive_last_at", "Ultimo backup Google Drive", "mdi:cloud-check-outline", None, None),
+    ("storage_total", "storage", "total_bytes", "Spazio totale", "mdi:harddisk", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
     ("storage_free", "storage", "free_bytes", "Spazio libero", "mdi:harddisk", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
     ("storage_used", "storage", "used_bytes", "Spazio utilizzato", "mdi:database", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
     ("documents_count", "documents", "count", "Numero allegati", "mdi:file-multiple-outline", None, SensorStateClass.MEASUREMENT),
     ("documents_bytes", "documents", "bytes", "Dimensione allegati", "mdi:file-document-outline", UnitOfInformation.BYTES, SensorStateClass.MEASUREMENT),
     ("jobs_queued", "jobs", "queued", "Processi in coda", "mdi:progress-clock", None, SensorStateClass.MEASUREMENT),
     ("jobs_running", "jobs", "running", "Processi in esecuzione", "mdi:progress-wrench", None, SensorStateClass.MEASUREMENT),
+    ("jobs_done", "jobs", "done", "Processi completati", "mdi:check-circle-outline", None, SensorStateClass.MEASUREMENT),
     ("jobs_failed", "jobs", "failed", "Processi in errore", "mdi:alert-circle-outline", None, SensorStateClass.MEASUREMENT),
 ]
 
