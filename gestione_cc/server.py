@@ -1216,32 +1216,26 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/integration/v1/commands/"):
             if not self.require_integration_auth(): return
-            if not INTEGRATION_OPERATION_LOCK.acquire(blocking=False):
-                self.send_json(409, {"status": "busy"}); return
+            command = path.rsplit("/", 1)[-1]
+            operations = {
+                "local-backup": "local_backup",
+                "google-drive-backup": "google_drive_backup",
+                "integrity-check": "integrity_check",
+            }
+            operation = operations.get(command)
+            if operation is None:
+                self.send_json(404, {"error": "not_found"})
+                return
+            if operation == "google_drive_backup" and not drive_read_config().get("token", {}).get("refresh_token"):
+                self.send_json(409, {"status": "unavailable", "code": "drive_not_connected"})
+                return
             try:
-                if path == "/api/integration/v1/commands/local-backup":
-                    create_sqlite_backup("integration")
-                    self.send_json(200, {"status": "completed", "operation": "local_backup"})
-                elif path == "/api/integration/v1/commands/google-drive-backup":
-                    cfg = drive_read_config()
-                    if not cfg.get("token", {}).get("refresh_token"):
-                        self.send_json(409, {"status": "unavailable", "code": "drive_not_connected"})
-                    else:
-                        drive_nightly_backup()
-                        self.send_json(200, {"status": "completed", "operation": "google_drive_backup"})
-                elif path == "/api/integration/v1/commands/integrity-check":
-                    with db() as connection:
-                        result = connection.execute("PRAGMA integrity_check").fetchone()[0]
-                    ok = result == "ok"
-                    integration_set_setting("integration_last_integrity_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
-                    integration_set_setting("integration_last_integrity_ok", "1" if ok else "0")
-                    self.send_json(200 if ok else 500, {"status": "completed" if ok else "failed", "integrity_ok": ok})
-                else:
-                    self.send_json(404, {"error": "not_found"})
+                result = enqueue_integration_job(operation)
+                self.send_json(202, result)
+            except RuntimeError:
+                self.send_json(409, {"status": "busy"})
             except Exception:
                 self.send_json(500, {"status": "failed", "code": "operation_failed"})
-            finally:
-                INTEGRATION_OPERATION_LOCK.release()
             return
         if path == "/api/attachments/upload":
             item = self.require_auth(csrf=True)
