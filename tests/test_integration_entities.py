@@ -8,13 +8,13 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def literal_assignment(path, name):
+def tuple_first_values(path, name):
     tree = ast.parse(path.read_text(encoding="utf-8"))
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
             isinstance(target, ast.Name) and target.id == name for target in node.targets
         ):
-            return ast.literal_eval(node.value)
+            return [ast.literal_eval(item.elts[0]) for item in node.value.elts]
     raise AssertionError(f"Assignment {name} not found in {path}")
 
 
@@ -33,12 +33,12 @@ def collect_entity_ids(value):
 
 class IntegrationEntityExamplesTest(unittest.TestCase):
     def test_dashboard_and_automations_only_reference_defined_entities(self):
-        sensor_items = literal_assignment(ROOT / "custom_components/gestione_cc/sensor.py", "SENSORS")
-        binary_items = literal_assignment(ROOT / "custom_components/gestione_cc/binary_sensor.py", "ENTITIES")
-        button_items = literal_assignment(ROOT / "custom_components/gestione_cc/button.py", "BUTTONS")
-        defined = {f"sensor.gestione_cc_{item[0]}" for item in sensor_items}
-        defined |= {f"binary_sensor.gestione_cc_{item[0]}" for item in binary_items}
-        defined |= {f"button.gestione_cc_{item[0]}" for item in button_items}
+        sensor_items = tuple_first_values(ROOT / "custom_components/gestione_cc/sensor.py", "SENSORS")
+        binary_items = tuple_first_values(ROOT / "custom_components/gestione_cc/binary_sensor.py", "ENTITIES")
+        button_items = tuple_first_values(ROOT / "custom_components/gestione_cc/button.py", "BUTTONS")
+        defined = {f"sensor.gestione_cc_{item}" for item in sensor_items}
+        defined |= {f"binary_sensor.gestione_cc_{item}" for item in binary_items}
+        defined |= {f"button.gestione_cc_{item}" for item in button_items}
 
         dashboard = yaml.safe_load((ROOT / "docs/dashboard_gestione_cc.yaml").read_text(encoding="utf-8"))
         automations = yaml.safe_load((ROOT / "docs/automazioni_gestione_cc.yaml").read_text(encoding="utf-8"))
