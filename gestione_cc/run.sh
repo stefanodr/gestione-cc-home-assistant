@@ -7,17 +7,20 @@ export WWW_DIR=/app/www
 export ADDON_OPTIONS_FILE=/data/options.json
 export SSL_DIR=/data/tls
 HOSTNAME_CFG="$(bashio::config 'hostname')"
-HOSTNAME_CFG="${HOSTNAME_CFG:-homeassistant.local}"
+HOSTNAME_CFG="${HOSTNAME_CFG:-192.168.1.27}"
 if ! echo "$HOSTNAME_CFG" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'; then
-  bashio::log.error "hostname non valido: usare un nome DNS semplice, ad esempio homeassistant.local"
+  bashio::log.error "hostname non valido: usare un nome DNS semplice o un indirizzo IPv4, ad esempio 192.168.1.27"
   exit 1
 fi
 if python3 -c 'import ipaddress,sys; ipaddress.IPv4Address(sys.argv[1])' "$HOSTNAME_CFG" >/dev/null 2>&1; then
-  SAN_ENTRY="IP:$HOSTNAME_CFG"
+  SAN_ENTRY="IP:$HOSTNAME_CFG,DNS:homeassistant.local"
   SAN_MARKER="IP Address:$HOSTNAME_CFG"
 else
   SAN_ENTRY="DNS:$HOSTNAME_CFG"
   SAN_MARKER="DNS:$HOSTNAME_CFG"
+  if [ "$HOSTNAME_CFG" != "homeassistant.local" ]; then
+    SAN_ENTRY="$SAN_ENTRY,DNS:homeassistant.local"
+  fi
 fi
 CA_CREATED=0
 if [ ! -s /data/tls/root-ca.crt ] || [ ! -s /data/tls/root-ca.key ]; then
@@ -71,9 +74,15 @@ fi
 
 NEED_CERT=0
 if [ -e /data/tls/.renew-server-cert ] || [ ! -s /data/tls/server.crt ] || [ ! -s /data/tls/server.key ]; then NEED_CERT=1; fi
-if [ "$NEED_CERT" -eq 0 ] && ! openssl x509 -in /data/tls/server.crt -noout -ext subjectAltName 2>/dev/null | grep -Fq "$SAN_MARKER"; then NEED_CERT=1; fi
+if [ "$NEED_CERT" -eq 0 ]; then
+  SAN_OUTPUT="$(openssl x509 -in /data/tls/server.crt -noout -ext subjectAltName 2>/dev/null || true)"
+  if ! printf '%s' "$SAN_OUTPUT" | grep -Fq "$SAN_MARKER" \
+    || ! printf '%s' "$SAN_OUTPUT" | grep -Fq "DNS:homeassistant.local"; then
+    NEED_CERT=1
+  fi
+fi
 if [ "$NEED_CERT" -eq 1 ]; then
-  bashio::log.info "Creo/aggiorno il certificato HTTPS per $HOSTNAME_CFG"
+  bashio::log.info "Creo/aggiorno il certificato HTTPS per $HOSTNAME_CFG (con alias homeassistant.local)"
   SERVER_TMP="/data/tls/.server-new"
   rm -rf "$SERVER_TMP"
   mkdir -m 700 -p "$SERVER_TMP"
