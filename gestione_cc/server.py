@@ -644,6 +644,66 @@ def drive_backup_scheduler():
             print("GestioneCC: backup notturno Google Drive non riuscito: " + str(error))
 
 
+
+# Home Assistant integration API: deliberately restricted to technical metadata.
+SERVER_STARTED_AT = time.time()
+INTEGRATION_OPERATION_LOCK = __import__("threading").Lock()
+
+def integration_setting(key, default=None):
+    with db() as connection:
+        row = connection.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    return row["value"] if row else default
+
+def integration_set_setting(key, value):
+    with db() as connection:
+        if value is None:
+            connection.execute("DELETE FROM settings WHERE key=?", (key,))
+        else:
+            connection.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, str(value)))
+
+def integration_token_digest(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+def integration_job_counts():
+    allowed = {"document_ocr", "drive_session_backup"}
+    counts = {"queued": 0, "running": 0, "done": 0, "failed": 0}
+    with db() as connection:
+        rows = connection.execute("SELECT kind,status,COUNT(*) AS total FROM background_jobs GROUP BY kind,status").fetchall()
+    for row in rows:
+        if row["kind"] in allowed and row["status"] in counts:
+            counts[row["status"]] += int(row["total"])
+    return counts
+
+def integration_status(path):
+    now = time.time()
+    if path == "/api/integration/v1/health":
+        return {"available": True, "uptime_seconds": max(0, int(now - SERVER_STARTED_AT))}
+    if path == "/api/integration/v1/database/status":
+        try:
+            stat = DB_PATH.stat()
+            wal = Path(str(DB_PATH) + "-wal")
+            size = stat.st_size + (wal.stat().st_size if wal.is_file() else 0)
+            exists = True
+        except FileNotFoundError:
+            size, exists = 0, False
+        return {"exists": exists, "size_bytes": int(size), "last_check_at": integration_setting("integration_last_integrity_at"), "last_check_ok": integration_setting("integration_last_integrity_ok") == "1" if integration_setting("integration_last_integrity_ok") is not None else None}
+    if path == "/api/integration/v1/backups/status":
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        local_files = [p for p in BACKUP_DIR.glob("*.sqlite3") if p.is_file()]
+        latest = max((p.stat().st_mtime for p in local_files), default=0)
+        cfg = drive_read_config()
+        return {"local_count": len(local_files), "local_last_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(latest)) if latest else None, "drive_connected": bool(cfg.get("token", {}).get("refresh_token")), "drive_last_at": cfg.get("last_nightly_backup")}
+    if path == "/api/integration/v1/storage/status":
+        usage = shutil.disk_usage(DATA)
+        return {"total_bytes": int(usage.total), "used_bytes": int(usage.used), "free_bytes": int(usage.free)}
+    if path == "/api/integration/v1/documents/status":
+        with db() as connection:
+            row = connection.execute("SELECT COUNT(*) AS total, COALESCE(SUM(size),0) AS bytes FROM attachments").fetchone()
+        return {"count": int(row["total"]), "bytes": int(row["bytes"])}
+    if path == "/api/integration/v1/jobs/status":
+        return integration_job_counts()
+    return None
+
 def valid_state(state):
     if not isinstance(state, dict): return False
     accounts, transactions, rules = state.get('accounts'), state.get('transactions'), state.get('rules', [])
@@ -724,8 +784,29 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return item
 
+    def require_integration_auth(self):
+        header = str(self.headers.get("Authorization", ""))
+        scheme, _, token = header.partition(" ")
+        if scheme.lower() != "bearer" or not token or len(token) > 256:
+            self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+            return False
+        expected = integration_setting("integration_token_sha256")
+        actual = integration_token_digest(token)
+        if not expected or not hmac.compare_digest(actual, expected):
+            self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+            return False
+        return True
+
     def do_GET(self):
         path = urlparse(self.path).path
+        if path.startswith("/api/integration/v1/"):
+            if not self.require_integration_auth(): return
+            result = integration_status(path)
+            if result is None:
+                self.send_json(404, {"error": "not_found"})
+            else:
+                self.send_json(200, result)
+            return
         if path == "/api/transactions/audit":
             item = self.require_auth()
             if not item: return
@@ -963,6 +1044,49 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 self.send_json(400, {"error":"JSON non valido"})
                 return
+        if path == "/api/integration/token":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            action = payload.get("action")
+            if action == "revoke":
+                integration_set_setting("integration_token_sha256", None)
+                self.send_json(200, {"ok": True, "revoked": True})
+                return
+            if action != "create":
+                self.send_json(400, {"error": "invalid_action"}); return
+            token = secrets.token_urlsafe(48)
+            integration_set_setting("integration_token_sha256", integration_token_digest(token))
+            self.send_json(200, {"ok": True, "token": token, "shown_once": True})
+            return
+        if path.startswith("/api/integration/v1/commands/"):
+            if not self.require_integration_auth(): return
+            if not INTEGRATION_OPERATION_LOCK.acquire(blocking=False):
+                self.send_json(409, {"status": "busy"}); return
+            try:
+                if path == "/api/integration/v1/commands/local-backup":
+                    create_sqlite_backup("integration")
+                    self.send_json(200, {"status": "completed", "operation": "local_backup"})
+                elif path == "/api/integration/v1/commands/google-drive-backup":
+                    cfg = drive_read_config()
+                    if not cfg.get("token", {}).get("refresh_token"):
+                        self.send_json(409, {"status": "unavailable", "code": "drive_not_connected"})
+                    else:
+                        drive_nightly_backup()
+                        self.send_json(200, {"status": "completed", "operation": "google_drive_backup"})
+                elif path == "/api/integration/v1/commands/integrity-check":
+                    with db() as connection:
+                        result = connection.execute("PRAGMA integrity_check").fetchone()[0]
+                    ok = result == "ok"
+                    integration_set_setting("integration_last_integrity_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+                    integration_set_setting("integration_last_integrity_ok", "1" if ok else "0")
+                    self.send_json(200 if ok else 500, {"status": "completed" if ok else "failed", "integrity_ok": ok})
+                else:
+                    self.send_json(404, {"error": "not_found"})
+            except Exception:
+                self.send_json(500, {"status": "failed", "code": "operation_failed"})
+            finally:
+                INTEGRATION_OPERATION_LOCK.release()
+            return
         if path == "/api/attachments/upload":
             item = self.require_auth(csrf=True)
             if not item: return
