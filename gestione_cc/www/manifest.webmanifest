@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "Gestione C/C",
+  "short_name": "Gestione C/C",
+  "description": "Archivio contabile personale protetto da PIN, accessibile in rete locale.",
+  "lang": "it-IT",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#132d2b",
+  "theme_color": "#132d2b",
+  "icons": [
+    {
+      "src": "brand-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
