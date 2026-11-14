@@ -1,6 +1,7 @@
 import ast
 import hashlib
 import ipaddress
+import os
 import shutil
 import sqlite3
 import tempfile
@@ -18,6 +19,7 @@ NAMESPACE = {
     "sqlite3": sqlite3,
     "ACCESS_LOG_RETENTION_SECONDS": 30 * 24 * 60 * 60,
     "ipaddress": ipaddress,
+    "os": os,
     "time": time,
     "Path": Path,
     "shutil": shutil,
