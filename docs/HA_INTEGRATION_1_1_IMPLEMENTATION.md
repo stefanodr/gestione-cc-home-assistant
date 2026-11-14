@@ -57,8 +57,9 @@ Le risposte devono essere DTO espliciti con allowlist di campi. Non serializzare
 
 - Mantenere HTTPS, verifica del certificato e filtro LAN.
 - Nessun port forwarding, ingress pubblico, Nabu Casa o accesso WAN.
-- Prima di abilitare la comunicazione HA Core → add-on, verificare la reale IP sorgente vista dal container e il comportamento della rete Supervisor. Non ampliare `lan_network`, non usare `host_network` e non indebolire TLS come scorciatoia.
-- Se la topologia attuale impedisce la comunicazione, valutare una soluzione esplicita e limitata dopo test; nessuna eccezione generica o bypass.
+- Home Assistant OS documenta la rete interna app/Supervisor `172.30.32.0/23` e l'indirizzo di Home Assistant Core `172.30.32.1`. È stata quindi introdotta un'eccezione configurabile e predefinita limitata a `172.30.32.1/32`, separata dalla LAN dell'utente.
+- Il peer `172.30.32.1` è autorizzato esclusivamente su GET `/api/integration/v1/*` e POST `/api/integration/v1/commands/*`; non può aprire login, UI, endpoint contabili o gestione token. La LAN configurata conserva il comportamento attuale.
+- Il valore /32 deve essere confermato sul sistema Home Assistant reale durante il collaudo; non usare `host_network`, non allargare la LAN e non indebolire TLS.
 
 ### 4. Integrazione HACS
 
