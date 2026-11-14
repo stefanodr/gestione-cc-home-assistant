@@ -24,7 +24,7 @@ def _valid_local_https_url(value: str) -> bool:
         address = ipaddress.ip_address(host)
         return address.is_private and not address.is_loopback and not address.is_link_local
     except ValueError:
-        return host in ("localhost", "homeassistant.local") or host.endswith((".local", ".lan", ".home", ".internal"))
+        return host == "homeassistant.local" or host.endswith((".local", ".lan", ".home", ".internal"))
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
