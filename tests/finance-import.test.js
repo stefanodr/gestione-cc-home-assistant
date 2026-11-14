@@ -10,8 +10,9 @@ function extract(name, nextName) {
   const asyncStart = source.indexOf('async function ' + name + '(');
   const start = asyncStart >= 0 ? asyncStart : source.indexOf('function ' + name + '(');
   assert.notEqual(start, -1, 'Funzione non trovata: ' + name);
-  const end = source.indexOf('function ' + nextName + '(', start + 1);
+  let end = source.indexOf('function ' + nextName + '(', start + 1);
   assert.notEqual(end, -1, 'Delimitatore non trovato: ' + nextName);
+  if (source.slice(end - 6, end) === 'async ') end -= 6;
   return source.slice(start, end);
 }
 const parseAmount = extract('parseAmount', 'normalize');
