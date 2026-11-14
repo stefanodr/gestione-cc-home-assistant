@@ -686,7 +686,9 @@ def integration_status(path):
             exists = True
         except FileNotFoundError:
             size, exists = 0, False
-        return {"exists": exists, "size_bytes": int(size), "last_check_at": integration_setting("integration_last_integrity_at"), "last_check_ok": integration_setting("integration_last_integrity_ok") == "1" if integration_setting("integration_last_integrity_ok") is not None else None}
+        check_at = integration_setting("integration_last_integrity_at")
+        check_ok = integration_setting("integration_last_integrity_ok")
+        return {"exists": exists, "size_bytes": int(size), "last_check_at": check_at, "last_check_ok": check_ok == "1" if check_ok is not None else None}
     if path == "/api/integration/v1/backups/status":
         BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         local_files = [p for p in BACKUP_DIR.glob("*.sqlite3") if p.is_file()]
@@ -1039,7 +1041,18 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         payload = {}
         raw_body = None
-        if path not in ("/api/sqlite-restore", "/api/attachments/upload"):
+        if path.startswith("/api/integration/"):
+            try:
+                raw = self.body()
+                if len(raw) > 4096:
+                    self.send_json(413, {"error": "request_too_large"}); return
+                payload = json.loads(raw or b"{}")
+                if not isinstance(payload, dict):
+                    self.send_json(400, {"error": "invalid_payload"}); return
+            except Exception:
+                self.send_json(400, {"error": "invalid_json"})
+                return
+        elif path not in ("/api/sqlite-restore", "/api/attachments/upload"):
             try: payload = json.loads(self.body() or b"{}")
             except Exception:
                 self.send_json(400, {"error":"JSON non valido"})
