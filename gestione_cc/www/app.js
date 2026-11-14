@@ -1394,7 +1394,9 @@
       (ids.has(t.bankAccountId)||ids.has(t.counterpartAccountId)||(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.some(sp=>ids.has(sp.accountId)))));
     const primaryAccountId=state.bankAccountId;
     const opening=ids.has(primaryAccountId)?(Number(state.openingBalance)||0):0;
-    const openingBalanceReconstructed=accounts.filter(account=>account.id!==primaryAccountId);
+    // The archive stores one opening balance (for the configured primary account).
+    // Other selected accounts can only be reconstructed from the transactions available.
+    const openingBalanceUnknown=accounts.filter(account=>account.id!==primaryAccountId);
     const lastClosedMonth=shiftMonthKey(currentMonth,-1);
     const cutoff=lastClosedMonth+'-'+String(new Date(Number(lastClosedMonth.slice(0,4)),Number(lastClosedMonth.slice(5,7)),0).getDate()).padStart(2,'0');
     const closedTxs=txs.filter(tx=>String(tx.date||'')<=cutoff);
@@ -1489,7 +1491,7 @@
     const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:openingBalance,key:currentMonth});
     const source=sources.size>1?'budget e storico misti':sources.has('budget')?'budget':sources.has('anno_precedente')?'anno precedente':'anno corrente';
     const historyCount=historyMonths.filter(key=>txs.some(tx=>String(tx.date||'').slice(0,7)===key)).length;
-    return {accounts,currentBalance:openingBalance,forecast,minimum,historyCount,estimatedNet:forecast.reduce((sum,row)=>sum+row.estimateIncome-row.estimateExpense,0),estimates:{source},openingBalanceReconstructed,lastClosedMonth};
+    return {accounts,currentBalance:openingBalance,forecast,minimum,historyCount,estimatedNet:forecast.reduce((sum,row)=>sum+row.estimateIncome-row.estimateExpense,0),estimates:{source},openingBalanceUnknown,lastClosedMonth};
   }
   async function renderForecastSelection() {
     const renderId = (renderForecastSelection._requestId || 0) + 1;
@@ -1512,7 +1514,8 @@
     $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
     $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
     $('#forecastEnding').textContent=euro.format(result.forecast.at(-1)?.balance??result.currentBalance);
-    $('#forecastReliability').textContent='Saldo al '+monthLabel(result.lastClosedMonth)+' · base '+result.estimates.source+(result.openingBalanceReconstructed.length?' · altri saldi ricostruiti dai movimenti':'')+' · stima indicativa';
+    $('#forecastReliability').textContent='Saldo al '+monthLabel(result.lastClosedMonth)+' · base '+result.estimates.source+' · stima indicativa'+(result.openingBalanceUnknown.length?' · saldo iniziale noto solo per il conto principale':''); 
+    if(status&&result.openingBalanceUnknown.length)status.textContent+=' ATTENZIONE: per '+result.openingBalanceUnknown.length+' conto/i selezionato/i non è configurato un saldo iniziale dedicato; il saldo è ricostruito dai movimenti disponibili e può essere incompleto.';
     const activeSchedules=(Array.isArray(state.recurringRules)?state.recurringRules:[]).filter(rule=>rule.active!==false);
     const dueSchedules=result.forecast.reduce((sum,row)=>sum+forecastRecurringItems(row.key,new Set(result.accounts.map(account=>account.id))).length,0);
     if(status)status.textContent+=' Impegni attivi: '+activeSchedules.length+' · occorrenze programmate nei prossimi 12 mesi: '+dueSchedules+'.';
