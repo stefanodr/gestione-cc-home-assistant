@@ -2,7 +2,7 @@
   'use strict';
 
   const APP_VERSION = '1.7.13';
-  let privacyMode = '1';
+  let privacyMode = false;
   let privacyObserver = null;
   function setAppProgress(value, label) {
     const percent = Math.max(0, Math.min(100, Math.round(value)));
@@ -10,45 +10,68 @@
     if (bar) bar.style.width = percent + '%';
     if (text) text.textContent = (label ? label + ' · ' : '') + percent + '%';
   }
+  async function paintAppProgress() {
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }
   function maskNumericText(root) {
-    if (privacyMode !== '3' || !root) return;
+    if (!privacyMode || !root) return;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode(node) {
       const parent = node.parentElement;
-      if (!parent || parent.closest('script,style,input,textarea,select,.privacy-control,.privacy-digit-mask,[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
-      return /\d/.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      if (!parent || parent.closest('script,style,input,textarea,select,.privacy-toggle,.privacy-money-mask,[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
+      const amountContainer = parent.closest('.amount-cell,.amount-in,.amount-out,.pending-amount,.category-amount,.privacy-balance,.metric-value,.report-value,.delta-positive,.delta-negative,[data-money]');
+      const value = node.nodeValue || '';
+      return (amountContainer ? /\\d/.test(value) : /€/.test(value)) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }});
-    const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
     for (const node of nodes) {
-      const fragment=document.createDocumentFragment();
-      for (const part of node.nodeValue.split(/(\d+(?:[.,]\d+)?)/g)) {
-        if (!part) continue;
-        if (/^\d/.test(part)) { const span=document.createElement('span'); span.className='privacy-digit-mask'; span.textContent='*'.repeat(Math.max(3,part.length)); span.dataset.original=part; fragment.append(span); }
-        else fragment.append(document.createTextNode(part));
+      const value = node.nodeValue || '';
+      const parent = node.parentElement;
+      const amountContainer = parent?.closest('.amount-cell,.amount-in,.amount-out,.pending-amount,.category-amount,.privacy-balance,.metric-value,.report-value,.delta-positive,.delta-negative,[data-money]');
+      const pattern = amountContainer ? /[-+]?\\d[\\d.,]*/g : /(?:€\\s*[-+]?\\d[\\d.,]*|[-+]?\\d[\\d.,]*\\s*€)/g;
+      const fragment = document.createDocumentFragment();
+      let last = 0, match;
+      while ((match = pattern.exec(value))) {
+        if (match.index > last) fragment.append(document.createTextNode(value.slice(last, match.index)));
+        const original = match[0];
+        const number = original.match(/[-+]?\\d[\\d.,]*/)?.[0] || '';
+        const span = document.createElement('span');
+        span.className = 'privacy-money-mask';
+        span.textContent = original.replace(number, '*'.repeat(Math.max(3, number.length)));
+        span.dataset.original = original;
+        fragment.append(span);
+        last = match.index + original.length;
       }
+      if (last === 0) continue;
+      if (last < value.length) fragment.append(document.createTextNode(value.slice(last)));
       node.replaceWith(fragment);
     }
   }
-  function applyPrivacyMode(mode) {
-    privacyMode = ['1','2','3'].includes(String(mode)) ? String(mode) : '1';
-    document.body.dataset.privacy = privacyMode;
-    document.querySelectorAll('.privacy-digit-mask').forEach(span=>span.replaceWith(document.createTextNode(span.dataset.original || '')));
-    document.querySelectorAll('.privacy-balance').forEach(el=>el.classList.toggle('privacy-hidden',privacyMode==='2'||privacyMode==='3'));
-    document.querySelectorAll('[data-privacy-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.privacyMode===privacyMode)));
+  function applyPrivacyMode(hidden) {
+    privacyMode = Boolean(hidden);
+    document.body.dataset.hideAmounts = String(privacyMode);
+    document.querySelectorAll('.privacy-money-mask').forEach(span => span.replaceWith(document.createTextNode(span.dataset.original || '')));
+    const toggle = $('#privacyToggle');
+    if (toggle) toggle.checked = privacyMode;
     if (privacyObserver) privacyObserver.disconnect();
-    if (privacyMode==='3') maskNumericText(document.body);
-    if (privacyObserver) privacyObserver.observe(document.body,{childList:true,subtree:true});
+    if (privacyMode) maskNumericText(document.body);
+    if (privacyObserver) privacyObserver.observe(document.body, { childList: true, subtree: true });
   }
   function setupPrivacyControls() {
-    document.querySelectorAll('[data-privacy-mode]').forEach(button=>button.addEventListener('click',()=>applyPrivacyMode(button.dataset.privacyMode)));
+    const toggle = $('#privacyToggle');
+    toggle?.addEventListener('change', () => applyPrivacyMode(toggle.checked));
     if (privacyObserver) privacyObserver.disconnect();
-    privacyObserver = new MutationObserver(records=>{
-      if (privacyMode!=='3') return;
+    privacyObserver = new MutationObserver(records => {
+      if (!privacyMode) return;
       privacyObserver.disconnect();
-      for (const record of records) for (const node of record.addedNodes) if (node.nodeType===Node.TEXT_NODE) maskNumericText(node.parentNode); else if (node.nodeType===Node.ELEMENT_NODE) maskNumericText(node);
-      privacyObserver.observe(document.body,{childList:true,subtree:true});
+      for (const record of records) for (const node of record.addedNodes) {
+        if (node.nodeType === Node.TEXT_NODE) maskNumericText(node.parentNode);
+        else if (node.nodeType === Node.ELEMENT_NODE) maskNumericText(node);
+      }
+      privacyObserver.observe(document.body, { childList: true, subtree: true });
     });
-    privacyObserver.observe(document.body,{childList:true,subtree:true});
-    applyPrivacyMode('1');
+    privacyObserver.observe(document.body, { childList: true, subtree: true });
+    applyPrivacyMode(false);
   }
   const DB_NAME = 'ContiChiariPrototype';
   const DB_VERSION = 1;
@@ -434,6 +457,7 @@
   async function initialize() {
     const retryButton = $('#retryAppLoading');
     setAppProgress(8, 'Connessione al database');
+    await paintAppProgress();
     retryButton?.addEventListener('click', () => {
       if (retryButton.disabled) return;
       retryButton.disabled = true;
@@ -453,7 +477,10 @@
       } finally {
         window.clearTimeout(loadingTimeout);
       }
-      setAppProgress(38, 'Archivio ricevuto');
+      setAppProgress(32, 'Database collegato');
+      await paintAppProgress();
+      setAppProgress(42, 'Archivio ricevuto');
+      await paintAppProgress();
       csrfToken = archive.csrf || '';
       stateRevision = Number.isInteger(archive.revision) ? archive.revision : 0;
       state = archive.state;
@@ -473,8 +500,11 @@
       $('#saveStatus').textContent = 'Server non raggiungibile';
       return;
     }
-    setAppProgress(58, 'Preparazione dei dati');
+    setAppProgress(50, 'Preparazione dei dati');
+    await paintAppProgress();
     if (normalizeState()) needsSave = true;
+    setAppProgress(68, 'Dati preparati');
+    await paintAppProgress();
     reportMode = ['monthly', 'quarterly', 'halfyearly', 'annual'].includes(state.reportMode) ? state.reportMode : 'monthly';
     $('#reportPeriodMode').value = reportMode;
     setupControls();
@@ -487,12 +517,18 @@
     if (state.selectedMonth !== selectedMonth) { state.selectedMonth = selectedMonth; needsSave = true; }
     $('#monthPicker').value = selectedMonth;
     syncReportPeriodPicker(selectedMonth);
-    if (needsSave) { setAppProgress(72, 'Salvataggio iniziale'); await saveState(); }
-    setAppProgress(88, 'Apertura delle schermate');
+    if (needsSave) {
+      setAppProgress(78, 'Salvataggio iniziale');
+      await paintAppProgress();
+      await saveState();
+    }
+    setAppProgress(92, 'Apertura delle schermate');
+    await paintAppProgress();
     
     $('#welcomeDate').textContent = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()).toUpperCase();
     document.body.classList.add('app-ready');
     setAppProgress(100, 'Completato');
+    await paintAppProgress();
     $('#appLoading')?.classList.add('hidden');
     navigate('overview');
     void refreshStorageInfo();
