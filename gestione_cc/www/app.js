@@ -1508,7 +1508,7 @@
     const dueSchedules=result.forecast.reduce((sum,row)=>sum+forecastRecurringItems(row.key,new Set(result.accounts.map(account=>account.id))).length,0);
     if(status)status.textContent+=' Impegni attivi: '+activeSchedules.length+' · occorrenze programmate nei prossimi 12 mesi: '+dueSchedules+'.';
     $('#forecastBody').innerHTML=result.forecast.map(row=>'<tr><td>'+safeText(monthLabel(row.key))+'</td><td>'+euro.format(row.openingBalance)+'</td><td>'+euro.format(row.programmedIncome)+'</td><td>'+euro.format(row.programmedExpense)+'</td><td>'+euro.format(row.estimateIncome)+'</td><td>'+euro.format(row.estimateExpense)+'</td><td class="'+(row.balance>=0?'amount-in':'amount-out')+'">'+euro.format(row.balance)+'</td></tr>').join('');
-    document.querySelectorAll('#forecastBody td:nth-child(2),#forecastBody td:nth-child(7)').forEach(cell=>{cell.classList.add('privacy-balance');cell.classList.toggle('privacy-hidden',privacyMode==='2'||privacyMode==='3');});
+    document.querySelectorAll('#forecastBody td:nth-child(2),#forecastBody td:nth-child(7)').forEach(cell=>{cell.classList.add('privacy-balance');if(privacyMode)maskNumericText(cell);});
   }
 
   function navigate(view) {
