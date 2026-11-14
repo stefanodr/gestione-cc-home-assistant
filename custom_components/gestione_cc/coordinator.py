@@ -70,7 +70,7 @@ class GestioneCCCoordinator(DataUpdateCoordinator):
             headers={"Authorization": f"Bearer {self.token}"},
             json={},
             ssl=self.ssl_context,
-            timeout=aiohttp.ClientTimeout(total=300),
+            timeout=aiohttp.ClientTimeout(total=15),
         ) as response:
             payload = await response.json()
             if response.status >= 400:
