@@ -17,22 +17,17 @@ class SSLExecutorRegressionTest(unittest.TestCase):
         ]
         self.assertGreaterEqual(len(calls), 2, "CA file check and SSL context creation must run in executor")
 
-        direct_ssl_calls = [
+        ssl_factory_refs = [
             node for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "create_default_context"
+            if isinstance(node, ast.Attribute) and node.attr == "create_default_context"
         ]
-        self.assertEqual(len(direct_ssl_calls), 1)
+        self.assertEqual(len(ssl_factory_refs), 1)
         self.assertTrue(
             any(
                 isinstance(arg, ast.Call)
                 and isinstance(arg.func, ast.Name)
                 and arg.func.id == "partial"
-                and any(
-                    isinstance(inner, ast.Attribute) and inner.attr == "create_default_context"
-                    for inner in ast.walk(arg)
-                )
+                and ssl_factory_refs[0] in list(ast.walk(arg))
                 for call in calls for arg in call.args
             ),
             "SSL context creation must be passed to async_add_executor_job",
@@ -47,6 +42,12 @@ class SSLExecutorRegressionTest(unittest.TestCase):
             and node.func.attr == "async_add_executor_job"
         ]
         self.assertTrue(calls, "Coordinator SSL context creation must run in executor")
+        ssl_factory_refs = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Attribute) and node.attr == "create_default_context"
+        ]
+        self.assertEqual(len(ssl_factory_refs), 1)
+        self.assertTrue(any(ssl_factory_refs[0] in list(ast.walk(arg)) for call in calls for arg in call.args))
 
 
 if __name__ == "__main__":
