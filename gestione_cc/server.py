@@ -768,14 +768,13 @@ def integration_status(path):
 ACCESS_LOG_RETENTION_SECONDS = 30 * 24 * 60 * 60
 
 def access_db():
-    is_new = not ACCESS_LOG_DB_PATH.exists()
+    try:
+        descriptor = os.open(ACCESS_LOG_DB_PATH, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+        os.close(descriptor)
+    except FileExistsError:
+        pass
     connection = sqlite3.connect(ACCESS_LOG_DB_PATH, timeout=15)
-    if is_new:
-        try:
-            os.chmod(ACCESS_LOG_DB_PATH, 0o600)
-        except OSError:
-            connection.close()
-            raise
+    os.chmod(ACCESS_LOG_DB_PATH, 0o600)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA secure_delete=ON")
     connection.execute("CREATE TABLE IF NOT EXISTS access_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL, outcome TEXT NOT NULL, session_ref TEXT, ip_address TEXT NOT NULL)")
