@@ -45,7 +45,7 @@ Il link non contiene PIN o token. L'app richiede comunque il PIN all'apertura qu
 - Config flow, coordinator, sensori, binary sensor e pulsanti sono in fase iniziale.
 - Polling corrente: 2 minuti per tutti gli endpoint.
 - I comandi sono sincroni e hanno timeout esteso; la gestione job asincrona sarà migliorata.
-- La compatibilità di rete HA Core → add-on deve essere verificata sul sistema reale. L'add-on applica un filtro LAN e non deve essere allargato o disattivato per far funzionare l'integrazione.
+- L'add-on mantiene la LAN autorizzata e aggiunge una sola eccezione /32 per Home Assistant Core (`172.30.32.1/32`, rete interna documentata di Home Assistant OS). Quel peer può chiamare esclusivamente gli endpoint tecnici e i tre comandi: non può accedere a login, interfaccia, API contabili o gestione token. Il valore /32 va comunque confermato nel collaudo reale; non viene usato `host_network` e non si apre l'accesso WAN.
 - L'installazione HACS e il test end-to-end saranno abilitati solo dopo il collaudo della rete e del certificato.
 
 **Non installare questa versione di sviluppo sul sistema operativo Home Assistant principale.**
