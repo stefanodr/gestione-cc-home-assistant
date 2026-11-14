@@ -11,6 +11,10 @@
       entity_id: binary_sensor.gestione_cc_applicazione_online
       to: "off"
       for: "00:01:00"
+    - trigger: state
+      entity_id: binary_sensor.gestione_cc_app_online
+      to: "unavailable"
+      for: "00:01:00"
   actions:
     - action: notify.notify
       data:
@@ -58,4 +62,18 @@
       data:
         title: "Gestione C/C"
         message: "Sono presenti elaborazioni OCR non riuscite. Apri Gestione C/C per verificare."
+  mode: single
+
+- id: gestione_cc_processi_falliti
+  alias: "Gestione C/C - processi non riusciti"
+  description: "Avvisa quando un processo in background termina con errore."
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.gestione_cc_jobs_failed
+      above: 0
+  actions:
+    - action: notify.notify
+      data:
+        title: "Gestione C/C"
+        message: "È presente almeno un processo non riuscito negli ultimi 7 giorni. Apri l'app per verificare."
   mode: single
