@@ -1,0 +1,94 @@
+title: Gestione C/C
+views:
+  - title: Monitoraggio
+    path: gestione-cc
+    icon: mdi:bank-check
+    cards:
+      - type: markdown
+        content: |
+          # Gestione C/C
+          Monitoraggio tecnico. Nessun dato contabile viene mostrato in questa dashboard.
+
+          [Apri l'applicazione](https://homeassistant.local:8443/)
+      - type: entities
+        title: Applicazione e database
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.gestione_cc_applicazione_online
+            name: Applicazione online
+          - entity: sensor.gestione_cc_versione_applicazione
+            name: Versione applicazione
+          - entity: sensor.gestione_cc_versione_add_on
+            name: Versione add-on
+          - entity: sensor.gestione_cc_tempo_attivita
+            name: Tempo attività
+          - entity: binary_sensor.gestione_cc_database_integro
+            name: Database integro
+          - entity: sensor.gestione_cc_dimensione_database
+            name: Dimensione database
+          - entity: sensor.gestione_cc_ultimo_controllo_integrita
+            name: Ultimo controllo integrità
+      - type: entities
+        title: Backup e archiviazione
+        show_header_toggle: false
+        entities:
+          - entity: sensor.gestione_cc_copie_backup_locali
+            name: Copie locali
+          - entity: sensor.gestione_cc_ultimo_backup_locale
+            name: Ultimo backup locale
+          - entity: binary_sensor.gestione_cc_google_drive_collegato
+            name: Google Drive collegato
+          - entity: sensor.gestione_cc_ultimo_backup_google_drive
+            name: Ultimo backup Google Drive
+          - entity: sensor.gestione_cc_spazio_libero
+            name: Spazio libero
+          - entity: sensor.gestione_cc_spazio_utilizzato
+            name: Spazio utilizzato
+      - type: entities
+        title: OCR, allegati e processi
+        show_header_toggle: false
+        entities:
+          - entity: sensor.gestione_cc_numero_allegati
+            name: Numero allegati
+          - entity: sensor.gestione_cc_dimensione_allegati
+            name: Dimensione allegati
+          - entity: sensor.gestione_cc_ocr_in_coda
+            name: OCR in coda
+          - entity: sensor.gestione_cc_ocr_in_elaborazione
+            name: OCR in elaborazione
+          - entity: sensor.gestione_cc_ocr_in_errore
+            name: OCR in errore
+          - entity: sensor.gestione_cc_processi_in_errore
+            name: Processi in errore
+      - type: grid
+        title: Operazioni
+        columns: 3
+        square: false
+        cards:
+          - type: button
+            entity: button.gestione_cc_backup_locale
+            name: Backup locale
+            icon: mdi:backup-restore
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.gestione_cc_backup_locale
+          - type: button
+            entity: button.gestione_cc_backup_google_drive
+            name: Backup Drive
+            icon: mdi:cloud-upload
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.gestione_cc_backup_google_drive
+          - type: button
+            entity: button.gestione_cc_controllo_integrita_database
+            name: Controllo integrità
+            icon: mdi:database-check
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.gestione_cc_controllo_integrita_database
