@@ -146,6 +146,12 @@ class IntegrationApiDtoTest(unittest.TestCase):
         self.assertEqual(row[3], "192.168.1.42")
         self.assertNotIn(raw_session, str(row))
 
+    def test_access_log_failure_does_not_block_application_flow(self):
+        def fail_open():
+            raise OSError("disk unavailable")
+        with patch.dict(NAMESPACE, {"access_db": fail_open}):
+            NAMESPACE["record_access_event"]("login", "success", "192.168.1.42", "session")
+
     def test_access_log_retention_removes_records_older_than_30_days(self):
         old = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 31 * 86400))
         recent = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
