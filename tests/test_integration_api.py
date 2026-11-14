@@ -34,6 +34,8 @@ class IntegrationApiDtoTest(unittest.TestCase):
         connection.row_factory = sqlite3.Row
         connection.executescript("""
             CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE app_state (id INTEGER PRIMARY KEY, updated_at TEXT);
+            INSERT INTO app_state VALUES (1, '2026-11-14T18:00:00Z');
             CREATE TABLE background_jobs (id TEXT, kind TEXT, status TEXT);
             CREATE TABLE attachments (id TEXT, filename TEXT, size INTEGER, content BLOB);
             INSERT INTO background_jobs VALUES ('secret-job-id', 'document_ocr', 'queued');
@@ -78,7 +80,7 @@ class IntegrationApiDtoTest(unittest.TestCase):
 
     def test_database_dto_does_not_return_paths_or_accounting_data(self):
         result = NAMESPACE["integration_status"]("/api/integration/v1/database/status")
-        self.assertEqual(set(result), {"exists", "size_bytes", "last_check_at", "last_check_ok"})
+        self.assertEqual(set(result), {"exists", "size_bytes", "last_write_at", "last_check_at", "last_check_ok"})
         self.assertNotIn("path", result)
         self.assertNotIn("filename", result)
 
