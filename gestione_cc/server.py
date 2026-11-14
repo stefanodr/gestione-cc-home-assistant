@@ -1084,7 +1084,7 @@ class Handler(BaseHTTPRequestHandler):
         if not str(candidate).startswith(str(WWW.resolve()) + os.sep) or not candidate.is_file():
             self.send_error(404); return
         data = candidate.read_bytes()
-        mime = {".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8" ,".svg":"image/svg+xml",".json":"application/json"}.get(candidate.suffix, "application/octet-stream")
+        mime = {".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8" ,".svg":"image/svg+xml",".json":"application/json",".webmanifest":"application/manifest+json; charset=utf-8"}.get(candidate.suffix, "application/octet-stream")
         self.send_response(200)
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
