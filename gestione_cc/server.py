@@ -751,11 +751,16 @@ def record_access_event(event, outcome, ip_address, session_token=None):
     except ValueError:
         ip_value = "unknown"
     at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    with access_db() as connection:
-        connection.execute("INSERT INTO access_log(at,event,outcome,session_ref,ip_address) VALUES(?,?,?,?,?)",
-                           (at, str(event)[:32], str(outcome)[:16], session_ref, ip_value))
-        connection.execute("DELETE FROM access_log WHERE at < ?",
-                           (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - ACCESS_LOG_RETENTION_SECONDS)),))
+    try:
+        with access_db() as connection:
+            connection.execute("INSERT INTO access_log(at,event,outcome,session_ref,ip_address) VALUES(?,?,?,?,?)",
+                               (at, str(event)[:32], str(outcome)[:16], session_ref, ip_value))
+            connection.execute("DELETE FROM access_log WHERE at < ?",
+                               (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - ACCESS_LOG_RETENTION_SECONDS)),))
+    except Exception as error:
+        # Security logging must not lock the accounting application out if its
+        # separate log volume is unavailable; never print IPs or session tokens.
+        print("GestioneCC: scrittura registro accessi non riuscita: " + type(error).__name__)
 
 def access_log_cleanup_worker():
     while True:
@@ -1674,7 +1679,10 @@ class LANOnlyHTTPServer(ThreadingHTTPServer):
 
 if __name__ == "__main__":
     init_db()
-    cleanup_access_log()
+    try:
+        cleanup_access_log()
+    except Exception as error:
+        print("GestioneCC: pulizia iniziale registro accessi non riuscita: " + type(error).__name__)
     __import__("threading").Thread(target=access_log_cleanup_worker, daemon=True, name="access-log-cleanup").start()
     cert_file = SSL_DIR / "server.crt"
     key_file = SSL_DIR / "server.key"
