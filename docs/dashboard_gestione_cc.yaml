@@ -14,51 +14,51 @@ views:
         title: Applicazione e database
         show_header_toggle: false
         entities:
-          - entity: binary_sensor.gestione_cc_applicazione_online
+          - entity: binary_sensor.gestione_cc_app_online
             name: Applicazione online
-          - entity: sensor.gestione_cc_versione_applicazione
+          - entity: sensor.gestione_cc_app_version
             name: Versione applicazione
-          - entity: sensor.gestione_cc_versione_add_on
+          - entity: sensor.gestione_cc_addon_version
             name: Versione add-on
-          - entity: sensor.gestione_cc_tempo_attivita
+          - entity: sensor.gestione_cc_uptime
             name: Tempo attività
-          - entity: binary_sensor.gestione_cc_database_integro
+          - entity: binary_sensor.gestione_cc_database_integrity
             name: Database integro
-          - entity: sensor.gestione_cc_dimensione_database
+          - entity: sensor.gestione_cc_database_size
             name: Dimensione database
-          - entity: sensor.gestione_cc_ultimo_controllo_integrita
+          - entity: sensor.gestione_cc_database_last_check
             name: Ultimo controllo integrità
       - type: entities
         title: Backup e archiviazione
         show_header_toggle: false
         entities:
-          - entity: sensor.gestione_cc_copie_backup_locali
+          - entity: sensor.gestione_cc_backup_local_count
             name: Copie locali
-          - entity: sensor.gestione_cc_ultimo_backup_locale
+          - entity: sensor.gestione_cc_backup_local_last
             name: Ultimo backup locale
-          - entity: binary_sensor.gestione_cc_google_drive_collegato
+          - entity: binary_sensor.gestione_cc_google_drive_connected
             name: Google Drive collegato
-          - entity: sensor.gestione_cc_ultimo_backup_google_drive
+          - entity: sensor.gestione_cc_backup_drive_last
             name: Ultimo backup Google Drive
-          - entity: sensor.gestione_cc_spazio_libero
+          - entity: sensor.gestione_cc_storage_free
             name: Spazio libero
-          - entity: sensor.gestione_cc_spazio_utilizzato
+          - entity: sensor.gestione_cc_storage_used
             name: Spazio utilizzato
       - type: entities
         title: OCR, allegati e processi
         show_header_toggle: false
         entities:
-          - entity: sensor.gestione_cc_numero_allegati
+          - entity: sensor.gestione_cc_documents_count
             name: Numero allegati
-          - entity: sensor.gestione_cc_dimensione_allegati
+          - entity: sensor.gestione_cc_documents_bytes
             name: Dimensione allegati
-          - entity: sensor.gestione_cc_ocr_in_coda
+          - entity: sensor.gestione_cc_ocr_queued
             name: OCR in coda
-          - entity: sensor.gestione_cc_ocr_in_elaborazione
+          - entity: sensor.gestione_cc_ocr_running
             name: OCR in elaborazione
-          - entity: sensor.gestione_cc_ocr_in_errore
+          - entity: sensor.gestione_cc_ocr_failed
             name: OCR in errore
-          - entity: sensor.gestione_cc_processi_in_errore
+          - entity: sensor.gestione_cc_jobs_failed
             name: Processi in errore
       - type: grid
         title: Operazioni
@@ -66,29 +66,29 @@ views:
         square: false
         cards:
           - type: button
-            entity: button.gestione_cc_backup_locale
+            entity: button.gestione_cc_local_backup
             name: Backup locale
             icon: mdi:backup-restore
             tap_action:
               action: perform-action
               perform_action: button.press
               target:
-                entity_id: button.gestione_cc_backup_locale
+                entity_id: button.gestione_cc_local_backup
           - type: button
-            entity: button.gestione_cc_backup_google_drive
+            entity: button.gestione_cc_google_drive_backup
             name: Backup Drive
             icon: mdi:cloud-upload
             tap_action:
               action: perform-action
               perform_action: button.press
               target:
-                entity_id: button.gestione_cc_backup_google_drive
+                entity_id: button.gestione_cc_google_drive_backup
           - type: button
-            entity: button.gestione_cc_controllo_integrita_database
+            entity: button.gestione_cc_integrity_check
             name: Controllo integrità
             icon: mdi:database-check
             tap_action:
               action: perform-action
               perform_action: button.press
               target:
-                entity_id: button.gestione_cc_controllo_integrita_database
+                entity_id: button.gestione_cc_integrity_check
