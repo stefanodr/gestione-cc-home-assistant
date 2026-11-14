@@ -36,7 +36,10 @@ class IntegrationApiDtoTest(unittest.TestCase):
         self.db_path = self.root / "test.sqlite3"
         self.access_log_path = self.root / "access_log.sqlite3"
         self.backup_dir = self.root / "backups"
+        self.www_dir = self.root / "www"
         self.backup_dir.mkdir()
+        self.www_dir.mkdir()
+        (self.www_dir / "app.js").write_text("const APP_VERSION = '1.7.14';\\nconst ADDON_VERSION = '1.0.43';", encoding="utf-8")
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
         connection.executescript("""
@@ -65,6 +68,7 @@ class IntegrationApiDtoTest(unittest.TestCase):
             "ACCESS_LOG_DB_PATH": self.access_log_path,
             "BACKUP_DIR": self.backup_dir,
             "DATA": self.root,
+            "WWW": self.www_dir,
             "SERVER_STARTED_AT": time.time() - 15,
             "drive_read_config": lambda: {
                 "token": {"refresh_token": "private-refresh-token"},
@@ -82,8 +86,10 @@ class IntegrationApiDtoTest(unittest.TestCase):
 
     def test_health_dto_has_only_technical_fields(self):
         result = NAMESPACE["integration_status"]("/api/integration/v1/health")
-        self.assertEqual(set(result), {"available", "uptime_seconds"})
+        self.assertEqual(set(result), {"available", "app_version", "addon_version", "uptime_seconds"})
         self.assertTrue(result["available"])
+        self.assertEqual(result["app_version"], "1.7.14")
+        self.assertEqual(result["addon_version"], "1.0.43")
         self.assertGreaterEqual(result["uptime_seconds"], 0)
 
     def test_database_dto_does_not_return_paths_or_accounting_data(self):
