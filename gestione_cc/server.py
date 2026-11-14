@@ -809,7 +809,7 @@ def record_access_event(event, outcome, ip_address, session_token=None):
         ip_value = "unknown"
     at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     try:
-        with access_db() as connection:
+        with access_db_connection() as connection:
             connection.execute("INSERT INTO access_log(at,event,outcome,session_ref,ip_address) VALUES(?,?,?,?,?)",
                                (at, str(event)[:32], str(outcome)[:16], session_ref, ip_value))
             connection.execute("DELETE FROM access_log WHERE at < ?",
@@ -931,7 +931,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/security/access-log":
             item = self.require_auth()
             if not item: return
-            with access_db() as connection:
+            with access_db_connection() as connection:
                 rows = connection.execute("SELECT at,event,outcome,session_ref,ip_address FROM access_log ORDER BY id DESC LIMIT 200").fetchall()
             self.send_json(200, {"items": [dict(row) for row in rows], "retention_days": 30})
             return
