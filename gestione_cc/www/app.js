@@ -20,7 +20,7 @@
       if (!parent || parent.closest('script,style,input,textarea,select,.privacy-toggle,.privacy-money-mask,[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
       const amountContainer = parent.closest('.amount-cell,.amount-in,.amount-out,.pending-amount,.category-amount,.privacy-balance,.metric-value,.report-value,.delta-positive,.delta-negative,[data-money]');
       const value = node.nodeValue || '';
-      return (amountContainer ? /\\d/.test(value) : /€/.test(value)) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      return (amountContainer ? /\d/.test(value) : /€/.test(value)) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }});
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
@@ -28,13 +28,13 @@
       const value = node.nodeValue || '';
       const parent = node.parentElement;
       const amountContainer = parent?.closest('.amount-cell,.amount-in,.amount-out,.pending-amount,.category-amount,.privacy-balance,.metric-value,.report-value,.delta-positive,.delta-negative,[data-money]');
-      const pattern = amountContainer ? /[-+]?\\d[\\d.,]*/g : /(?:€\\s*[-+]?\\d[\\d.,]*|[-+]?\\d[\\d.,]*\\s*€)/g;
+      const pattern = amountContainer ? /[-+]?\d[\d.,]*/g : /(?:€\\s*[-+]?\d[\d.,]*|[-+]?\d[\d.,]*\\s*€)/g;
       const fragment = document.createDocumentFragment();
       let last = 0, match;
       while ((match = pattern.exec(value))) {
         if (match.index > last) fragment.append(document.createTextNode(value.slice(last, match.index)));
         const original = match[0];
-        const number = original.match(/[-+]?\\d[\\d.,]*/)?.[0] || '';
+        const number = original.match(/[-+]?\d[\d.,]*/)?.[0] || '';
         const span = document.createElement('span');
         span.className = 'privacy-money-mask';
         span.textContent = original.replace(number, '*'.repeat(Math.max(3, number.length)));
@@ -510,7 +510,7 @@
     setupControls();
     setupPrivacyControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.31</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + ' · add-on 1.0.32</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
