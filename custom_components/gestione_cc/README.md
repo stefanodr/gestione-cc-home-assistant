@@ -15,7 +15,7 @@ Questa è la prima versione di sviluppo della custom integration. Non è ancora 
 4. Aggiungere **Gestione C/C** da Impostazioni → Dispositivi e servizi.
 5. Inserire URL HTTPS locale, token (campo mascherato) e percorso `/ssl/gestione-cc-ca.crt`.
 
-La verifica TLS è obbligatoria: l'integrazione non disabilita la verifica del certificato e non accetta HTTP o URL pubblici. Se il token viene rinnovato, aggiornare la configurazione dell'integrazione con il nuovo token; non revocare il vecchio prima di aver aggiornato Home Assistant.
+La verifica TLS è obbligatoria: l'integrazione non disabilita la verifica del certificato e non accetta HTTP o URL pubblici. Per ruotare il token in questa prima versione: generare il nuovo token nell'app, rimuovere e aggiungere nuovamente l'integrazione in Home Assistant con il nuovo token, quindi revocare il vecchio. Non revocare il vecchio prima di aver completato la riconfigurazione.
 
 ## Sensori e comandi
 La prima bozza espone disponibilità app, versioni app/add-on, uptime, dimensione/ultima modifica DB, backup, spazio, conteggio allegati e conteggi aggregati dei processi. Sono previsti tre pulsanti: backup locale, backup Google Drive e controllo integrità.
