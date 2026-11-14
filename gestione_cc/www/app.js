@@ -28,7 +28,7 @@
       const value = node.nodeValue || '';
       const parent = node.parentElement;
       const amountContainer = parent?.closest('.amount-cell,.amount-in,.amount-out,.pending-amount,.category-amount,.privacy-balance,.metric-value,.report-value,.delta-positive,.delta-negative,[data-money]');
-      const pattern = amountContainer ? /[-+]?\d[\d.,]*/g : /(?:€\\s*[-+]?\d[\d.,]*|[-+]?\d[\d.,]*\\s*€)/g;
+      const pattern = amountContainer ? /[-+]?\d[\d.,]*/g : /(?:€\s*[-+]?\d[\d.,]*|[-+]?\d[\d.,]*\s*€)/g;
       const fragment = document.createDocumentFragment();
       let last = 0, match;
       while ((match = pattern.exec(value))) {
@@ -2809,7 +2809,7 @@
     const source=String(content||'').replace(/^\uFEFF/,'');
     const blocks=source.match(/<STMTTRN\b[^>]*>[\s\S]*?(?:<\/STMTTRN>|(?=<STMTTRN\b)|$)/gi)||[];
     const read=(block,tag)=>{
-      const match=block.match(new RegExp('<'+tag+'\\s*>([^<\\r\\n]*)','i'));
+      const match=block.match(new RegExp('<'+tag+'\s*>([^<\\r\\n]*)','i'));
       return match?String(match[1]).trim():'';
     };
     return blocks.map(block=>{
