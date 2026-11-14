@@ -1,14 +1,14 @@
-## [1.0.36] - 2026-11-14
+## [1.0.37] - 2026-11-14
 
 ### Corretto
-- Corretto il caricamento degli script dell'interfaccia: ora `app.js` e `guide.js` sono inclusi come script separati e vengono eseguiti nell'ordine previsto.
-- Ripristinati l'apertura della Guida all’utilizzo, la visualizzazione dei capitoli e la ricerca senza ricaricamento della pagina.
-- Allineata la versione mostrata nel piè di pagina alla 1.0.36.
+- Corretta la ricerca delle etichette della Guida: titolo, introduzione e lingua sono elementi esterni al pannello e vengono ora individuati nel documento.
+- Evitato l'errore JavaScript che interrompeva il rendering iniziale, la ricerca e l'apertura completa della guida.
+- Allineata la versione dell'add-on a 1.0.37 nei metadati e nel piè di pagina.
 
 ### Fixed
-- Fixed interface script loading: `app.js` and `guide.js` are now separate script elements and execute in the intended order.
-- Restored User Guide navigation, topic rendering and search without a page reload.
-- Updated the footer version to 1.0.36.
+- Fixed User Guide label lookup: title, introduction and language labels are outside the guide panel and are now selected from the document.
+- Prevented the JavaScript error that stopped initial rendering, search and full-guide expansion.
+- Updated the add-on version to 1.0.37 in metadata and footer.
 
 ## [1.0.35] - 2026-11-14
 
