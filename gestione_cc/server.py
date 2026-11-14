@@ -936,7 +936,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
-        if self.server.is_integration_only_peer(self.client_address[0]) and not path.startswith("/api/integration/v1/"):
+        if not integration_peer_can_access(
+            self.client_address[0], self.server.allowed_network, self.server.integration_network, "GET", path
+        ):
             self.send_json(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
             return
         if path == "/api/security/access-log":
@@ -1189,7 +1191,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
-        if self.server.is_integration_only_peer(self.client_address[0]) and not path.startswith("/api/integration/v1/commands/"):
+        if not integration_peer_can_access(
+            self.client_address[0], self.server.allowed_network, self.server.integration_network, "POST", path
+        ):
             self.send_json(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
             return
         payload = {}
@@ -1724,6 +1728,30 @@ def peer_is_allowed(peer_address, allowed_network, integration_network):
     except ValueError:
         return False
 
+
+INTEGRATION_READ_PATHS = {
+    "/api/integration/v1/health",
+    "/api/integration/v1/database/status",
+    "/api/integration/v1/backups/status",
+    "/api/integration/v1/storage/status",
+    "/api/integration/v1/documents/status",
+    "/api/integration/v1/jobs/status",
+}
+INTEGRATION_COMMAND_PATHS = {
+    "/api/integration/v1/commands/local-backup",
+    "/api/integration/v1/commands/google-drive-backup",
+    "/api/integration/v1/commands/integrity-check",
+}
+
+def integration_peer_can_access(peer_address, allowed_network, integration_network, method, path):
+    """Restrict the extra Home Assistant Core peer to the exact technical API allowlist."""
+    if not peer_is_integration_only(peer_address, allowed_network, integration_network):
+        return True
+    if method == "GET":
+        return path in INTEGRATION_READ_PATHS
+    if method == "POST":
+        return path in INTEGRATION_COMMAND_PATHS
+    return False
 
 class LANOnlyHTTPServer(ThreadingHTTPServer):
     """Allow the home LAN plus a narrowly scoped Home Assistant Core peer."""
