@@ -8,12 +8,18 @@ Questa è la prima versione di sviluppo della custom integration. Non è ancora 
 - Certificato CA privata dell'add-on installato in un percorso leggibile da Home Assistant Core.
 - Token dedicato generato da Gestione C/C → Impostazioni → Integrazione Home Assistant.
 
-## Configurazione di sviluppo
-1. Copiare la directory `custom_components/gestione_cc` in `/config/custom_components/gestione_cc`.
-2. Dalla pagina Impostazioni → Sicurezza di Gestione C/C, scaricare il certificato CA. Copiarlo nella cartella `/ssl` di Home Assistant (con nome `gestione-cc-ca.crt`) e verificare che Home Assistant Core possa leggerlo.
-3. Riavviare Home Assistant.
-4. Aggiungere **Gestione C/C** da Impostazioni → Dispositivi e servizi.
-5. Inserire URL HTTPS locale, token (campo mascherato) e percorso `/ssl/gestione-cc-ca.crt`.
+## Installazione tramite HACS (repository personalizzato)
+1. Aprire **HACS → Integrazioni**.
+2. Aprire il menu in alto a destra e scegliere **Repository personalizzati**.
+3. Inserire `https://github.com/stefanodr/gestione-cc-home-assistant` e selezionare la categoria **Integrazione**.
+4. Aggiungere il repository e installare **Gestione C/C**.
+5. Riavviare Home Assistant.
+6. Dalla pagina Impostazioni → Sicurezza di Gestione C/C, scaricare il certificato CA. Copiarlo nella cartella `/ssl` di Home Assistant (con nome `gestione-cc-ca.crt`) e verificare che Home Assistant Core possa leggerlo.
+7. Aggiungere **Gestione C/C** da Impostazioni → Dispositivi e servizi.
+8. Inserire URL HTTPS locale, token (campo mascherato) e percorso `/ssl/gestione-cc-ca.crt`.
+
+### Installazione manuale per sviluppo
+In alternativa, copiare la directory `custom_components/gestione_cc` in `/config/custom_components/gestione_cc`, quindi seguire i passaggi 5–8. La distribuzione prevista per gli utenti è tramite HACS.
 
 Il token è conservato nei dati di configurazione Home Assistant, che non costituiscono un vault cifrato: proteggi backup e accesso amministrativo. La verifica TLS è obbligatoria: l'integrazione non disabilita la verifica del certificato e non accetta HTTP o URL pubblici. Per ruotare il token in questa prima versione: generare il nuovo token nell'app, rimuovere e aggiungere nuovamente l'integrazione in Home Assistant con il nuovo token, quindi revocare il vecchio. Non revocare il vecchio prima di aver completato la riconfigurazione.
 
