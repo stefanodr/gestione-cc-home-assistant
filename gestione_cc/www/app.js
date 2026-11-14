@@ -15,14 +15,14 @@
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode(node) {
       const parent = node.parentElement;
       if (!parent || parent.closest('script,style,input,textarea,select,button,.privacy-digit-mask,[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
-      return /\\d/.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      return /\d/.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }});
     const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
     for (const node of nodes) {
       const fragment=document.createDocumentFragment();
-      for (const part of node.nodeValue.split(/(\\d+(?:[.,]\\d+)?)/g)) {
+      for (const part of node.nodeValue.split(/(\d+(?:[.,]\d+)?)/g)) {
         if (!part) continue;
-        if (/^\\d/.test(part)) { const span=document.createElement('span'); span.className='privacy-digit-mask'; span.textContent='•'.repeat(Math.max(3,part.length)); span.dataset.original=part; fragment.append(span); }
+        if (/^\d/.test(part)) { const span=document.createElement('span'); span.className='privacy-digit-mask'; span.textContent='•'.repeat(Math.max(3,part.length)); span.dataset.original=part; fragment.append(span); }
         else fragment.append(document.createTextNode(part));
       }
       node.replaceWith(fragment);
@@ -1437,6 +1437,8 @@
       balance=Math.round((balance+programmedIncome-programmedExpense+estimateIncome-estimateExpense)*100)/100;
       forecast.push({key,openingBalance:opening,programmedIncome,programmedExpense,estimateIncome,estimateExpense,
         programmed:programmedIncome-programmedExpense,estimate:estimateIncome-estimateExpense,balance});
+      onProgress((i+1)/12*100);
+      await new Promise(resolve=>requestAnimationFrame(resolve));
     }
     const minimum=forecast.reduce((a,b)=>b.balance<a.balance?b:a,forecast[0]||{balance:openingBalance,key:currentMonth});
     const source=sources.size>1?'budget e storico misti':sources.has('budget')?'budget':sources.has('anno_precedente')?'anno precedente':'anno corrente';
@@ -1452,7 +1454,11 @@
     if(bank){const prior=bank.value;bank.innerHTML=liquid.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if(liquid.some(a=>a.id===prior))bank.value=prior;}
     if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
     renderRecurringRules();
-    const result=buildForecast();
+    const progress=$('#forecastProgress'),progressBar=$('#forecastProgressBar'),progressText=$('#forecastProgressText');
+    if(progress)progress.hidden=false; if(progressBar)progressBar.style.width='0%'; if(progressText)progressText.textContent='0%';
+    let result;
+    try { result=await buildForecast(value=>{if(progressBar)progressBar.style.width=value+'%';if(progressText)progressText.textContent=Math.round(value)+'%';}); }
+    finally { if(progress)progress.hidden=true; }
     $('#forecastOpening').textContent=euro.format(result.currentBalance);
     $('#forecastMinimum').textContent=euro.format(result.minimum.balance);
     $('#forecastMinimumMonth').textContent=monthLabel(result.minimum.key);
