@@ -1,3 +1,15 @@
+## [1.0.35] - 2026-11-14
+
+### Corretto
+- Spostata la Guida all’utilizzo in una sezione autonoma nel menu laterale, subito sotto Impostazioni.
+- Aggiunta la visualizzazione completa della guida con apertura/chiusura di tutti i capitoli.
+- Corretta e ampliata la ricerca: ricerca su titoli, contenuti e parole chiave; supporto al tasto Invio e pulsante Cerca.
+
+### Fixed
+- Moved the User Guide to its own sidebar section, directly below Settings.
+- Added full-guide view with expand/collapse for all chapters.
+- Fixed and expanded search across titles, content and keywords; added Enter-key and Search-button support.
+
 ## [1.0.34] - 2026-11-14
 
 ### Aggiunto
