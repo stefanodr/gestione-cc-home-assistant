@@ -56,10 +56,10 @@ class IntegrationApiDtoTest(unittest.TestCase):
             INSERT INTO app_state VALUES (1, '2026-11-14T18:00:00Z');
             CREATE TABLE background_jobs (id TEXT, kind TEXT, status TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT, result_json TEXT, error TEXT);
             CREATE TABLE attachments (id TEXT, filename TEXT, size INTEGER, content BLOB);
-            INSERT INTO background_jobs VALUES ('secret-job-id', 'document_ocr', 'queued');
-            INSERT INTO background_jobs VALUES ('secret-job-id-2', 'document_ocr', 'failed');
-            INSERT INTO background_jobs VALUES ('secret-drive-job', 'drive_session_backup', 'done');
-            INSERT INTO background_jobs VALUES ('unrelated-job', 'internal_task', 'failed');
+            INSERT INTO background_jobs(id,kind,status) VALUES ('secret-job-id', 'document_ocr', 'queued');
+            INSERT INTO background_jobs(id,kind,status) VALUES ('secret-job-id-2', 'document_ocr', 'failed');
+            INSERT INTO background_jobs(id,kind,status) VALUES ('secret-drive-job', 'drive_session_backup', 'done');
+            INSERT INTO background_jobs(id,kind,status) VALUES ('unrelated-job', 'internal_task', 'failed');
             INSERT INTO attachments VALUES ('secret-document-id', 'estratto-conto.pdf', 1234, X'0102');
         """)
         connection.commit()
