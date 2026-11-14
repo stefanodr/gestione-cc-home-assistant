@@ -1513,7 +1513,7 @@
   function navigate(view) {
     $$('.content-view').forEach(section => section.classList.toggle('active', section.id === `view-${view}`));
     $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === view));
-    const names = { overview: 'Panoramica', transactions: 'Movimenti', search: 'Ricerca avanzata', documents: 'Archivio documenti', budget: 'Budget', forecast: 'Previsioni', reports: 'Report', accounts: 'Piano dei conti', rules: 'Regole apprese', settings: 'Impostazioni' };
+    const names = { overview: 'Panoramica', transactions: 'Movimenti', search: 'Ricerca avanzata', documents: 'Archivio documenti', budget: 'Budget', forecast: 'Previsioni', reports: 'Report', accounts: 'Piano dei conti', rules: 'Regole apprese', settings: 'Impostazioni', guide: 'Guida all’utilizzo' };
     $('#currentSection').textContent = names[view] || 'Panoramica';
     renderAll();
     if (view === 'reports') requestAnimationFrame(drawReportChart);
