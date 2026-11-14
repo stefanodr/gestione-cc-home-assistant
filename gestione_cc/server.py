@@ -679,7 +679,16 @@ def integration_job_counts():
 def integration_status(path):
     now = time.time()
     if path == "/api/integration/v1/health":
-        return {"available": True, "uptime_seconds": max(0, int(now - SERVER_STARTED_AT))}
+        app_version = addon_version = None
+        try:
+            script = (WWW / "app.js").read_text(encoding="utf-8")
+            app_match = re.search(r"const APP_VERSION = ['\\"]([^'\\"]+)", script)
+            addon_match = re.search(r"const ADDON_VERSION = ['\\"]([^'\\"]+)", script)
+            app_version = app_match.group(1) if app_match else None
+            addon_version = addon_match.group(1) if addon_match else None
+        except OSError:
+            pass
+        return {"available": True, "app_version": app_version, "addon_version": addon_version, "uptime_seconds": max(0, int(now - SERVER_STARTED_AT))}
     if path == "/api/integration/v1/database/status":
         try:
             stat = DB_PATH.stat()
