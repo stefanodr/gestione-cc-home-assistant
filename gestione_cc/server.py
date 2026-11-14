@@ -650,7 +650,6 @@ def drive_backup_scheduler():
 
 # Home Assistant integration API: deliberately restricted to technical metadata.
 SERVER_STARTED_AT = time.time()
-INTEGRATION_OPERATION_LOCK = __import__("threading").Lock()
 
 def integration_setting(key, default=None):
     with db() as connection:
@@ -671,11 +670,30 @@ def integration_job_counts():
     allowed = {"document_ocr", "drive_session_backup"}
     counts = {"queued": 0, "running": 0, "done": 0, "failed": 0}
     with db() as connection:
-        rows = connection.execute("SELECT kind,status,COUNT(*) AS total FROM background_jobs GROUP BY kind,status").fetchall()
+        rows = connection.execute("SELECT kind,status,COUNT(*) AS total FROM background_jobs WHERE created_at >= datetime('now','-7 days') GROUP BY kind,status").fetchall()
     for row in rows:
         if row["kind"] in allowed and row["status"] in counts:
             counts[row["status"]] += int(row["total"])
     return counts
+
+def enqueue_integration_job(operation):
+    kinds = {
+        "local_backup": "integration_local_backup",
+        "google_drive_backup": "integration_google_drive_backup",
+        "integrity_check": "integration_integrity_check",
+    }
+    kind = kinds.get(operation)
+    if not kind:
+        raise ValueError("unsupported_operation")
+    with BACKGROUND_JOBS_LOCK:
+        with db() as connection:
+            active = connection.execute("SELECT 1 FROM background_jobs WHERE kind LIKE 'integration_%' AND status IN ('queued','running') LIMIT 1").fetchone()
+            if active:
+                raise RuntimeError("operation_busy")
+            job_id = secrets.token_urlsafe(24)
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            connection.execute("INSERT INTO background_jobs(id,kind,status,created_at,updated_at) VALUES(?,?,'queued',?,?)", (job_id, kind, now, now))
+    return {"status": "queued", "operation": operation}
 
 def integration_status(path):
     now = time.time()
