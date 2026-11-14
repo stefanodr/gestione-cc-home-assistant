@@ -22,7 +22,7 @@ def _valid_local_https_url(value: str) -> bool:
     host = parsed.hostname.lower()
     try:
         address = ipaddress.ip_address(host)
-        return address.is_private or address.is_loopback
+        return address.is_private and not address.is_loopback and not address.is_link_local
     except ValueError:
         return host in ("localhost", "homeassistant.local") or host.endswith((".local", ".lan", ".home", ".internal"))
 
