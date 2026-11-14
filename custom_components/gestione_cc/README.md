@@ -22,6 +22,25 @@ La prima bozza espone disponibilità app, uptime, dimensione/ultima modifica DB,
 
 Non vengono creati sensori finanziari e non vengono trasferiti conti, saldi, movimenti, descrizioni o contenuti documentali.
 
+## PWA e collegamento Home Assistant Companion
+
+L'add-on serve un manifest PWA con apertura `standalone`. Non viene installato un service worker e non viene abilitata alcuna cache offline: le risposte HTML/API restano `no-store` per evitare la persistenza di dati contabili sul dispositivo.
+
+Da Chrome, aprire Gestione C/C e scegliere **Installa Gestione C/C** dal menu del browser.
+
+Per un accesso dalla Companion App, aggiungere alla dashboard Home Assistant una scheda Pulsante con azione URL (sostituire l'host se diverso):
+
+```yaml
+type: button
+name: Apri Gestione C/C
+icon: mdi:bank
+tap_action:
+  action: url
+  url_path: https://homeassistant.local:8443/
+```
+
+Il link non contiene PIN o token. L'app richiede comunque il PIN all'apertura quando la sessione non è valida.
+
 ## Stato e limitazioni note
 - Config flow, coordinator, sensori, binary sensor e pulsanti sono in fase iniziale.
 - Polling corrente: 2 minuti per tutti gli endpoint.
