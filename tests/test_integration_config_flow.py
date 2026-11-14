@@ -24,6 +24,7 @@ class LocalHttpsConfigFlowTest(unittest.TestCase):
         self.assertFalse(valid("http://192.168.1.27:8443"))
         self.assertFalse(valid("https://8.8.8.8:8443"))
         self.assertFalse(valid("https://127.0.0.1:8443"))
+        self.assertFalse(valid("https://localhost:8443"))
         self.assertFalse(valid("https://169.254.1.10:8443"))
         self.assertFalse(valid("https://example.com:8443"))
 
