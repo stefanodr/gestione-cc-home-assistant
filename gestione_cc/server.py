@@ -846,6 +846,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if self.server.is_integration_only_peer(self.client_address[0]) and not path.startswith("/api/integration/v1/"):
+            self.send_json(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
+            return
         if path == "/api/security/access-log":
             item = self.require_auth()
             if not item: return
@@ -1096,6 +1099,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if self.server.is_integration_only_peer(self.client_address[0]) and not path.startswith("/api/integration/v1/commands/"):
+            self.send_json(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
+            return
         payload = {}
         raw_body = None
         if path.startswith("/api/integration/"):
@@ -1620,14 +1626,23 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(405, {"error":"Metodo non consentito"})
 
 class LANOnlyHTTPServer(ThreadingHTTPServer):
-    """Accept connections only from the configured home LAN subnet."""
-    def __init__(self, server_address, RequestHandlerClass, allowed_network):
+    """Allow the home LAN plus a narrowly scoped Home Assistant Core peer."""
+    def __init__(self, server_address, RequestHandlerClass, allowed_network, integration_network):
         self.allowed_network = allowed_network
+        self.integration_network = integration_network
         super().__init__(server_address, RequestHandlerClass)
+
+    def is_integration_only_peer(self, peer_address):
+        try:
+            address = ipaddress.ip_address(peer_address)
+            return address in self.integration_network and address not in self.allowed_network
+        except ValueError:
+            return False
 
     def verify_request(self, request, client_address):
         try:
-            return ipaddress.ip_address(client_address[0]) in self.allowed_network
+            address = ipaddress.ip_address(client_address[0])
+            return address in self.allowed_network or address in self.integration_network
         except ValueError:
             return False
 
@@ -1646,11 +1661,12 @@ if __name__ == "__main__":
     options = read_options()
     try:
         allowed_network = ipaddress.ip_network(str(options.get("lan_network", "192.168.1.0/24")), strict=False)
+        integration_network = ipaddress.ip_network(str(options.get("integration_network", "172.30.32.1/32")), strict=False)
     except ValueError as error:
-        raise RuntimeError("lan_network non valida: usare una rete IPv4/IPv6 in formato CIDR.") from error
+        raise RuntimeError("Rete LAN o rete integrazione non valida: usare una rete IPv4/IPv6 in formato CIDR.") from error
     __import__("threading").Thread(target=drive_backup_scheduler, daemon=True, name="drive-backup-scheduler").start()
     __import__("threading").Thread(target=background_job_worker, daemon=True, name="background-job-worker").start()
-    httpd = LANOnlyHTTPServer(("0.0.0.0", 8443), Handler, allowed_network)
+    httpd = LANOnlyHTTPServer(("0.0.0.0", 8443), Handler, allowed_network, integration_network)
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     print("Gestione C/C HTTPS in ascolto sulla porta 8443")
     httpd.serve_forever()
