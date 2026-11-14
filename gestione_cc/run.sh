@@ -39,6 +39,8 @@ if [ "$CA_CREATED" -eq 1 ]; then
   fi
 
   bashio::log.info "Creo una nuova CA privata con estensioni X.509 per Home Assistant"
+  # Set the marker before replacing the CA so an interrupted startup always renews the server certificate.
+  touch /data/tls/.renew-server-cert
   CA_TMP="/data/tls/.ca-new"
   rm -rf "$CA_TMP"
   mkdir -m 700 -p "$CA_TMP"
@@ -65,8 +67,6 @@ EOF
   mv "$CA_TMP/root-ca.key" /data/tls/root-ca.key
   mv "$CA_TMP/root-ca.crt" /data/tls/root-ca.crt
   rm -rf "$CA_TMP"
-  # Keep this marker until the matching server certificate has been created successfully.
-  touch /data/tls/.renew-server-cert
 fi
 
 NEED_CERT=0
@@ -80,7 +80,7 @@ if [ "$NEED_CERT" -eq 1 ]; then
   openssl req -new -newkey rsa:3072 -nodes \
     -keyout "$SERVER_TMP/server.key" -out "$SERVER_TMP/server.csr" \
     -subj "/CN=$HOSTNAME_CFG"
-  printf "subjectAltName=$SAN_ENTRY\nextendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyEncipherment\n" > "$SERVER_TMP/server.ext"
+  printf "basicConstraints=critical,CA:FALSE\nsubjectAltName=$SAN_ENTRY\nextendedKeyUsage=serverAuth\nkeyUsage=critical,digitalSignature,keyEncipherment\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n" > "$SERVER_TMP/server.ext"
   openssl x509 -req -in "$SERVER_TMP/server.csr" -CA /data/tls/root-ca.crt \
     -CAkey /data/tls/root-ca.key -CAcreateserial -out "$SERVER_TMP/server.crt" \
     -days 825 -sha256 -extfile "$SERVER_TMP/server.ext"
