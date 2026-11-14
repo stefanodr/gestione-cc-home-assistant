@@ -113,6 +113,12 @@ class IntegrationApiDtoTest(unittest.TestCase):
     def test_unknown_status_endpoint_returns_no_payload(self):
         self.assertIsNone(NAMESPACE["integration_status"]("/api/integration/v1/private/export"))
 
+    def test_security_log_is_not_in_accounting_database(self):
+        connection = sqlite3.connect(self.db_path)
+        row = connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='access_log'").fetchone()
+        connection.close()
+        self.assertIsNone(row)
+
     def test_access_log_stores_ip_and_pseudonymous_session_reference(self):
         raw_session = "private-session-cookie-value"
         NAMESPACE["record_access_event"]("login", "success", "192.168.1.42", raw_session)
