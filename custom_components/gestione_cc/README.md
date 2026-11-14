@@ -16,7 +16,7 @@ Questa è la prima versione di sviluppo della custom integration. Non è ancora 
 5. Riavviare Home Assistant.
 6. Dalla pagina Impostazioni → Sicurezza di Gestione C/C, scaricare il certificato CA. Copiarlo nella cartella `/ssl` di Home Assistant (con nome `gestione-cc-ca.crt`) e verificare che Home Assistant Core possa leggerlo.
 7. Aggiungere **Gestione C/C** da Impostazioni → Dispositivi e servizi.
-8. Inserire URL HTTPS locale, token (campo mascherato) e percorso `/ssl/gestione-cc-ca.crt`. Il nome host o l'indirizzo IP nell'URL deve coincidere con il valore `hostname` configurato nell'add-on: il certificato server viene emesso con SAN DNS oppure IP in base a tale valore.
+8. Inserire URL HTTPS locale, token (campo mascherato) e percorso `/ssl/gestione-cc-ca.crt`. L'URL può usare l'IP privato configurato come `hostname` oppure `homeassistant.local`; il certificato contiene SAN per entrambi quando `hostname` è un IPv4.
 
 ### Installazione manuale per sviluppo
 In alternativa, copiare la directory `custom_components/gestione_cc` in `/config/custom_components/gestione_cc`, quindi seguire i passaggi 5–8. La distribuzione prevista per gli utenti è tramite HACS.
@@ -42,7 +42,7 @@ name: Apri Gestione C/C
 icon: mdi:bank
 tap_action:
   action: url
-  url_path: https://homeassistant.local:8443/
+  url_path: https://192.168.1.27:8443/
 ```
 
 Il link non contiene PIN o token. L'app richiede comunque il PIN all'apertura quando la sessione non è valida.
@@ -56,7 +56,6 @@ Il link non contiene PIN o token. L'app richiede comunque il PIN all'apertura qu
 
 **Non installare questa versione di sviluppo sul sistema operativo Home Assistant principale.**
 
-
 ## Dashboard e automazioni di esempio
 
-Sono disponibili esempi YAML in `docs/dashboard_gestione_cc.yaml` e `docs/automazioni_gestione_cc.yaml`. Prima di importarli, verificare gli entity_id effettivi creati da Home Assistant e sostituire `notify.notify` con il servizio di notifica desiderato. Nella dashboard, sostituire `homeassistant.local` con il nome host LAN configurato nell'add-on, se diverso.
+Sono disponibili esempi YAML in `docs/dashboard_gestione_cc.yaml` e `docs/automazioni_gestione_cc.yaml`. Prima di importarli, verificare gli entity_id effettivi creati da Home Assistant e sostituire `notify.notify` con il servizio di notifica desiderato. Nella dashboard, usare l'IP o il nome host LAN configurato nell'add-on.
