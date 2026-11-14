@@ -8,7 +8,7 @@
   description: "Avvisa quando il server Gestione C/C risulta offline."
   triggers:
     - trigger: state
-      entity_id: binary_sensor.gestione_cc_applicazione_online
+      entity_id: binary_sensor.gestione_cc_app_online
       to: "off"
       for: "00:01:00"
     - trigger: state
