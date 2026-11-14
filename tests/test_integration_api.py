@@ -15,6 +15,7 @@ TREE = ast.parse(SERVER.read_text(encoding="utf-8"))
 TARGETS = {"integration_token_digest", "integration_setting", "integration_job_counts", "integration_status", "record_access_event", "cleanup_access_log"}
 NAMESPACE = {
     "hashlib": hashlib,
+    "ACCESS_LOG_RETENTION_SECONDS": 30 * 24 * 60 * 60,
     "ipaddress": ipaddress,
     "time": time,
     "Path": Path,
