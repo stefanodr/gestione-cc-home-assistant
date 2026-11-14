@@ -764,7 +764,7 @@ def record_access_event(event, outcome, ip_address, session_token=None):
 
 def access_log_cleanup_worker():
     while True:
-        time.sleep(3600)
+        time.sleep(300)
         try:
             cleanup_access_log()
         except Exception as error:
