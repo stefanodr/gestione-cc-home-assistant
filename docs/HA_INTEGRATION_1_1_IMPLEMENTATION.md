@@ -55,7 +55,7 @@ Le risposte devono essere DTO espliciti con allowlist di campi. Non serializzare
 
 ### 3. Rete e TLS
 
-- Mantenere HTTPS, verifica del certificato e filtro LAN.
+- Mantenere HTTPS, verifica del certificato e filtro LAN. Il certificato server deve includere un SAN coerente con l'host usato da HA: DNS SAN per hostname locale, IP SAN per IPv4 privato; il config flow verifica la CA e la corrispondenza TLS.
 - Nessun port forwarding, ingress pubblico, Nabu Casa o accesso WAN.
 - Home Assistant OS documenta la rete interna app/Supervisor `172.30.32.0/23` e l'indirizzo di Home Assistant Core `172.30.32.1`. È stata quindi introdotta un'eccezione configurabile e predefinita limitata a `172.30.32.1/32`, separata dalla LAN dell'utente.
 - Il peer `172.30.32.1` è autorizzato esclusivamente su GET `/api/integration/v1/*` e POST `/api/integration/v1/commands/*`; non può aprire login, UI, endpoint contabili o gestione token. La LAN configurata conserva il comportamento attuale.
