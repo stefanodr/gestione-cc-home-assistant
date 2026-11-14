@@ -1099,7 +1099,7 @@
   }
   function budgetEligibleAccounts() {
     return state.accounts.filter(a => a.hierarchyType !== 'Mastro' &&
-      (a.type === 'EXPENSE' || (a.classification === 'Patrimoniale' && (a.includeInBudget === true || a.mortgage === true) && !isLiquidAccount(a))));
+      (a.type === 'EXPENSE' || (a.classification === 'Patrimoniale' && a.includeInBudget === true && !isLiquidAccount(a))));
   }
   function budgetExpenseHistory(month, accounts) {
     const now=new Date(),[year,targetMonth]=month.split('-').map(Number),currentYear=now.getFullYear();
@@ -1403,7 +1403,7 @@
     const openingBalance=Math.round((openingBase+openingTransactions.reduce((sum,tx)=>sum+(Number(tx.amount)||0),0)+Number.EPSILON)*100)/100;
     const openingBalanceUnknown=[];
     const categories=state.accounts.filter(a=>a.hierarchyType!=='Mastro'&&
-      (['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&(a.includeInBudget===true||a.mortgage===true)&&!isLiquidAccount(a))));
+      (['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))));
     // Use up to 24 closed months so each projected month can follow its own
     // calendar-month profile instead of repeating one annual median.
     const historyMonths=Array.from({length:24},(_,i)=>shiftMonthKey(lastClosedMonth,-23+i));
@@ -1503,7 +1503,7 @@
     const liquid=state.accounts.filter(isLiquidAccount);
     const bank=$('#recBankAccount'),category=$('#recCategory');
     if(bank){const prior=bank.value;bank.innerHTML=liquid.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if(liquid.some(a=>a.id===prior))bank.value=prior;}
-    if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
+    if(category){const prior=category.value;category.innerHTML='<option value="">Senza categoria</option>'+state.accounts.filter(a=>['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&(a.includeInBudget===true||a.mortgage===true)&&!isLiquidAccount(a))).map(a=>'<option value="'+safeText(a.id)+'">'+safeText(accountDisplayLabel(a))+'</option>').join('');if([...category.options].some(o=>o.value===prior))category.value=prior;}
     renderRecurringRules();
     const progress=$('#forecastProgress'),progressBar=$('#forecastProgressBar'),progressText=$('#forecastProgressText');
     if(progress)progress.hidden=false; if(progressBar)progressBar.style.width='0%'; if(progressText)progressText.textContent='0%';
