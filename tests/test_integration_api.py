@@ -161,6 +161,7 @@ class IntegrationApiDtoTest(unittest.TestCase):
         NAMESPACE["record_access_event"]("login", "success", "192.168.1.42", raw_session)
         connection = NAMESPACE["access_db"]()
         self.assertEqual(connection.execute("PRAGMA secure_delete").fetchone()[0], 1)
+        self.assertEqual(os.stat(self.access_log_path).st_mode & 0o777, 0o600)
         row = connection.execute("SELECT event,outcome,session_ref,ip_address FROM access_log").fetchone()
         connection.close()
         self.assertEqual(row[0:2], ("login", "success"))
