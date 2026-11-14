@@ -1,3 +1,15 @@
+## [1.1.3] - 2026-11-14
+
+### Correzioni
+- Aggiornata la generazione del certificato HTTPS: quando `hostname` è un IPv4, il certificato include SAN per l'indirizzo IP e per `homeassistant.local`.
+- L'add-on mantiene la stessa CA privata e rinnova il solo certificato server quando cambia il nome host; non vengono modificati database, PIN o token.
+- Impostato `192.168.1.27` come hostname predefinito per le nuove installazioni; le installazioni esistenti devono aggiornare il campo nelle opzioni dell'add-on.
+
+### Fixes
+- Updated HTTPS certificate generation: when `hostname` is an IPv4 address, the certificate includes SAN entries for both the IP address and `homeassistant.local`.
+- The add-on keeps the existing private CA and renews only the server certificate when the hostname changes; database, PIN and token are untouched.
+- Set `192.168.1.27` as the default hostname for new installations; existing installations must update the add-on option.
+
 ## [1.1.2] - 2026-11-14
 
 ### Diagnostica
