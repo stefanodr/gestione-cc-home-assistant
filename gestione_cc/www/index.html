@@ -37,6 +37,7 @@
         <button class="nav-item" data-view="accounts"><span class="nav-icon">☷</span>Piano dei conti</button>
         <button class="nav-item" data-view="rules"><span class="nav-icon">✦</span>Regole apprese</button>
         <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span>Impostazioni</button>
+        <button class="nav-item" data-view="guide"><span class="nav-icon">?</span>Guida all’utilizzo</button>
       </nav>
       <div class="sidebar-spacer"></div>
       <div class="local-card"><span class="local-dot"></span><div><strong>Archivio centralizzato</strong><small>server domestico · accesso autenticato</small><small class="storage-meta">Database: <span id="databasePath">lettura percorso…</span></small><small class="storage-meta">Dimensione: <span id="databaseSize">calcolo…</span></small></div></div>
@@ -200,6 +201,20 @@
           <button class="button button-quiet" id="disconnectDrive" type="button">Scollega Google Drive</button>
           <p class="drive-footnote">Conservazione: 1 backup di sessione e gli ultimi 3 backup notturni (ore 03:00, ora italiana). Il backup alla chiusura della scheda è un tentativo; il comando Esci attende il completamento.</p>
         </article><article class="panel setting-card danger-card"><div class="setting-icon danger">⌫</div><h2>Cancellazione dei movimenti</h2><p>Elimina la cronologia importata e le regole imparate, mantenendo il piano dei conti.</p><button class="button button-danger" id="deletePersonalData">Elimina movimenti e regole</button></article></div>
+      </section>
+
+      <section class="content-view" id="view-guide">
+        <div class="page-heading"><div><p class="eyebrow">MANUALE OPERATIVO</p><h1 data-guide-label="title">Guida all’utilizzo</h1><p class="subtitle" data-guide-label="intro">Consulta la guida completa oppure cerca un argomento specifico.</p></div><label class="guide-language-label"><span data-guide-label="language">Lingua guida</span><select id="guideLanguage" aria-label="Lingua della guida"><option value="it">Italiano</option><option value="en">English</option></select></label></div>
+        <article class="panel guide-panel" id="usageGuide">
+          <form id="guideSearchForm" class="guide-tools">
+            <label class="guide-search" for="guideSearch"><span aria-hidden="true">⌕</span><input id="guideSearch" type="search" placeholder="Cerca un argomento o una funzione…" autocomplete="off"><button type="button" id="guideSearchClear" aria-label="Cancella ricerca">×</button></label>
+            <button class="button button-primary guide-submit" id="guideSearchSubmit" type="submit">Cerca</button>
+            <span id="guideResultCount" class="guide-result-count" aria-live="polite"></span>
+          </form>
+          <div class="guide-toolbar"><p id="guideBrowseHint">Puoi aprire i singoli capitoli oppure visualizzare tutta la guida in un'unica pagina.</p><button type="button" class="button button-outline" id="guideExpandAll">Apri tutta la guida</button></div>
+          <div id="guideTopics" class="guide-topics"></div>
+          <p id="guideNoResults" class="guide-no-results" hidden>Nessun risultato. Prova con parole diverse.</p>
+        </article>
       </section>
 
       <footer class="app-footer"><span>Gestione C/C · Archivio centralizzato</span><span id="saveStatus">Connessione al server domestico</span></footer>
