@@ -1,7 +1,5 @@
 # Gestione C/C — Documentation / Documentazione
 
-**Versione / Version:** 1.0.19
-
 [Italiano](#italiano) · [English](#english)
 
 ---
