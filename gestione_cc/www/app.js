@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.7.13';
+  const APP_VERSION = '1.7.14';
   let privacyMode = false;
   let privacyObserver = null;
   function setAppProgress(value, label) {
@@ -1401,7 +1401,9 @@
     const openingBase=allLiquidSelected||ids.has(state.bankAccountId)?Number(state.openingBalance)||0:0;
     const openingTransactions=state.transactions.filter(tx=>String(tx.date||'')<=cutoff&&tx.status!=='duplicate'&&(allLiquidSelected||ids.has(tx.bankAccountId)));
     const openingBalance=Math.round((openingBase+openingTransactions.reduce((sum,tx)=>sum+(Number(tx.amount)||0),0)+Number.EPSILON)*100)/100;
-    const openingBalanceUnknown=[];
+    const openingBalanceUnknown=accounts
+      .filter(account=>account.id!==state.bankAccountId&&account.openingBalance==null)
+      .map(account=>account.path||account.name||account.id);
     const categories=state.accounts.filter(a=>a.hierarchyType!=='Mastro'&&
       (['INCOME','EXPENSE'].includes(a.type)||(a.classification==='Patrimoniale'&&a.includeInBudget===true&&!isLiquidAccount(a))));
     // Use up to 24 closed months so each projected month can follow its own
@@ -1632,15 +1634,35 @@
     const accountFilter = state.reportAccountId || state.bankAccountId;
     return state.transactions.filter(tx => tx.date >= start && tx.date <= end && tx.status !== 'duplicate' && (accountFilter === 'all' || !accountFilter || tx.bankAccountId === accountFilter));
   }
+  function isMortgageAccount(account) {
+    let current = account;
+    const visited = new Set();
+    while (current && !visited.has(String(current.id))) {
+      visited.add(String(current.id));
+      if (current.mortgage === true) return true;
+      current = current.parentId ? accountById(current.parentId) : null;
+    }
+    return false;
+  }
+  function isReportExpenseAccount(account) {
+    return Boolean(account && (account.type === 'EXPENSE' ||
+      (account.classification === 'Patrimoniale' && (account.includeInBudget === true || isMortgageAccount(account)))));
+  }
   function cashFlowTotals(transactions) {
     let income = 0, expense = 0, transfers = 0;
     for (const tx of transactions) {
       if (tx.amount > 0) income += tx.amount;
       else expense += Math.abs(tx.amount);
       if (Array.isArray(tx.counterpartSplits) && tx.counterpartSplits.length) {
-        const transferParts = tx.counterpartSplits.filter(split => accountById(split.accountId)?.classification === 'Patrimoniale');
+        const transferParts = tx.counterpartSplits.filter(split => {
+          const account = accountById(split.accountId);
+          return account?.classification === 'Patrimoniale' && !isMortgageAccount(account);
+        });
         transfers += transferParts.reduce((sum, split) => sum + Math.abs(split.value), 0);
-      } else if (accountById(tx.counterpartAccountId)?.classification === 'Patrimoniale') transfers += Math.abs(tx.amount);
+      } else {
+        const account = accountById(tx.counterpartAccountId);
+        if (account?.classification === 'Patrimoniale' && !isMortgageAccount(account)) transfers += Math.abs(tx.amount);
+      }
     }
     return { income, expense, net: income - expense, transfers };
   }
@@ -2446,7 +2468,7 @@
       const visited = new Set();
       while (account && !visited.has(String(account.id))) {
         visited.add(String(account.id));
-        if (account.type === 'EXPENSE' || (account.classification === 'Patrimoniale' && account.includeInBudget === true)) {
+        if (isReportExpenseAccount(account)) {
           totals.set(account.id, (totals.get(account.id) || 0) + amount);
         }
         account = account.parentId ? accountById(account.parentId) : null;
@@ -2505,8 +2527,8 @@
   }
   function signedEuro(value) { return `${value > 0 ? '+' : value < 0 ? '−' : ''}${euro.format(Math.abs(value))}`; }
   function economicExpenseAmount(tx) {
-    if (tx.counterpartSplits?.length) return tx.counterpartSplits.reduce((sum, split) => sum + (accountById(split.accountId)?.type === 'EXPENSE' ? Math.abs(Number(split.value) || 0) : 0), 0);
-    return accountById(tx.counterpartAccountId)?.type === 'EXPENSE' ? Math.abs(tx.amount) : 0;
+    if (tx.counterpartSplits?.length) return tx.counterpartSplits.reduce((sum, split) => sum + (isReportExpenseAccount(accountById(split.accountId)) ? Math.abs(Number(split.value) || 0) : 0), 0);
+    return isReportExpenseAccount(accountById(tx.counterpartAccountId)) ? Math.abs(tx.amount) : 0;
   }
   function reportExpenseIsUnclassified(tx) { return tx.status === 'pending' && tx.amount < 0 && !tx.counterpartAccountId && !tx.counterpartSplits?.length; }
   function reportExpenseAmount(tx) { return economicExpenseAmount(tx) || (reportExpenseIsUnclassified(tx) ? Math.abs(tx.amount) : 0); }
@@ -2521,8 +2543,7 @@
       const visited = new Set();
       while (parent && !visited.has(String(parent.id))) {
         visited.add(String(parent.id));
-        const eligible = parent.type === 'EXPENSE' ||
-          (parent.classification === 'Patrimoniale' && parent.includeInBudget === true);
+        const eligible = isReportExpenseAccount(parent);
         if (eligible && rowIds.has(String(parent.id))) return false;
         parent = parent.parentId ? accountById(parent.parentId) : null;
       }
@@ -2666,9 +2687,10 @@
       const cls = a.classification === 'Economica' ? 'class-economic' : a.classification === 'Patrimoniale' ? 'class-balance' : a.classification === 'Tecnica' ? 'class-technical' : 'class-structural';
       const options = ['automatico','Mastro','Mastro e conto','Conto'].map(v => `<option value="${v}" ${(v === 'automatico' ? !a.hierarchyTypeOverride : a.hierarchyType === v && a.hierarchyTypeSource === 'manuale') ? 'selected' : ''}>${v === 'automatico' ? 'Automatico · ' + safeText(a.hierarchyTypeProposal || a.hierarchyType) : v}</option>`).join('');
       const budgetEligible=a.classification==='Patrimoniale'&&!isLiquidAccount(a)&&a.hierarchyType!=='Mastro';
+      const mortgageEligible=a.classification==='Patrimoniale'&&!isLiquidAccount(a);
       const tags=Array.isArray(a.tags)?a.tags:[];
       const tagMarkup=tags.length?'<small class="account-tags">'+tags.map(tag=>'<span>'+safeText(tag)+'</span>').join(' ')+'</small>':'';
-      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+'> Includi nel budget</label>' : '—'}</td></tr>`;
+      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+' > Includi nel Budget/Report</label>' : '—'}</td><td>${mortgageEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-mortgage-account="'+safeText(a.id)+'" '+(a.mortgage===true?'checked':'')+'> Mutuo</label>' : '—'}</td></tr>`;
     }).join('');
     $('#accountsBody').querySelectorAll('[data-rename-account]').forEach(button=>button.addEventListener('click',()=>renameAccount(button.dataset.renameAccount)));
     $('#accountsBody').querySelectorAll('[data-tags-account]').forEach(button=>button.addEventListener('click',()=>editAccountTags(button.dataset.tagsAccount)));
@@ -2682,6 +2704,11 @@
       const account=accountById(input.dataset.budgetIncludeAccount);if(!account)return;
       account.includeInBudget=input.checked;
       await saveState();renderAccounts();renderBudgetView();renderForecastSelection();
+    }));
+    $('#accountsBody').querySelectorAll('[data-mortgage-account]').forEach(input=>input.addEventListener('change',async()=>{
+      const account=accountById(input.dataset.mortgageAccount);if(!account)return;
+      account.mortgage=input.checked;
+      await saveState();renderAccounts();renderReports();
     }));
   }
   function renderRules() {
@@ -2742,11 +2769,11 @@
       const parent=account.parentId?accountById(account.parentId):null;
       const tags=Array.isArray(account.tags)?account.tags.join(', '):'';
       const history=Array.isArray(account.nameHistory)?account.nameHistory.map(item=>[item.path,item.from?'dal '+formatDate(item.from):'',item.to?'al '+formatDate(item.to):''].filter(Boolean).join(' ')).join(' · '):'';
-      return '<tr><td>'+safeText(account.id||'—')+'</td><td>'+safeText(account.path||account.name||'')+'</td><td>'+safeText(account.type||'—')+'</td><td>'+safeText(account.classification||'—')+'</td><td>'+safeText(account.hierarchyType||'—')+' · '+(account.hierarchyTypeSource==='manuale'?'manuale':'automatico')+'</td><td>'+safeText(parent?.path||'—')+'</td><td class="num">'+txCount+'</td><td>'+(account.includeInBudget===true?'Sì':'No')+'</td><td>'+safeText(account.hasChildren?'Sì':'No')+'</td><td>'+safeText(account.validFrom?formatDate(account.validFrom):'—')+'</td><td>'+safeText(tags||'—')+'</td><td>'+safeText(history||'—')+'</td></tr>';
+      return '<tr><td>'+safeText(account.id||'—')+'</td><td>'+safeText(account.path||account.name||'')+'</td><td>'+safeText(account.type||'—')+'</td><td>'+safeText(account.classification||'—')+'</td><td>'+safeText(account.hierarchyType||'—')+' · '+(account.hierarchyTypeSource==='manuale'?'manuale':'automatico')+'</td><td>'+safeText(parent?.path||'—')+'</td><td class="num">'+txCount+'</td><td>'+(account.includeInBudget===true?'Sì':'No')+'</td><td>'+(account.mortgage===true?'Sì':'No')+'</td><td>'+safeText(account.hasChildren?'Sì':'No')+'</td><td>'+safeText(account.validFrom?formatDate(account.validFrom):'—')+'</td><td>'+safeText(tags||'—')+'</td><td>'+safeText(history||'—')+'</td></tr>';
     }).join('');
     const summary=[['Patrimoniale',accounts.filter(a=>a.classification==='Patrimoniale').length],['Economica',accounts.filter(a=>a.classification==='Economica').length],['Tecnica',accounts.filter(a=>a.classification==='Tecnica').length]];
     const summaryHtml=summary.map(item=>'<div>Conti '+item[0].toLowerCase()+'<strong>'+item[1]+'</strong></div>').join('');
-    const content='<h1>Piano dei conti</h1><div class="sub">Esportazione completa · '+accounts.length+' conti · '+new Date().toLocaleDateString('it-IT')+'</div><div class="summary">'+summaryHtml+'</div><table><thead><tr><th>ID</th><th>Percorso conto</th><th>Tipo GnuCash</th><th>Classificazione</th><th>Gerarchia</th><th>Conto padre</th><th class="num">Movimenti</th><th>Nel budget</th><th>Ha sottoconti</th><th>Decorrenza nome</th><th>Tag</th><th>Storico denominazioni</th></tr></thead><tbody>'+(rows||'<tr><td colspan="12">Nessun conto presente.</td></tr>')+'</tbody></table><p class="foot">Il documento include i conti e i metadati attualmente presenti nell’archivio. I movimenti non sono esportati.</p>';
+    const content='<h1>Piano dei conti</h1><div class="sub">Esportazione completa · '+accounts.length+' conti · '+new Date().toLocaleDateString('it-IT')+'</div><div class="summary">'+summaryHtml+'</div><table><thead><tr><th>ID</th><th>Percorso conto</th><th>Tipo GnuCash</th><th>Classificazione</th><th>Gerarchia</th><th>Conto padre</th><th class="num">Movimenti</th><th>Budget/Report</th><th>Mutuo</th><th>Ha sottoconti</th><th>Decorrenza nome</th><th>Tag</th><th>Storico denominazioni</th></tr></thead><tbody>'+(rows||'<tr><td colspan="13">Nessun conto presente.</td></tr>')+'</tbody></table><p class="foot">Il documento include i conti e i metadati attualmente presenti nell’archivio. I movimenti non sono esportati.</p>';
     printHtml('Piano-dei-conti',content,{reportToolbar:true,toolbarTitle:'Piano dei conti · esportazione PDF'});
   }
   function openAddAccount() {
