@@ -1,3 +1,15 @@
+## [1.0.36] - 2026-11-14
+
+### Corretto
+- Corretto il caricamento degli script dell'interfaccia: ora `app.js` e `guide.js` sono inclusi come script separati e vengono eseguiti nell'ordine previsto.
+- Ripristinati l'apertura della Guida all’utilizzo, la visualizzazione dei capitoli e la ricerca senza ricaricamento della pagina.
+- Allineata la versione mostrata nel piè di pagina alla 1.0.36.
+
+### Fixed
+- Fixed interface script loading: `app.js` and `guide.js` are now separate script elements and execute in the intended order.
+- Restored User Guide navigation, topic rendering and search without a page reload.
+- Updated the footer version to 1.0.36.
+
 ## [1.0.35] - 2026-11-14
 
 ### Corretto
