@@ -23,20 +23,19 @@
 | ![Panoramica Gestione C/C](docs/screenshots/panoramica.png) | ![Movimenti Gestione C/C](docs/screenshots/movimenti.png) | ![Report Gestione C/C](docs/screenshots/report.png) |
 | Entrate, uscite, saldi e andamento. | Consultazione e classificazione dei movimenti. | Analisi dei flussi e confronti tra periodi. |
 
-## Integrazione Home Assistant — versione 1.1 (anteprima)
+## Integrazione Home Assistant tramite HACS
 
-La versione 1.1 introduce una prima integrazione HACS per il monitoraggio **esclusivamente tecnico** di Gestione C/C e per l'avvio di alcune operazioni di manutenzione.
+Gestione C/C include una **custom integration HACS** per collegare Home Assistant all'istanza dell'app e monitorarne esclusivamente lo stato tecnico.
 
-- Sensori tecnici per disponibilità, database, backup, spazio, allegati e processi.
-- Pulsanti per backup locale, backup Google Drive e controllo integrità.
-- Esempi di dashboard e automazioni Home Assistant.
-- Comunicazione HTTPS con CA dedicata e accesso limitato alla rete locale.
+- Sensori per disponibilità, versione app e integrazione, uptime, database, backup, spazio, allegati e processi.
+- Sensori binari per gli stati tecnici supportati.
+- Pulsanti per avviare backup locale, backup Google Drive e controllo d'integrità.
+- Esempi pronti di dashboard e automazioni.
+- Connessione HTTPS con CA privata, token dedicato e autorizzazioni API limitate.
 
-**Privacy:** l'integrazione non legge il database contabile, i movimenti, i saldi, i documenti, i file di backup o il registro accessi. Home Assistant riceve soltanto stati tecnici predefiniti. Le operazioni di manutenzione non consentono di scaricare o consultare i dati.
+**Separazione dei dati:** l'integrazione non legge né trasferisce conti, saldi, movimenti, descrizioni, documenti, file di backup o registro accessi. Home Assistant riceve soltanto informazioni tecniche predefinite e può inviare i comandi di manutenzione autorizzati. La versione HACS è indipendente dalla versione dell'app: per questa release è **1.1.6**.
 
-Questa versione è destinata al collaudo. L'installazione e la configurazione sono descritte in [README dell'integrazione](custom_components/gestione_cc/README.md); gli esempi sono in [dashboard](docs/dashboard_gestione_cc.yaml) e [automazioni](docs/automazioni_gestione_cc.yaml).
-
-La documentazione estesa delle nuove funzionalità e la presentazione completa saranno consolidate dopo il collaudo, nella successiva release 2.0.
+Installazione e configurazione sono descritte nella sezione [Integrazione HACS](#integrazione-home-assistant-tramite-hacs) e nel [manuale dell'integrazione](custom_components/gestione_cc/README.md). Sono disponibili esempi di [dashboard](docs/dashboard_gestione_cc.yaml) e [automazioni](docs/automazioni_gestione_cc.yaml).
 
 ---
 
@@ -61,6 +60,8 @@ La documentazione estesa delle nuove funzionalità e la presentazione completa s
   - [Funzionalità](#funzionalità)
   - [Requisiti](#requisiti)
   - [Installazione](#installazione)
+  - [Integrazione Home Assistant tramite HACS](#integrazione-home-assistant-tramite-hacs)
+  - [PWA e installazione come app desktop](#pwa-e-installazione-come-app-desktop)
   - [Configurazione e primo accesso](#configurazione-e-primo-accesso)
   - [Sicurezza e privacy](#sicurezza-e-privacy)
   - [Dati, backup e ripristino](#dati-backup-e-ripristino)
@@ -71,6 +72,8 @@ La documentazione estesa delle nuove funzionalità e la presentazione completa s
   - [Features](#features)
   - [Requirements](#requirements)
   - [Installation](#installation)
+  - [Home Assistant integration through HACS](#home-assistant-integration-through-hacs)
+  - [PWA and desktop app installation](#pwa-and-desktop-app-installation)
   - [Configuration and first access](#configuration-and-first-access)
   - [Security and privacy](#security-and-privacy)
   - [Data, backup and restore](#data-backup-and-restore)
@@ -159,6 +162,75 @@ L'applicazione permette di consultare in un unico ambiente entrate, uscite, sald
 
 8. Al primo accesso il browser può segnalare che il certificato è emesso da una CA privata. Accedi solo dalla rete locale, scarica la CA dalla pagina di login/Impostazioni e installala sui dispositivi autorizzati seguendo la [documentazione](gestione_cc/DOCS.md).
 
+## Integrazione Home Assistant tramite HACS
+
+Questa integrazione è distinta dall'Home Assistant App che ospita il server Gestione C/C. L'App fornisce database e interfaccia web; la custom integration collega Home Assistant al servizio tecnico dell'App.
+
+### Installazione
+1. Apri **HACS → Integrazioni**.
+2. Apri il menu in alto a destra e scegli **Repository personalizzati**.
+3. Inserisci `https://github.com/stefanodr/gestione-cc-home-assistant` e seleziona la categoria **Integrazione**.
+4. Aggiungi il repository e installa **Gestione C/C**.
+5. Riavvia Home Assistant.
+6. Dall'interfaccia Gestione C/C apri **Impostazioni → Integrazione Home Assistant** e genera il token dedicato.
+7. Dalla sezione Sicurezza/Certificati scarica la CA privata dell'App e copiala nella cartella `/ssl` di Home Assistant, ad esempio come `/ssl/gestione-cc-ca.crt`.
+8. In Home Assistant apri **Impostazioni → Dispositivi e servizi → Aggiungi integrazione**, cerca **Gestione C/C** e inserisci:
+   - URL HTTPS LAN dell'App, ad esempio `https://192.168.1.27:8443`;
+   - token dedicato generato nell'app;
+   - percorso della CA, ad esempio `/ssl/gestione-cc-ca.crt`.
+9. Completa la configurazione e verifica che i sensori tecnici risultino disponibili.
+
+### Entità e privacy
+L'integrazione può esporre informazioni tecniche relative a disponibilità, versioni, uptime, database, backup, spazio, allegati e processi, oltre a sensori binari e pulsanti di manutenzione. I pulsanti consentono esclusivamente le operazioni autorizzate dall'API tecnica.
+
+**Non vengono esposti** movimenti, descrizioni, conti, saldi, dati di budget, contenuti documentali, file di backup o registro accessi. Non vengono creati sensori finanziari. Il token è una credenziale: non inserirlo in dashboard, automazioni condivise, screenshot o repository pubblici.
+
+La verifica TLS resta obbligatoria. Non usare HTTP, non disabilitare la verifica del certificato e non esporre la porta dell'App su Internet. La versione HACS è indipendente e, per questa release, è **1.1.6**.
+
+Per i dettagli aggiornati consulta il [README tecnico dell'integrazione](custom_components/gestione_cc/README.md).
+
+## PWA e installazione come app desktop
+
+## PWA e installazione come app desktop
+
+Gestione C/C può essere aperta come normale pagina web oppure installata come web app in una finestra dedicata. L'installazione non crea un programma Windows autonomo: il browser continua a fornire il motore di esecuzione.
+
+### Prima di installare
+1. Apri l'indirizzo HTTPS LAN dell'App, ad esempio `https://192.168.1.27:8443`.
+2. Verifica che la CA privata sia installata e attendibile nel sistema operativo/browser.
+3. Accedi e controlla che l'interfaccia funzioni correttamente.
+4. Installa la web app dal browser. Non usare un indirizzo pubblico o un collegamento che esponga il servizio su Internet.
+
+### Google Chrome
+1. Apri Gestione C/C in Chrome.
+2. Apri **⋮ → Trasmetti, salva e condividi → Installa pagina come app**; in alcune versioni compare direttamente l'icona Installa nella barra degli indirizzi.
+3. Conferma il nome e l'installazione.
+4. Apri l'app dal menu Start o dal collegamento creato. Per il desktop, apri la gestione delle app/collegamenti di Chrome e scegli **Crea collegamento** o l'opzione disponibile per aggiungerla al desktop.
+
+### Microsoft Edge
+1. Apri Gestione C/C in Edge.
+2. Seleziona **⋯ → App → Installa questo sito come app** oppure l'icona di installazione nella barra degli indirizzi.
+3. Conferma l'installazione.
+4. In `edge://apps`, apri **Dettagli** dell'app e scegli **Aggiungi alla barra delle applicazioni**, **Aggiungi a Start** o **Crea collegamento sul desktop**.
+
+### Mozilla Firefox su Windows
+Firefox supporta le web app su Windows a partire dalla versione 143. Se installato dal Microsoft Store, è richiesta la versione 150 o successiva.
+1. Apri Gestione C/C in una normale finestra di Firefox.
+2. Se compare il pulsante **Aggiungi scheda alla barra delle applicazioni / Web app** nella barra degli indirizzi, selezionalo.
+3. Firefox crea una finestra dedicata e aggiunge la web app alla barra delle applicazioni e al menu Start.
+4. Questa funzione è disponibile su Windows; non è la procedura PWA Chromium e non è prevista in modalità anonima.
+
+### Icona e collegamento Windows
+L'App pubblica icone PNG dedicate da 192×192 e 512×512 pixel con il logo ufficiale (€ blu e monete dorate). Se la finestra d'installazione mostra il logo corretto ma il collegamento desktop continua a visualizzare l'icona generica del browser, può essere necessario correggerla manualmente: clic destro sul collegamento → **Proprietà → Collegamento → Cambia icona**, selezionare il file/icona corretta e confermare. È un comportamento del collegamento o della cache icone di Windows, non un'indicazione che l'icona fornita dal sito sia errata.
+
+### Aggiornamenti e dati
+- Per aggiornare l'applicazione, aggiorna l'Home Assistant App: non disinstallarla e non cancellarne i dati.
+- La PWA è una finestra d'accesso al servizio web, non una copia autonoma dell'archivio.
+
+Guide ufficiali dei browser: [Chrome](https://support.google.com/chrome/answer/9658361), [Microsoft Edge](https://support.microsoft.com/it-it/edge/installare-gestire-o-disinstallare-app-in-microsoft-edge), [Firefox per Windows](https://support.mozilla.org/en-US/kb/web-apps-firefox-windows).
+- Il service worker non memorizza nella cache dati contabili, risposte API, pagine HTML o documenti. La web app richiede il server Home Assistant raggiungibile.
+- Le sessioni e le regole di autenticazione restano quelle dell'applicazione: la PWA non elimina la richiesta PIN quando necessaria.
+
 ## Configurazione e primo accesso
 
 - **PIN iniziale:** imposta un codice composto da esattamente sei cifre prima del primo avvio.
@@ -217,7 +289,7 @@ Per le novità della versione installata consulta le [note di rilascio](CHANGELO
 
 L'uso gratuito è consentito alle persone fisiche per finalità personali e non commerciali, nei limiti della licenza. Gli usi professionali, aziendali e commerciali richiedono un accordo scritto.
 
-Versione di distribuzione dichiarata: **1.0.19**.
+Versione Home Assistant App: **2.0.0**. Versione dell'app inclusa: **2.0.0**. Versione custom integration HACS: **1.1.6** (indipendente).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). Tutti i diritti riservati salvo i permessi espressamente concessi.
 
@@ -306,6 +378,75 @@ It is designed for personal use on a local network and does not require an exter
 
 8. On first access, the browser may warn that the certificate was issued by a private CA. Connect only from your local network, download the CA from the login page/Settings and install it on authorised devices as described in the [App documentation](gestione_cc/DOCS.md).
 
+## Home Assistant integration through HACS
+
+This integration is separate from the Home Assistant App that hosts the Gestione C/C server. The App provides the database and web interface; the custom integration connects Home Assistant to the App's technical service.
+
+### Installation
+1. Open **HACS → Integrations**.
+2. Open the top-right menu and choose **Custom repositories**.
+3. Enter `https://github.com/stefanodr/gestione-cc-home-assistant` and select the **Integration** category.
+4. Add the repository and install **Gestione C/C**.
+5. Restart Home Assistant.
+6. In Gestione C/C, open **Settings → Home Assistant Integration** and generate the dedicated token.
+7. From the Security/Certificates section, download the App's private CA and copy it into Home Assistant's `/ssl` folder, for example as `/ssl/gestione-cc-ca.crt`.
+8. In Home Assistant, open **Settings → Devices & services → Add integration**, search for **Gestione C/C**, and provide:
+   - the App's LAN HTTPS URL, e.g. `https://192.168.1.27:8443`;
+   - the dedicated token generated by the app;
+   - the CA path, e.g. `/ssl/gestione-cc-ca.crt`.
+9. Complete setup and verify that the technical entities are available.
+
+### Entities and privacy
+The integration can expose technical information about availability, versions, uptime, database, backups, storage, attachments and processes, as well as supported binary sensors and maintenance buttons. Buttons can only invoke operations explicitly authorised by the technical API.
+
+**It does not expose** transactions, descriptions, accounts, balances, budget data, document contents, backup files or access logs. No financial sensors are created. Treat the token as a credential: never put it in dashboards, shared automations, screenshots or public repositories.
+
+TLS verification remains mandatory. Do not use HTTP, disable certificate verification or expose the App port to the Internet. The HACS integration has its own independent version; it is **1.1.6** for this release.
+
+See the [integration technical README](custom_components/gestione_cc/README.md) for further details.
+
+## PWA and desktop app installation
+
+## PWA and desktop app installation
+
+Gestione C/C can be opened as a regular web page or installed as a web app in a dedicated window. Installation does not create a standalone Windows executable: the browser still provides the runtime.
+
+### Before installing
+1. Open the App's LAN HTTPS address, e.g. `https://192.168.1.27:8443`.
+2. Make sure the private CA is installed and trusted by the operating system/browser.
+3. Sign in and verify that the interface works correctly.
+4. Install the web app from the browser. Do not use a public URL or expose the service to the Internet.
+
+### Google Chrome
+1. Open Gestione C/C in Chrome.
+2. Select **⋮ → Cast, save and share → Install page as app**; some versions show an Install icon in the address bar.
+3. Confirm the app name and installation.
+4. Launch it from the Start menu or its shortcut. To create a desktop shortcut, use Chrome's app/shortcut management and select **Create shortcut** or the available desktop option.
+
+### Microsoft Edge
+1. Open Gestione C/C in Edge.
+2. Select **⋯ → Apps → Install this site as an app**, or use the install icon in the address bar.
+3. Confirm the installation.
+4. In `edge://apps`, open the app's **Details** and choose **Pin to taskbar**, **Pin to Start** or **Create desktop shortcut**.
+
+### Mozilla Firefox on Windows
+Firefox supports web apps on Windows starting with version 143. If Firefox was installed from the Microsoft Store, version 150 or later is required.
+1. Open Gestione C/C in a regular Firefox window.
+2. If the **Add tab to taskbar / Web app** button appears in the address bar, select it.
+3. Firefox creates a dedicated window and adds the web app to the taskbar and Start menu.
+4. This feature is available on Windows; it is different from the Chromium PWA installation flow and is not available in private browsing.
+
+### Icon and Windows shortcut
+The App provides dedicated 192×192 and 512×512 PNG icons using the official logo (blue € symbol and gold coins). If the installation dialog shows the correct logo but the desktop shortcut still displays a generic browser icon, Windows may require a manual shortcut adjustment: right-click the shortcut → **Properties → Shortcut → Change Icon**, select the correct icon and confirm. This is a Windows shortcut/icon-cache behaviour, not evidence that the website's icon is missing.
+
+### Updates and data
+- Update the Home Assistant App to update the application; do not uninstall it or delete its data.
+- The PWA is a window into the web service, not a separate copy of the archive.
+
+Official browser guides: [Chrome](https://support.google.com/chrome/answer/9658361), [Microsoft Edge](https://support.microsoft.com/en-us/edge/install-manage-or-uninstall-apps-in-microsoft-edge), [Firefox for Windows](https://support.mozilla.org/en-US/kb/web-apps-firefox-windows).
+- The service worker does not cache accounting data, API responses, HTML pages or documents. The Home Assistant server must remain reachable.
+- The app's normal authentication rules still apply: the PWA does not bypass the PIN when it is required.
+
 ## Configuration and first access
 
 - **Initial PIN:** set a code containing exactly six digits before the first start.
@@ -364,7 +505,7 @@ See the [release notes](CHANGELOG.md) for changes in each version.
 
 Free use is permitted to individuals for personal, non-commercial purposes, subject to the licence terms. Professional, business and commercial uses require a written agreement.
 
-Declared distribution version: **1.0.19**.
+Home Assistant App version: **2.0.0**. Bundled application version: **2.0.0**. HACS custom integration version: **1.1.6** (independent).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). All rights reserved except where permissions are expressly granted.
 
