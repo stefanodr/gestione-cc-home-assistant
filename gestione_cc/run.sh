@@ -7,9 +7,9 @@ export WWW_DIR=/app/www
 export ADDON_OPTIONS_FILE=/data/options.json
 export SSL_DIR=/data/tls
 HOSTNAME_CFG="$(bashio::config 'hostname')"
-HOSTNAME_CFG="${HOSTNAME_CFG:-192.168.1.27}"
+HOSTNAME_CFG="${HOSTNAME_CFG:-homeassistant.local}"
 if ! echo "$HOSTNAME_CFG" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'; then
-  bashio::log.error "hostname non valido: usare un nome DNS semplice o un indirizzo IPv4, ad esempio 192.168.1.27"
+  bashio::log.error "hostname non valido: usare un nome DNS semplice o un indirizzo IPv4, ad esempio homeassistant.local oppure 192.168.1.27"
   exit 1
 fi
 if python3 -c 'import ipaddress,sys; ipaddress.IPv4Address(sys.argv[1])' "$HOSTNAME_CFG" >/dev/null 2>&1; then
