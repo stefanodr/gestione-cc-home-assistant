@@ -226,6 +226,8 @@ L'App pubblica icone PNG dedicate da 192×192 e 512×512 pixel con il logo uffic
 ### Aggiornamenti e dati
 - Per aggiornare l'applicazione, aggiorna l'Home Assistant App: non disinstallarla e non cancellarne i dati.
 - La PWA è una finestra d'accesso al servizio web, non una copia autonoma dell'archivio.
+
+Guide ufficiali dei browser: [Chrome](https://support.google.com/chrome/answer/9658361), [Microsoft Edge](https://support.microsoft.com/it-it/edge/installare-gestire-o-disinstallare-app-in-microsoft-edge), [Firefox per Windows](https://support.mozilla.org/en-US/kb/web-apps-firefox-windows).
 - Il service worker non memorizza nella cache dati contabili, risposte API, pagine HTML o documenti. La web app richiede il server Home Assistant raggiungibile.
 - Le sessioni e le regole di autenticazione restano quelle dell'applicazione: la PWA non elimina la richiesta PIN quando necessaria.
 
@@ -440,6 +442,8 @@ The App provides dedicated 192×192 and 512×512 PNG icons using the official lo
 ### Updates and data
 - Update the Home Assistant App to update the application; do not uninstall it or delete its data.
 - The PWA is a window into the web service, not a separate copy of the archive.
+
+Official browser guides: [Chrome](https://support.google.com/chrome/answer/9658361), [Microsoft Edge](https://support.microsoft.com/en-us/edge/install-manage-or-uninstall-apps-in-microsoft-edge), [Firefox for Windows](https://support.mozilla.org/en-US/kb/web-apps-firefox-windows).
 - The service worker does not cache accounting data, API responses, HTML pages or documents. The Home Assistant server must remain reachable.
 - The app's normal authentication rules still apply: the PWA does not bypass the PIN when it is required.
 
