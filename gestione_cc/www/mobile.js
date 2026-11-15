@@ -8,7 +8,7 @@
  const isLiquid=a=>{if(!a)return false;const type=String(a.type||'').toUpperCase();if(type==='BANK'||type==='CASH')return true;const path=normalize(a.path||'');return type==='ASSET'&&['attivita correnti','conto corrente','conto deposito','banca','cassa','liquidita','disponibilita liquide'].some(x=>path.includes(x));};
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const account=id=>state.accounts.find(a=>String(a.id)===String(id));
- const accountName=id=>account(id)?.name||'Da classificare';
+ const accountName=id=>account(id)?.path||account(id)?.name||'Da classificare';
  const isMortgage=a=>{let x=a,seen=new Set();while(x&&!seen.has(String(x.id))){seen.add(String(x.id));if(x.mortgage===true)return true;x=x.parentId?account(x.parentId):null;}return false;};
  const isExpense=a=>!!a&&(a.type==='EXPENSE'||(a.classification==='Patrimoniale'&&(a.includeInBudget===true||isMortgage(a))));
  function periodRange(){
