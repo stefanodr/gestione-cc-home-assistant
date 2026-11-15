@@ -647,7 +647,7 @@
     });
     backdrop.addEventListener('click', () => setState(false));
     mobileQuery.addEventListener?.('change', () => setState(false));
-    $( '.nav-item' ).forEach(button => {
+    document.querySelectorAll('.nav-item').forEach(button => {
       button.title = button.textContent.trim();
       button.addEventListener('click', () => {
         if (mobileQuery.matches) setState(false);
