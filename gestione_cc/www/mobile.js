@@ -6,7 +6,6 @@
  const dateKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
  selectedMonth=dateKey(new Date()).slice(0,7);
  const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
- const isLiquid=a=>{if(!a)return false;const type=String(a.type||'').toUpperCase();if(type==='BANK'||type==='CASH')return true;const path=normalize(a.path||'');return type==='ASSET'&&['attivita correnti','conto corrente','conto deposito','banca','cassa','liquidita','disponibilita liquide'].some(x=>path.includes(x));};
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const account=id=>state.accounts.find(a=>String(a.id)===String(id));
  const accountName=id=>account(id)?.path||account(id)?.name||'Da classificare';
@@ -52,7 +51,7 @@
   $('flowBars').innerHTML=[['Entrate',totals.income,'income'],['Uscite',totals.expense,'expense']].map(([label,value,kind])=>'<div class="flow-row"><span>'+label+'</span><div class="flow-track"><div class="flow-fill '+kind+'" style="width:'+Math.max(value?2:0,value/max*100)+'%"></div></div><strong class="money">'+money.format(value)+'</strong></div>').join('');
   const recent=[...rows].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5);
   $('recentTransactions').innerHTML=recent.length?recent.map(transactionHtml).join(''):'<div class="empty">Nessun movimento nel periodo</div>';
-  renderCategories(rows);renderComparison(totals);renderTransactions(rows);renderAccounts(cutoff);applyPrivacy();
+  renderCategories(rows);renderComparison(totals);renderCharts(rows);renderTransactions(rows);applyPrivacy();
  }
  function transactionHtml(t){
   const title=t.description||t.payee||t.causale||t.memo||'Movimento';
@@ -74,10 +73,20 @@
   $('transactionCount').textContent=filtered.length+' movimenti';
   $('transactionList').innerHTML=filtered.length?filtered.map(transactionHtml).join(''):'<div class="empty">Nessun movimento corrispondente</div>';
  }
- function renderAccounts(cutoff){
-  const classified=window.GestioneFinancialEngine?.classifyHierarchy?window.GestioneFinancialEngine.classifyHierarchy(state.accounts,state.transactions):state.accounts;
-  const rows=classified.filter(a=>isLiquid(a)&&a.hierarchyType!=='Mastro');
-  $('accountList').innerHTML=rows.map(a=>'<div class="account-row"><span>'+esc(a.path||a.name)+'</span><strong class="money">'+money.format(balanceFor(a.id,cutoff))+'</strong></div>').join('')||'<div class="empty">Nessun conto liquido disponibile</div>';
+ function renderCharts(rows){
+  const [year,month]=selectedMonth.split('-').map(Number);
+  const months=periodMode==='year'
+   ?Array.from({length:12},(_,i)=>new Date(year,i,1))
+   :Array.from({length:6},(_,i)=>new Date(year,month-6+i,1));
+  const series=months.map(date=>{
+   const key=dateKey(date).slice(0,7),last=new Date(date.getFullYear(),date.getMonth()+1,0).getDate();
+   const totals=flowTotals(transactionsIn({start:key+'-01',end:key+'-'+String(last).padStart(2,'0')}));
+   return{label:new Intl.DateTimeFormat('it-IT',{month:'short'}).format(date).replace('.',''),key,...totals};
+  });
+  const maxFlow=Math.max(1,...series.map(x=>Math.max(x.income,x.expense)));
+  $('trendChart').innerHTML=series.map(x=>'<div class="trend-row"><span class="trend-month">'+esc(x.label)+'</span><div class="trend-bars"><div class="trend-track"><div class="trend-fill income" style="width:'+(x.income/maxFlow*100)+'%"></div></div><div class="trend-track"><div class="trend-fill expense" style="width:'+(x.expense/maxFlow*100)+'%"></div></div></div><div class="trend-values"><span class="money">'+money.format(x.income)+'</span><span class="money">'+money.format(x.expense)+'</span></div></div>').join('');
+  const categories=expenseTotals(rows).slice(0,8),total=categories.reduce((sum,item)=>sum+item.value,0),maxCategory=Math.max(1,...categories.map(item=>item.value));
+  $('chartCategories').innerHTML=categories.length?categories.map(item=>'<div class="chart-category"><div class="chart-category-heading"><span>'+esc(item.name)+'</span><strong class="money">'+money.format(item.value)+'</strong></div><div class="chart-category-track"><div class="chart-category-fill" style="width:'+(item.value/maxCategory*100)+'%"></div></div><small>'+ (total?Math.round(item.value/total*100):0)+'% delle uscite</small></div>').join(''):'<div class="empty">Nessuna spesa categorizzata nel periodo</div>';
  }
  function applyPrivacy(){document.querySelectorAll('.money').forEach(el=>el.classList.toggle('masked',hideAmounts));$('privacyButton').textContent=hideAmounts?'◎':'◉';$('privacyButton').setAttribute('aria-label',hideAmounts?'Mostra importi':'Nascondi importi');}
  function setScreen(name){activeScreen=name;document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.id==='screen-'+name));document.querySelectorAll('.bottom-item').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));window.scrollTo({top:0,behavior:'smooth'});}
