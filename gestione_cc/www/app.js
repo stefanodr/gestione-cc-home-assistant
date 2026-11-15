@@ -647,9 +647,15 @@
     });
     backdrop.addEventListener('click', () => setState(false));
     mobileQuery.addEventListener?.('change', () => setState(false));
-    $$('.nav-item').forEach(button => button.addEventListener('click', () => {
-      if (mobileQuery.matches) setState(false);
-    }));
+    $('.nav-item').forEach(button => {
+      button.title = button.textContent.trim().replace(/\\s+\\d+$/, '');
+      button.addEventListener('click', () => {
+        if (mobileQuery.matches) setState(false);
+      });
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && mobileQuery.matches) setState(false);
+    });
     setState(false);
   }
 
