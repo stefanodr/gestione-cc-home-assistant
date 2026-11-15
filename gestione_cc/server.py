@@ -884,7 +884,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Strict-Transport-Security", "max-age=31536000")
         self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
-        for k,v in (headers or {}).items(): self.send_header(k,v)
+        for k,v in (headers or {}).items():
+            if k.lower() == "set-cookie" and isinstance(v, (list, tuple)):
+                for cookie_header in v: self.send_header(k, cookie_header)
+            else:
+                self.send_header(k,v)
         self.end_headers()
         self.wfile.write(raw)
 
@@ -1632,8 +1636,17 @@ class Handler(BaseHTTPRequestHandler):
             role = "readonly" if path == "/api/mobile/login" else "admin"
             sessions[token] = {"username":username,"role":role,"csrf":csrf,"expires":time.time()+SESSION_SECONDS}
             record_access_event("mobile_login" if role == "readonly" else "login", "success", peer, token)
-            cookie_name = "cc_mobile_session" if role == "readonly" else "cc_session"
-            self.send_json(200, {"ok":True,"csrf":csrf,"role":role}, {"Set-Cookie":f"{cookie_name}={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={SESSION_SECONDS}"})
+            if role == "readonly":
+                cookie_headers = [
+                    f"cc_mobile_session={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={SESSION_SECONDS}",
+                    "cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"
+                ]
+            else:
+                cookie_headers = [
+                    f"cc_session={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={SESSION_SECONDS}",
+                    "cc_mobile_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"
+                ]
+            self.send_json(200, {"ok":True,"csrf":csrf,"role":role}, {"Set-Cookie":cookie_headers})
             return
         if path == "/api/mobile/logout":
             item = self.require_auth(csrf=True)
