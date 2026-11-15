@@ -1,9 +1,10 @@
 'use strict';
 (() => {
- let state=null,periodMode='month',selectedMonth=dateKey(new Date()).slice(0,7),activeScreen='overview',hideAmounts=false,csrf='';
+ let state=null,periodMode='month',selectedMonth='',activeScreen='overview',hideAmounts=false,csrf='';
  const $=id=>document.getElementById(id),money=new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
  const num=n=>Number.isFinite(Number(n))?Number(n):0;
  const dateKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+ selectedMonth=dateKey(new Date()).slice(0,7);
  const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  const isLiquid=a=>{if(!a)return false;const type=String(a.type||'').toUpperCase();if(type==='BANK'||type==='CASH')return true;const path=normalize(a.path||'');return type==='ASSET'&&['attivita correnti','conto corrente','conto deposito','banca','cassa','liquidita','disponibilita liquide'].some(x=>path.includes(x));};
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
