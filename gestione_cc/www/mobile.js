@@ -1,19 +1,23 @@
 'use strict';
 (() => {
- let state=null,periodMode='month',selectedMonth=new Date().toISOString().slice(0,7),activeScreen='overview',hideAmounts=false,csrf='';
+ let state=null,periodMode='month',selectedMonth=dateKey(new Date()).slice(0,7),activeScreen='overview',hideAmounts=false,csrf='';
  const $=id=>document.getElementById(id),money=new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
  const num=n=>Number.isFinite(Number(n))?Number(n):0;
  const dateKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+ const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ const isLiquid=a=>{if(!a)return false;const type=String(a.type||'').toUpperCase();if(type==='BANK'||type==='CASH')return true;const path=normalize(a.path||'');return type==='ASSET'&&['attivita correnti','conto corrente','conto deposito','banca','cassa','liquidita','disponibilita liquide'].some(x=>path.includes(x));};
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const account=id=>state.accounts.find(a=>String(a.id)===String(id));
  const accountName=id=>account(id)?.name||'Da classificare';
  const isMortgage=a=>{let x=a,seen=new Set();while(x&&!seen.has(String(x.id))){seen.add(String(x.id));if(x.mortgage===true)return true;x=x.parentId?account(x.parentId):null;}return false;};
  const isExpense=a=>!!a&&(a.type==='EXPENSE'||(a.classification==='Patrimoniale'&&(a.includeInBudget===true||isMortgage(a))));
  function periodRange(){
-  const [y,m]=selectedMonth.split('-').map(Number);
-  if(periodMode==='month')return {start:y+'-'+String(m).padStart(2,'0')+'-01',end:y+'-'+String(m).padStart(2,'0')+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0'),label:new Intl.DateTimeFormat('it-IT',{month:'long',year:'numeric'}).format(new Date(y,m-1,1))};
-  const endMonth=y===new Date().getFullYear()?new Date().getMonth()+1:12;
-  return {start:y+'-01-01',end:y+'-'+String(endMonth).padStart(2,'0')+'-'+String(new Date(y,endMonth,0).getDate()).padStart(2,'0'),label:'Anno '+y};
+  const [y,m]=selectedMonth.split('-').map(Number),today=dateKey(new Date()),currentYear=new Date().getFullYear();
+  if(periodMode==='month'){
+   const lastDay=new Date(y,m,0).getDate(),monthEnd=y===currentYear&&m===new Date().getMonth()+1?today:y+'-'+String(m).padStart(2,'0')+'-'+String(lastDay).padStart(2,'0');
+   return {start:y+'-'+String(m).padStart(2,'0')+'-01',end:monthEnd,label:new Intl.DateTimeFormat('it-IT',{month:'long',year:'numeric'}).format(new Date(y,m-1,1))};
+  }
+  return {start:y+'-01-01',end:y===currentYear?today:y+'-12-31',label:'Anno '+y};
  }
  function transactionsIn(range){const f=state.reportAccountId||state.bankAccountId||'all';return state.transactions.filter(t=>t.date>=range.start&&t.date<=range.end&&t.status!=='duplicate'&&(f==='all'||!f||String(t.bankAccountId)===String(f)));}
  function flowTotals(rows){let income=0,expense=0;for(const t of rows){if(num(t.amount)>0)income+=num(t.amount);else expense+=Math.abs(num(t.amount));}return{income,expense,net:income-expense};}
@@ -29,7 +33,7 @@
   return [1,2,3].map(back=>{
    let start,end,label;
    if(periodMode==='month'){const yy=y-back,dayLimit=y===today.getFullYear()&&m===today.getMonth()+1?today.getDate():new Date(y,m,0).getDate();start=yy+'-'+String(m).padStart(2,'0')+'-01';end=yy+'-'+String(m).padStart(2,'0')+'-'+String(Math.min(dayLimit,new Date(yy,m,0).getDate())).padStart(2,'0');label=String(yy);}
-   else {const yy=y-back;start=yy+'-01-01';end=yy+'-12-31';label=String(yy);}
+   else {const yy=y-back,monthLimit=y===today.getFullYear()?today.getMonth()+1:12,dayLimit=y===today.getFullYear()?today.getDate():31;start=yy+'-01-01';end=yy+'-'+String(monthLimit).padStart(2,'0')+'-'+String(Math.min(dayLimit,new Date(yy,monthLimit,0).getDate())).padStart(2,'0');label=String(yy);}
    const rows=transactionsIn({start,end});return{label,data:flowTotals(rows)};
   });
  }
@@ -53,7 +57,7 @@
   const title=t.description||t.payee||t.causale||'Movimento';
   const category=t.counterpartSplits?.length?'Movimento ripartito':accountName(t.counterpartAccountId);
   const sign=num(t.amount)>=0?'+':'−';
-  return '<div class="transaction-row"><div><div class="tx-title">'+esc(title)+'</div><div class="tx-meta">'+esc(t.date||'')+' · '+esc(category)+(t.status==='pending'?' · Da classificare':'')+'</div></div><strong class="tx-amount '+(num(t.amount)>=0?'amount-in':'amount-out')+'">'+sign+money.format(Math.abs(num(t.amount)))+'</strong></div>';
+  return '<div class="transaction-row"><div><div class="tx-title">'+esc(title)+'</div><div class="tx-meta">'+esc(t.date||'')+' · '+esc(category)+(t.status==='pending'?' · Da classificare':'')+'</div></div><strong class="money tx-amount '+(num(t.amount)>=0?'amount-in':'amount-out')+'">'+sign+money.format(Math.abs(num(t.amount)))+'</strong></div>';
  }
  function renderCategories(rows){
   const cats=expenseTotals(rows),total=cats.reduce((s,c)=>s+c.value,0),top=cats.slice(0,12);
@@ -70,14 +74,14 @@
   $('transactionList').innerHTML=filtered.length?filtered.map(transactionHtml).join(''):'<div class="empty">Nessun movimento corrispondente</div>';
  }
  function renderAccounts(cutoff){
-  const accounts=state.accounts.filter(a=>['BANK','CASH','ASSET'].includes(a.type)&&!a.parentId||(['BANK','CASH'].includes(a.type)&&a.hierarchyType!=='Mastro'));
-  const rows=accounts.filter(a=>!a.parentId||a.hierarchyType==='Conto'||a.hierarchyType==='Mastro e conto');
-  $('accountList').innerHTML=rows.map(a=>'<div class="account-row"><span>'+esc(a.path||a.name)+'</span><strong class="money">'+money.format(balanceFor(a.id,cutoff))+'</strong></div>').join('')||'<div class="empty">Nessun conto disponibile</div>';
+  const classified=window.GestioneFinancialEngine?.classifyHierarchy?window.GestioneFinancialEngine.classifyHierarchy(state.accounts,state.transactions):state.accounts;
+  const rows=classified.filter(a=>isLiquid(a)&&a.hierarchyType!=='Mastro');
+  $('accountList').innerHTML=rows.map(a=>'<div class="account-row"><span>'+esc(a.path||a.name)+'</span><strong class="money">'+money.format(balanceFor(a.id,cutoff))+'</strong></div>').join('')||'<div class="empty">Nessun conto liquido disponibile</div>';
  }
  function applyPrivacy(){document.querySelectorAll('.money').forEach(el=>el.classList.toggle('masked',hideAmounts));$('privacyButton').textContent=hideAmounts?'◎':'◉';$('privacyButton').setAttribute('aria-label',hideAmounts?'Mostra importi':'Nascondi importi');}
  function setScreen(name){activeScreen=name;document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.id==='screen-'+name));document.querySelectorAll('.bottom-item').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));window.scrollTo({top:0,behavior:'smooth'});}
  function setPeriod(mode){periodMode=mode;document.querySelectorAll('.period-tab').forEach(el=>el.classList.toggle('active',el.dataset.period===mode));render();}
- function shiftPeriod(delta){const [y,m]=selectedMonth.split('-').map(Number),d=new Date(y,m-1+(periodMode==='year'?delta*12:delta),1);selectedMonth=dateKey(d).slice(0,7);if(selectedMonth>new Date().toISOString().slice(0,7))selectedMonth=new Date().toISOString().slice(0,7);render();}
+ function shiftPeriod(delta){const [y,m]=selectedMonth.split('-').map(Number),d=new Date(y,m-1+(periodMode==='year'?delta*12:delta),1);selectedMonth=dateKey(d).slice(0,7);if(selectedMonth>dateKey(new Date()).slice(0,7))selectedMonth=dateKey(new Date()).slice(0,7);render();}
  async function logout(){try{await fetch('/api/mobile/logout',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:'{}'});}finally{location.replace('/mobile/login');}}
  async function init(){
   try{
