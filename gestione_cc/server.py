@@ -989,7 +989,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         active_session = self.session()
         if active_session and active_session.get("role") == "readonly" and path not in {
-            "/", "/mobile", "/mobile/login", "/mobile.html", "/mobile.js", "/mobile.css",
+            "/", "/mobile", "/mobile/", "/mobile/login", "/mobile.html", "/mobile.js", "/mobile.css",
             "/mobile.webmanifest", "/mobile-login.html", "/mobile-login.js", "/mobile-login.css",
             "/financial-engine.js", "/mobile/service-worker.js", "/brand-logo.svg", "/app-icon-192.png", "/app-icon-512.png", "/service-worker.js",
             "/api/status", "/api/mobile/state"
