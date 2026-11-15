@@ -602,3 +602,35 @@ body[data-hide-amounts="true"] canvas{opacity:0!important}
   #view-documents .document-storage-donut:after{inset:12px;}
   #view-documents .document-storage-legend{grid-template-columns:minmax(0,1fr);}
 }
+
+
+/* Avvio: mostra esclusivamente la schermata di caricamento fino ai dati pronti. */
+body:not(.app-ready) .app-shell{visibility:hidden}
+#appLoading{
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:var(--paper,#f5f8f7);
+}
+#appLoading.hidden{display:none!important}
+#appLoading .app-loading-card{
+  width:min(440px,100%);
+  display:grid;
+  gap:18px;
+  padding:30px;
+  border:1px solid var(--line,#e6ecea);
+  border-radius:16px;
+  background:var(--white,#fff);
+  box-shadow:0 18px 55px rgba(22,53,48,.10);
+}
+#appLoadingTitle{font-size:17px;color:var(--ink,#1b2a2a)}
+#appLoading .app-progress{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px}
+#appLoading .app-progress-track{height:9px;overflow:hidden;border-radius:20px;background:#e7efec}
+#appLoading #appProgressBar{display:block;width:0;height:100%;border-radius:inherit;background:var(--teal,#1c7770);transition:width .22s ease}
+#appLoading #appProgressText{min-width:42px;text-align:right;color:var(--muted,#71807e);font-size:12px;font-variant-numeric:tabular-nums}
+#appLoadingText{color:var(--muted,#71807e);font-size:12px;line-height:1.55}
+#appLoading.app-loading-error{background:var(--paper,#f5f8f7)}
+@media(max-width:480px){#appLoading{padding:16px}#appLoading .app-loading-card{padding:23px 19px}}
