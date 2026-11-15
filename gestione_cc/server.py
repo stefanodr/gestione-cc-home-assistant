@@ -869,6 +869,43 @@ def verify_pin(pin):
 def valid_pin(value):
     return isinstance(value, str) and len(value) == 6 and value.isascii() and value.isdigit()
 
+
+def mobile_readonly_projection(state):
+    """Return only the fields required by the smartphone read-only interface."""
+    if not isinstance(state, dict):
+        return None
+    account_fields = (
+        "id", "name", "path", "parentId", "type", "classification",
+        "includeInBudget", "mortgage", "hierarchyType"
+    )
+    transaction_fields = (
+        "date", "status", "amount", "bankAccountId", "counterpartAccountId",
+        "counterpartSplits", "description", "payee", "causale"
+    )
+    accounts = [
+        {key: account.get(key) for key in account_fields if key in account}
+        for account in state.get("accounts", []) if isinstance(account, dict)
+    ]
+    transactions = []
+    for transaction in state.get("transactions", []):
+        if not isinstance(transaction, dict):
+            continue
+        item = {key: transaction.get(key) for key in transaction_fields if key in transaction}
+        if isinstance(item.get("counterpartSplits"), list):
+            item["counterpartSplits"] = [
+                {key: split.get(key) for key in ("accountId", "value") if key in split}
+                for split in item["counterpartSplits"] if isinstance(split, dict)
+            ]
+        transactions.append(item)
+    return {
+        "accounts": accounts,
+        "transactions": transactions,
+        "bankAccountId": state.get("bankAccountId"),
+        "openingBalance": state.get("openingBalance", 0),
+        "reportAccountId": state.get("reportAccountId", state.get("bankAccountId", "all")),
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "GestioneCC"
     def log_message(self, fmt, *args):
@@ -1159,7 +1196,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(HTTPStatus.FORBIDDEN, {"error": "Questa API è riservata alla modalità smartphone"})
                 return
             with db() as c: row = c.execute("SELECT state_json,revision FROM app_state WHERE id=1").fetchone()
-            self.send_json(200, {"state": json.loads(row["state_json"]) if row else None, "revision": row["revision"] if row else 0, "csrf": item["csrf"]})
+            full_state = json.loads(row["state_json"]) if row else None
+            self.send_json(200, {"state": mobile_readonly_projection(full_state), "revision": row["revision"] if row else 0, "csrf": item["csrf"]})
             return
         if path == "/api/storage-info":
             item = self.require_auth()
