@@ -28,7 +28,7 @@
   const [y,m]=selectedMonth.split('-').map(Number),today=new Date();
   return [1,2,3].map(back=>{
    let start,end,label;
-   if(periodMode==='month'){const yy=y-back;start=yy+'-'+String(m).padStart(2,'0')+'-01';end=yy+'-'+String(m).padStart(2,'0')+'-'+String(new Date(yy,m,0).getDate()).padStart(2,'0');label=String(yy);}
+   if(periodMode==='month'){const yy=y-back,dayLimit=y===today.getFullYear()&&m===today.getMonth()+1?today.getDate():new Date(y,m,0).getDate();start=yy+'-'+String(m).padStart(2,'0')+'-01';end=yy+'-'+String(m).padStart(2,'0')+'-'+String(Math.min(dayLimit,new Date(yy,m,0).getDate())).padStart(2,'0');label=String(yy);}
    else {const yy=y-back;start=yy+'-01-01';end=yy+'-12-31';label=String(yy);}
    const rows=transactionsIn({start,end});return{label,data:flowTotals(rows)};
   });
