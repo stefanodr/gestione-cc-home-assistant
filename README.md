@@ -245,6 +245,20 @@ Firefox supporta le web app su Windows a partire dalla versione 143. Se installa
 ### Icona e collegamento Windows
 L'App pubblica icone PNG dedicate da 192×192 e 512×512 pixel con il logo ufficiale (€ blu e monete dorate). Se la finestra d'installazione mostra il logo corretto ma il collegamento desktop continua a visualizzare l'icona generica del browser, può essere necessario correggerla manualmente: clic destro sul collegamento → **Proprietà → Collegamento → Cambia icona**, selezionare il file/icona corretta e confermare. È un comportamento del collegamento o della cache icone di Windows, non un'indicazione che l'icona fornita dal sito sia errata.
 
+### Installazione PWA su tablet Android (procedura verificata su Samsung Galaxy Tab A8)
+
+Su Android la PWA può essere installata anche su tablet. Prima, però, Chrome deve riconoscere come attendibile il certificato HTTPS dell'App.
+
+1. Da un PC, apri Gestione C/C e scarica il **certificato CA privato** dalla sezione Sicurezza/Certificati. Se il browser lascia il download in attesa, puoi utilizzare un'applicazione di download affidabile per salvare il file originale.
+2. Trasferisci il file del certificato (ad esempio `.crt` o `.cer`) sul tablet. Una procedura semplice è caricarlo su Google Drive dal PC e scaricarlo da Drive sul tablet.
+3. Sul tablet apri **Impostazioni** e cerca **Installa certificato CA**. Sui dispositivi Samsung il percorso e il nome delle voci possono variare in base alla versione di Android/One UI.
+4. Seleziona il file CA salvato sul tablet e conferma l'installazione. Procedi soltanto con il certificato CA scaricato dalla propria istanza Gestione C/C e trasferito attraverso un canale fidato: un certificato CA installato diventa una nuova autorità considerata attendibile dal dispositivo.
+5. Chiudi e riapri Chrome, quindi visita nuovamente l'indirizzo HTTPS LAN di Gestione C/C. Verifica che la pagina si apra senza avvisi relativi al certificato.
+6. Apri il menu **⋮** di Chrome e seleziona **Installa app**. Conferma l'installazione: la PWA viene aggiunta al tablet con la propria icona.
+7. Se Chrome continua a proporre soltanto **Crea scorciatoia** oppure segnala che l'app non può essere installata, verifica prima che il certificato sia stato installato correttamente e che la pagina HTTPS non mostri avvisi. La semplice scorciatoia apre il sito nel browser e non equivale all'installazione della PWA.
+
+**Nota:** questa procedura è stata verificata su un Samsung Galaxy Tab A8. Le diciture e i menu possono essere diversi su altri tablet Android. Google Drive è stato usato soltanto per trasferire il file; non è necessario collegare Drive a Gestione C/C.
+
 ### Aggiornamenti e dati
 - Per aggiornare l'applicazione, aggiorna l'Home Assistant App: non disinstallarla e non cancellarne i dati.
 - La PWA è una finestra d'accesso al servizio web, non una copia autonoma dell'archivio.
@@ -460,6 +474,20 @@ Firefox supports web apps on Windows starting with version 143. If Firefox was i
 
 ### Icon and Windows shortcut
 The App provides dedicated 192×192 and 512×512 PNG icons using the official logo (blue € symbol and gold coins). If the installation dialog shows the correct logo but the desktop shortcut still displays a generic browser icon, Windows may require a manual shortcut adjustment: right-click the shortcut → **Properties → Shortcut → Change Icon**, select the correct icon and confirm. This is a Windows shortcut/icon-cache behaviour, not evidence that the website's icon is missing.
+
+### Installing the PWA on an Android tablet (procedure tested on Samsung Galaxy Tab A8)
+
+The PWA can also be installed on Android tablets. Chrome must first trust the App's HTTPS certificate.
+
+1. On a PC, open Gestione C/C and download the **private CA certificate** from Security/Certificates. If the browser leaves the download pending, use a trusted download manager to save the original file.
+2. Transfer the certificate file (for example, `.crt` or `.cer`) to the tablet. One simple method is to upload it to Google Drive from the PC and download it from Drive on the tablet.
+3. On the tablet, open **Settings** and search for **Install CA certificate**. On Samsung devices, the menu path and wording may vary with the Android/One UI version.
+4. Select the CA file saved on the tablet and confirm installation. Only install the CA certificate downloaded from your own Gestione C/C instance and transferred through a trusted channel: an installed CA becomes a new certificate authority trusted by the device.
+5. Close and reopen Chrome, then visit the Gestione C/C LAN HTTPS address again. Check that the page opens without certificate warnings.
+6. Open Chrome's **⋮** menu and select **Install app**. Confirm to add the PWA to the tablet with its own app icon.
+7. If Chrome still offers only **Create shortcut** or says the app cannot be installed, first check that the certificate was installed correctly and that the HTTPS page shows no warnings. A regular shortcut opens the website in the browser; it is not the same as installing the PWA.
+
+**Note:** this procedure was tested on a Samsung Galaxy Tab A8. Menu names and paths may differ on other Android tablets. Google Drive was used only to transfer the file; Gestione C/C does not need to be connected to Drive.
 
 ### Updates and data
 - Update the Home Assistant App to update the application; do not uninstall it or delete its data.
