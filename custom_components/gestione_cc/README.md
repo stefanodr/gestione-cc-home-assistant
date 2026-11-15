@@ -32,7 +32,7 @@ Non vengono creati sensori finanziari e non vengono trasferiti conti, saldi, mov
 
 ## PWA e collegamento Home Assistant Companion
 
-L'add-on serve un manifest PWA con apertura `standalone`. Non viene installato un service worker e non viene abilitata alcuna cache offline: le risposte HTML/API restano `no-store` per evitare la persistenza di dati contabili sul dispositivo.
+L'add-on serve un manifest PWA con apertura `standalone`. È presente un service worker minimale per il ciclo di vita della web app, ma non memorizza nella cache dati contabili, risposte API, pagine HTML o documenti. Le risposte HTML/API restano `no-store` per evitare la persistenza di dati contabili sul dispositivo.
 
 Da Chrome, aprire Gestione C/C e scegliere **Installa pagina come app** dal menu del browser. Edge consente **App → Installa questo sito come app**. Firefox su Windows 143 o successivo consente di aggiungere il sito come web app dalla barra degli indirizzi; per la build Microsoft Store è richiesta la versione 150 o successiva.
 
