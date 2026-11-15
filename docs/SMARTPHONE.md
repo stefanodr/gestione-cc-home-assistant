@@ -30,18 +30,19 @@ Fornire una seconda interfaccia, progettata per lo smartphone, che riutilizza l'
 
 La pagina mobile non contiene comandi di inserimento, modifica, importazione o cancellazione. Il server assegna alla sessione il ruolo `readonly` e applica una lista consentita di richieste GET. L'unica richiesta POST ammessa dopo l'accesso è la disconnessione mobile; le altre richieste POST vengono rifiutate. L'API `/api/mobile/state` restituisce lo stato contabile solo a una sessione mobile autenticata.
 
-Le sessioni desktop e smartphone usano cookie separati, così l'accesso mobile non sostituisce la sessione amministrativa del browser.
+Le sessioni desktop e smartphone usano cookie separati e reciprocamente esclusivi nello stesso browser. L'API mobile restituisce una proiezione ridotta dei dati: conti, movimenti e campi necessari alla consultazione; esclude impostazioni, credenziali, allegati, regole ricorrenti e identificativi interni non necessari.
 
 ## Limiti della prima versione
 
 - Non sono ancora inclusi i grafici storici dettagliati, i report completi, gli scostamenti e le medie attese.
-- La consultazione dei movimenti è limitata al periodo selezionato.
+- La consultazione dei movimenti è limitata al periodo selezionato; mese e anno correnti terminano alla data odierna.
+- La PWA usa uno scope dedicato `/mobile/`, senza controllare le pagine desktop.
 - La PWA mobile e l'installazione su Android devono ancora essere verificate su dispositivi reali.
 - Il servizio rimane LAN-only e richiede HTTPS e il certificato CA già previsto dall'app.
 
 ## Verifiche automatiche
 
-Il workflow `Mobile read-only validation` controlla la sintassi Python e JavaScript, il manifest PWA, la presenza degli asset e le protezioni strutturali della modalità di sola lettura.
+Il workflow `Mobile read-only validation` controlla la sintassi Python e JavaScript, il manifest PWA, la presenza degli asset, la proiezione dei dati e le protezioni strutturali della modalità di sola lettura. Anche i test del motore finanziario desktop sono eseguiti separatamente.
 
 ---
 
@@ -77,15 +78,16 @@ Provide a separate smartphone-first interface using the existing SQLite archive 
 
 The mobile page contains no transaction creation, editing, import or deletion controls. The server assigns the `readonly` role and enforces an allowlist of GET requests. After login, the only permitted POST request is mobile sign-out; all other POST requests are rejected. The `/api/mobile/state` endpoint returns accounting state only to an authenticated mobile session.
 
-Desktop and smartphone sessions use separate cookies, so mobile sign-in does not replace the browser's administrator session.
+Desktop and smartphone sessions use separate, mutually exclusive cookies in the same browser. The mobile API returns a reduced data projection containing only accounts, transactions and fields required for consultation; it excludes settings, credentials, attachments, recurring rules and unnecessary internal identifiers.
 
 ## Initial limitations
 
 - Detailed historical charts, full reports, variances and expected averages are not included yet.
-- Transaction consultation is limited to the selected period.
+- Transaction consultation is limited to the selected period; the current month and year stop at today's date.
+- The PWA uses a dedicated `/mobile/` scope and does not control desktop pages.
 - The mobile PWA and Android installation still need to be checked on real devices.
 - The service remains LAN-only and requires HTTPS and the app's existing private CA certificate.
 
 ## Automated checks
 
-The `Mobile read-only validation` workflow checks Python and JavaScript syntax, the PWA manifest, required assets and structural read-only protections.
+The `Mobile read-only validation` workflow checks Python and JavaScript syntax, the PWA manifest, required assets, data projection and structural read-only protections. The desktop financial-engine tests are also run separately.
