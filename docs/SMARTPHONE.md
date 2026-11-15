@@ -14,6 +14,7 @@ Fornire una seconda interfaccia, progettata per lo smartphone, che riutilizza l'
 - Accesso: `/mobile/login`.
 - Autenticazione: PIN amministratore esistente di sei cifre.
 - La sessione smartphone usa il cookie `cc_mobile_session`, distinto dalla sessione desktop `cc_session`.
+- Le due modalità sono mutuamente esclusive nello stesso browser: l'accesso smartphone invalida il cookie amministrativo e un successivo accesso amministrativo invalida quello smartphone.
 - La sessione mobile non abilita l'accesso alla pagina amministrativa.
 
 ## Funzioni iniziali
@@ -60,6 +61,7 @@ Provide a separate smartphone-first interface using the existing SQLite archive 
 - Login: `/mobile/login`.
 - Authentication: the existing six-digit administrator PIN.
 - The smartphone session uses the `cc_mobile_session` cookie, separate from the desktop `cc_session` cookie.
+- The two modes are mutually exclusive in the same browser: mobile sign-in expires the administrator cookie, and a subsequent administrator sign-in expires the mobile cookie.
 - The mobile session does not grant access to the administrative page.
 
 ## Initial features
