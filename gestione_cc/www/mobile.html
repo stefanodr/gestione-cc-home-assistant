@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f7f5">
+<meta name="robots" content="noindex,nofollow">
+<title>Gestione C/C · Smartphone</title>
+<link rel="manifest" href="/mobile.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/app-icon-192.png">
+<link rel="apple-touch-icon" href="/app-icon-192.png">
+<link rel="stylesheet" href="/mobile.css">
+<script src="/financial-engine.js" defer></script>
+<script src="/mobile.js" defer></script>
+</head>
+<body>
+<div id="mobileLoading" class="loading"><span class="spinner"></span><strong>Caricamento dati…</strong></div>
+<main id="mobileApp" class="mobile-app" hidden>
+<header class="topbar">
+ <div class="brand"><img src="/brand-logo.svg" alt="" width="38" height="38"><div><strong>Gestione C/C</strong><small>Consultazione personale</small></div></div>
+ <div class="topbar-actions"><button id="privacyButton" class="icon-button" type="button" aria-label="Nascondi importi" title="Nascondi importi">◉</button><button id="logoutButton" class="icon-button logout-button" type="button" aria-label="Esci" title="Esci">↪</button></div>
+</header>
+<div class="period-row">
+ <div><span class="eyebrow">PERIODO DI ANALISI</span><strong id="periodLabel">—</strong></div>
+ <div class="period-actions"><button id="periodPrev" type="button" aria-label="Periodo precedente">‹</button><button id="periodNext" type="button" aria-label="Periodo successivo">›</button></div>
+</div>
+<div class="period-tabs" role="group" aria-label="Tipo di periodo">
+ <button class="period-tab active" data-period="month" type="button">Mese</button>
+ <button class="period-tab" data-period="year" type="button">Anno</button>
+</div>
+<section id="screen-overview" class="screen active">
+ <article class="balance-card">
+  <span>Saldo conto selezionato</span><strong id="balanceValue" class="money">—</strong><small id="balanceCaption">Saldo ricostruito dai movimenti</small>
+  <div class="balance-foot"><span id="accountCaption">Tutti i conti</span><span id="asOfCaption">—</span></div>
+ </article>
+ <div class="metric-grid">
+  <article class="metric income"><span>Entrate</span><strong id="incomeValue" class="money">—</strong><small id="incomeCompare">Nel periodo</small></article>
+  <article class="metric expense"><span>Uscite</span><strong id="expenseValue" class="money">—</strong><small id="expenseCompare">Nel periodo</small></article>
+ </div>
+ <article class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">RISULTATO</span><h2>Saldo netto</h2></div><strong id="netValue" class="money">—</strong></div>
+  <div id="flowBars" class="flow-bars"></div>
+ </article>
+ <article class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">ULTIMI INSERIMENTI</span><h2>Movimenti recenti</h2></div><button class="text-link" data-screen="transactions" type="button">Tutti</button></div>
+  <div id="recentTransactions" class="transaction-list"></div>
+ </article>
+</section>
+<section id="screen-expenses" class="screen">
+ <div class="section-title"><span class="eyebrow">DISTRIBUZIONE</span><h1>Spese per categoria</h1><p>Uscite economiche del periodo selezionato</p></div>
+ <article class="panel"><div id="categoryList" class="category-list"></div></article>
+ <article class="panel"><div class="panel-heading"><div><span class="eyebrow">CONFRONTO</span><h2>Rispetto ai periodi precedenti</h2></div></div><div id="expenseComparison" class="comparison-list"></div></article>
+</section>
+<section id="screen-transactions" class="screen">
+ <div class="section-title"><span class="eyebrow">REGISTRO</span><h1>Movimenti</h1><p>Consultazione dei movimenti del periodo</p></div>
+ <div class="filter-row"><select id="transactionFilter" aria-label="Filtra movimenti"><option value="all">Tutti</option><option value="income">Entrate</option><option value="expense">Uscite</option><option value="pending">Da classificare</option></select><span id="transactionCount"></span></div>
+ <article class="panel"><div id="transactionList" class="transaction-list"></div></article>
+</section>
+<section id="screen-accounts" class="screen">
+ <div class="section-title"><span class="eyebrow">PATRIMONIO</span><h1>Conti</h1><p>Saldi ricostruiti al termine del periodo</p></div>
+ <article class="panel"><div id="accountList" class="account-list"></div></article>
+</section>
+<nav class="bottom-nav" aria-label="Navigazione smartphone">
+ <button class="bottom-item active" data-screen="overview" type="button"><span>⌂</span><small>Home</small></button>
+ <button class="bottom-item" data-screen="expenses" type="button"><span>◔</span><small>Spese</small></button>
+ <button class="bottom-item" data-screen="transactions" type="button"><span>⇄</span><small>Movimenti</small></button>
+ <button class="bottom-item" data-screen="accounts" type="button"><span>▤</span><small>Conti</small></button>
+</nav>
+</main>
+<div id="mobileError" class="error-card" hidden><strong>Impossibile caricare i dati</strong><p id="mobileErrorText"></p><button id="retryMobile" type="button">Riprova</button></div>
+
+</body></html>

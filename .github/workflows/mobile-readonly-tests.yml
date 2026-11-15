@@ -1,0 +1,32 @@
+name: Mobile read-only validation
+
+on:
+  push:
+    branches:
+      - feature/mobile-readonly
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  mobile-readonly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate server and mobile JavaScript syntax
+        run: |
+          python -m py_compile gestione_cc/server.py
+          node --check gestione_cc/www/mobile.js
+          node --check gestione_cc/www/mobile-login.js
+      - name: Validate mobile manifest and read-only structure
+        run: |
+          python -m unittest discover -s tests -p 'test_mobile_readonly.py' -v

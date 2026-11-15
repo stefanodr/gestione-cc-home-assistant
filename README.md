@@ -23,6 +23,8 @@ Questa distribuzione comprende **tre componenti distinti**, che svolgono ruoli d
 
 **Guide rapide:** [installazione dell'App](#installazione) · [configurazione HACS](#integrazione-home-assistant-tramite-hacs) · [installazione PWA](#pwa-e-installazione-come-app-desktop) · [dettagli dei pulsanti di backup](custom_components/gestione_cc/README.md#pulsanti-di-manutenzione) · [changelog 2.0.0](gestione_cc/CHANGELOG.md).
 
+**Versione smartphone (in sviluppo):** interfaccia separata in sola lettura per consultare saldi, flussi e movimenti dal telefono. Consulta la [documentazione della versione smartphone](docs/SMARTPHONE.md).
+
 ### What's new in version 2.0.0
 
 This distribution includes **three separate components** with different roles:
