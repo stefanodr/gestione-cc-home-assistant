@@ -916,7 +916,7 @@ class Handler(BaseHTTPRequestHandler):
         if not item:
             self.send_json(HTTPStatus.UNAUTHORIZED, {"error":"Autenticazione richiesta"})
             return None
-        if csrf and item.get("role") == "readonly":
+        if csrf and item.get("role") == "readonly" and urlparse(self.path).path != "/api/mobile/logout":
             self.send_json(HTTPStatus.FORBIDDEN, {"error":"Sessione smartphone in sola lettura"})
             return None
         if csrf and not hmac.compare_digest(str(self.headers.get("X-CSRF-Token","")), item["csrf"]):
@@ -947,7 +947,8 @@ class Handler(BaseHTTPRequestHandler):
         active_session = self.session()
         if active_session and active_session.get("role") == "readonly" and path not in {
             "/", "/mobile", "/mobile/login", "/mobile.html", "/mobile.js", "/mobile.css",
-            "/mobile.webmanifest", "/mobile-login.html", "/mobile-login.js",
+            "/mobile.webmanifest", "/mobile-login.html", "/mobile-login.js", "/mobile-login.css",
+            "/brand-logo.svg", "/app-icon-192.png", "/app-icon-512.png",
             "/api/status", "/api/mobile/state"
         }:
             self.send_json(HTTPStatus.FORBIDDEN, {"error": "Endpoint non disponibile nella modalità smartphone"})
@@ -1152,7 +1153,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(HTTPStatus.FORBIDDEN, {"error": "Questa API è riservata alla modalità smartphone"})
                 return
             with db() as c: row = c.execute("SELECT state_json,revision FROM app_state WHERE id=1").fetchone()
-            self.send_json(200, {"state": json.loads(row["state_json"]) if row else None, "revision": row["revision"] if row else 0})
+            self.send_json(200, {"state": json.loads(row["state_json"]) if row else None, "revision": row["revision"] if row else 0, "csrf": item["csrf"]})
             return
         if path == "/api/storage-info":
             item = self.require_auth()
