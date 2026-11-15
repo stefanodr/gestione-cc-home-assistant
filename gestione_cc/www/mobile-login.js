@@ -1,7 +1,7 @@
 'use strict';
 (() => {
  const form=document.getElementById('mobileLoginForm'),pin=document.getElementById('mobilePin'),error=document.getElementById('mobileLoginError'),button=document.getElementById('mobileLoginSubmit');
- pin.addEventListener('input',()=>{pin.value=pin.value.replace(/\\D/g,'').slice(0,6);});
+ pin.addEventListener('input',()=>{pin.value=pin.value.replace(/\D/g,'').slice(0,6);});
  form.addEventListener('submit',async event=>{
   event.preventDefault();error.textContent='';
   if(!/^[0-9]{6}$/.test(pin.value)){error.textContent='Inserisci tutte le 6 cifre del PIN.';pin.focus();return;}
