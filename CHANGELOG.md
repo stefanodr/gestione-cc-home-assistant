@@ -1,3 +1,21 @@
+## [2.1.0] - 2026-11-15
+
+### Interfaccia smartphone
+- Aggiunta una PWA dedicata alla consultazione da smartphone, in sola lettura.
+- Accesso con PIN esistente e sessione separata dalla modalità desktop.
+- API mobile con proiezione ridotta dei dati contabili, senza impostazioni, credenziali o allegati.
+- Scope PWA isolato sotto `/mobile/`; interfaccia desktop e database invariati.
+- Aggiunti test automatici per la modalità read-only e la proiezione dei dati.
+- Superati i test di sicurezza API, validazione applicativa, test finanziari, validazione smartphone e compilazione dell'add-on Home Assistant.
+
+### Smartphone interface
+- Added a dedicated read-only smartphone PWA.
+- Uses the existing PIN and a session separate from desktop mode.
+- Mobile API returns a reduced projection of accounting data, excluding settings, credentials and attachments.
+- PWA scope isolated under `/mobile/`; desktop interface and database remain unchanged.
+- Added automated tests for read-only enforcement and data projection.
+- API security, application validation, financial tests, mobile validation and Home Assistant add-on build all passed.
+
 ## [2.0.0] - 2026-11-15
 
 ### Rilascio principale
