@@ -11,6 +11,30 @@
 
 **Italiano · English**
 
+## Novità della versione 2.0.0 — per chi visita il repository
+
+Questa distribuzione comprende **tre componenti distinti**, che svolgono ruoli diversi:
+
+- **Home Assistant App (server):** ospita Gestione C/C, l'interfaccia web e il database SQLite persistente.
+- **Integrazione personalizzata HACS (v1.1.6):** collega Home Assistant al server e aggiunge sensori di monitoraggio tecnico e pulsanti di manutenzione. Non importa in Home Assistant conti, saldi o movimenti.
+- **PWA (Progressive Web App):** permette di installare l'interfaccia come finestra/app sul PC o su un dispositivo compatibile. Non è un programma autonomo e richiede che il server Home Assistant sia raggiungibile.
+
+**Novità documentate nella 2.0.0:** integrazione HACS con autenticazione tramite token e certificato CA privata; monitoraggio di disponibilità, database, backup, spazio e processi; comandi di backup locale, backup Google Drive e controllo integrità; manifest e icone PWA con istruzioni per Chrome, Edge e Firefox su Windows.
+
+**Guide rapide:** [installazione dell'App](#installazione) · [configurazione HACS](#integrazione-home-assistant-tramite-hacs) · [installazione PWA](#pwa-e-installazione-come-app-desktop) · [dettagli dei pulsanti di backup](custom_components/gestione_cc/README.md#pulsanti-di-manutenzione) · [changelog 2.0.0](gestione_cc/CHANGELOG.md).
+
+### What's new in version 2.0.0 — for first-time visitors
+
+This distribution includes **three separate components** with different roles:
+
+- **Home Assistant App (server):** hosts Gestione C/C, its web interface and persistent SQLite database.
+- **HACS custom integration (v1.1.6):** connects Home Assistant to the server and adds technical monitoring sensors and maintenance buttons. It does not import account, balance or transaction data into Home Assistant.
+- **PWA (Progressive Web App):** lets you install the interface as a dedicated app/window on a PC or compatible device. It is not a standalone program and requires the Home Assistant server to be reachable.
+
+**Version 2.0.0 highlights:** HACS integration authenticated with a dedicated token and private CA certificate; monitoring of availability, database, backups, storage and jobs; local backup, Google Drive backup and integrity-check commands; PWA manifest and icons with Chrome, Edge and Firefox for Windows installation instructions.
+
+**Quick links:** [Install the App](#installation) · [Set up HACS](#home-assistant-integration-through-hacs) · [Install the PWA](#pwa-and-desktop-app-installation) · [Backup button details](custom_components/gestione_cc/README.md#maintenance-buttons) · [version 2.0.0 changelog](gestione_cc/CHANGELOG.md).
+
 > [!IMPORTANT]
 > **SCHERMATE DIMOSTRATIVE — DATI FITTIZI**
 >
@@ -29,7 +53,7 @@ Gestione C/C include una **custom integration HACS** per collegare Home Assistan
 
 - Sensori per disponibilità, versione app e integrazione, uptime, database, backup, spazio, allegati e processi.
 - Sensori binari per gli stati tecnici supportati.
-- Pulsanti per avviare backup locale, backup Google Drive e controllo d'integrità.
+- Pulsanti di manutenzione: **Backup totale/locale** (crea una copia SQLite completa del database sul server Home Assistant, con conservazione delle ultime 30 copie locali), **Backup Google Drive** (crea una copia SQLite e la carica nel Drive collegato, mantenendo gli ultimi 3 backup notturni) e **Controllo integrità** (esegue `PRAGMA integrity_check` sul database). I comandi vengono accodati ed eseguiti in background.
 - Esempi pronti di dashboard e automazioni.
 - Connessione HTTPS con CA privata, token dedicato e autorizzazioni API limitate.
 
