@@ -77,7 +77,7 @@
   const [year,month]=selectedMonth.split('-').map(Number);
   const months=periodMode==='year'
    ?Array.from({length:12},(_,i)=>new Date(year,i,1))
-   :Array.from({length:6},(_,i)=>new Date(year,month-6+i,1));
+   :Array.from({length:6},(_,i)=>new Date(year,month-5+i,1));
   const series=months.map(date=>{
    const key=dateKey(date).slice(0,7),last=new Date(date.getFullYear(),date.getMonth()+1,0).getDate();
    const totals=flowTotals(transactionsIn({start:key+'-01',end:key+'-'+String(last).padStart(2,'0')}));
@@ -85,7 +85,7 @@
   });
   const maxFlow=Math.max(1,...series.map(x=>Math.max(x.income,x.expense)));
   $('trendChart').innerHTML=series.map(x=>'<div class="trend-row"><span class="trend-month">'+esc(x.label)+'</span><div class="trend-bars"><div class="trend-track"><div class="trend-fill income" style="width:'+(x.income/maxFlow*100)+'%"></div></div><div class="trend-track"><div class="trend-fill expense" style="width:'+(x.expense/maxFlow*100)+'%"></div></div></div><div class="trend-values"><span class="money">'+money.format(x.income)+'</span><span class="money">'+money.format(x.expense)+'</span></div></div>').join('');
-  const categories=expenseTotals(rows).slice(0,8),total=categories.reduce((sum,item)=>sum+item.value,0),maxCategory=Math.max(1,...categories.map(item=>item.value));
+  const allCategories=expenseTotals(rows),total=allCategories.reduce((sum,item)=>sum+item.value,0),categories=allCategories.slice(0,8),maxCategory=Math.max(1,...categories.map(item=>item.value));
   $('chartCategories').innerHTML=categories.length?categories.map(item=>'<div class="chart-category"><div class="chart-category-heading"><span>'+esc(item.name)+'</span><strong class="money">'+money.format(item.value)+'</strong></div><div class="chart-category-track"><div class="chart-category-fill" style="width:'+(item.value/maxCategory*100)+'%"></div></div><small>'+ (total?Math.round(item.value/total*100):0)+'% delle uscite</small></div>').join(''):'<div class="empty">Nessuna spesa categorizzata nel periodo</div>';
  }
  function applyPrivacy(){document.querySelectorAll('.money').forEach(el=>el.classList.toggle('masked',hideAmounts));$('privacyButton').textContent=hideAmounts?'◎':'◉';$('privacyButton').setAttribute('aria-label',hideAmounts?'Mostra importi':'Nascondi importi');}
