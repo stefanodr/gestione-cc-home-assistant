@@ -618,7 +618,51 @@
     return changed;
   }
 
+
+  function setupNavigationLayout() {
+    const toggle = $('#sidebarToggle');
+    const backdrop = $('#sidebarBackdrop');
+    if (!toggle || !backdrop) return;
+    const mobileQuery = window.matchMedia('(max-width: 620px)');
+    const setState = (open) => {
+      document.body.classList.toggle('sidebar-open', mobileQuery.matches && open);
+      toggle.setAttribute('aria-expanded', String(mobileQuery.matches ? open : !document.body.classList.contains('sidebar-collapsed')));
+      toggle.setAttribute('aria-label', mobileQuery.matches
+        ? (open ? 'Chiudi menu' : 'Apri menu')
+        : (document.body.classList.contains('sidebar-collapsed') ? 'Espandi menu' : 'Comprimi menu'));
+      toggle.title = toggle.getAttribute('aria-label');
+    };
+    try {
+      if (localStorage.getItem('gestioneCcSidebar') === 'compact') document.body.classList.add('sidebar-collapsed');
+    } catch (_) {}
+    toggle.addEventListener('click', () => {
+      if (mobileQuery.matches) {
+        setState(!document.body.classList.contains('sidebar-open'));
+      } else {
+        const compact = !document.body.classList.contains('sidebar-collapsed');
+        document.body.classList.toggle('sidebar-collapsed', compact);
+        try { localStorage.setItem('gestioneCcSidebar', compact ? 'compact' : 'expanded'); } catch (_) {}
+        setState(false);
+      }
+    });
+    backdrop.addEventListener('click', () => setState(false));
+    mobileQuery.addEventListener?.('change', () => setState(false));
+    $('.nav-item').forEach(button => button.addEventListener('click', () => {
+      if (mobileQuery.matches) setState(false);
+    }));
+    setState(false);
+  }
+
+  function registerAppServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    // Il worker abilita l'installazione PWA ma non conserva contenuti o dati finanziari.
+    navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+      .catch(error => console.warn('Installazione PWA non disponibile in questo browser:', error));
+  }
+
   function setupControls() {
+    setupNavigationLayout();
+    registerAppServiceWorker();
     // Wire modal controls first so a missing optional UI element cannot leave
     // the confirmation dialog with inert Cancel/Continue buttons.
     $$('[data-close-modal]').forEach(button => button.addEventListener('click', closeModals));
