@@ -876,11 +876,11 @@ def mobile_readonly_projection(state):
         return None
     account_fields = (
         "id", "name", "path", "parentId", "type", "classification",
-        "includeInBudget", "mortgage", "hierarchyType"
+        "includeInBudget", "mortgage", "hierarchyType", "hierarchyTypeOverride"
     )
     transaction_fields = (
         "date", "status", "amount", "bankAccountId", "counterpartAccountId",
-        "counterpartSplits", "description", "payee", "causale"
+        "counterpartSplits", "description", "payee", "causale", "memo"
     )
     accounts = [
         {key: account.get(key) for key in account_fields if key in account}
