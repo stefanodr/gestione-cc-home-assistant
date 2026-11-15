@@ -55,7 +55,7 @@
   renderCategories(rows);renderComparison(totals);renderTransactions(rows);renderAccounts(cutoff);applyPrivacy();
  }
  function transactionHtml(t){
-  const title=t.description||t.payee||t.causale||'Movimento';
+  const title=t.description||t.payee||t.causale||t.memo||'Movimento';
   const category=t.counterpartSplits?.length?'Movimento ripartito':accountName(t.counterpartAccountId);
   const sign=num(t.amount)>=0?'+':'−';
   return '<div class="transaction-row"><div><div class="tx-title">'+esc(title)+'</div><div class="tx-meta">'+esc(t.date||'')+' · '+esc(category)+(t.status==='pending'?' · Da classificare':'')+'</div></div><strong class="money tx-amount '+(num(t.amount)>=0?'amount-in':'amount-out')+'">'+sign+money.format(Math.abs(num(t.amount)))+'</strong></div>';
