@@ -42,10 +42,10 @@ class MobileReadOnlyStructureTest(unittest.TestCase):
     def test_projection_excludes_private_and_administrative_data(self):
         source = {
             "accounts": [{"id": "bank", "name": "Conto", "path": "Attività correnti:Banca",
-                          "type": "BANK", "classification": "Patrimoniale", "secret": "do-not-send"}],
+                          "type": "BANK", "classification": "Patrimoniale", "hierarchyTypeOverride": "Mastro e conto", "secret": "do-not-send"}],
             "transactions": [{"id": "private-id", "date": "2026-01-02", "amount": -10,
                               "bankAccountId": "bank", "counterpartAccountId": "food",
-                              "description": "Spesa", "status": "confirmed", "source": "private-source",
+                              "description": "Spesa", "memo": "Nota", "status": "confirmed", "source": "private-source",
                               "attachmentIds": ["private-file"], "counterpartSplits": [
                                   {"accountId": "food", "value": -10, "private": "omit"}]}],
             "bankAccountId": "bank", "openingBalance": 100, "reportAccountId": "all",
@@ -54,6 +54,8 @@ class MobileReadOnlyStructureTest(unittest.TestCase):
         }
         result = self.project["mobile_readonly_projection"](source)
         self.assertEqual(result["accounts"][0]["id"], "bank")
+        self.assertEqual(result["accounts"][0]["hierarchyTypeOverride"], "Mastro e conto")
+        self.assertEqual(result["transactions"][0]["memo"], "Nota")
         self.assertNotIn("secret", result["accounts"][0])
         self.assertEqual(result["transactions"][0]["counterpartSplits"], [{"accountId": "food", "value": -10}])
         for key in ("settings", "attachments", "recurringRules", "users"):
