@@ -11,19 +11,19 @@
 
 **Italiano · English**
 
-## Novità della versione 2.1.0
+## Novità della versione 2.1.1
 
-La versione **2.1.0** introduce una PWA dedicata allo smartphone, in sola lettura:
+La versione **2.1.1** introduce una PWA dedicata allo smartphone, in sola lettura:
 - Accesso con PIN esistente e sessione smartphone separata.
-- Panoramica, entrate, uscite, categorie, movimenti e saldi.
+- Panoramica, entrate, uscite, categorie, movimenti e grafici.
 - API mobile con dati ridotti e controlli server-side che impediscono le modifiche contabili.
 - PWA con percorso isolato `/mobile/`; interfaccia desktop e database restano invariati.
 
 Dopo l'aggiornamento dell'Home Assistant App, apri `https://<host-lan>:8443/mobile/` dal telefono. La funzione resta LAN-only e richiede il certificato CA HTTPS già installato sul dispositivo.
 
-### What's new in version 2.1.0
+### What's new in version 2.1.1
 
-Version **2.1.0** adds a dedicated read-only smartphone PWA:
+Version **2.1.1** adds a dedicated read-only smartphone PWA:
 - Existing PIN authentication with a separate smartphone session.
 - Overview, income, expenses, categories, transactions and balances.
 - Reduced-data mobile API and server-side controls preventing accounting changes.
@@ -347,7 +347,7 @@ Per le novità della versione installata consulta le [note di rilascio](CHANGELO
 
 L'uso gratuito è consentito alle persone fisiche per finalità personali e non commerciali, nei limiti della licenza. Gli usi professionali, aziendali e commerciali richiedono un accordo scritto.
 
-Versione Home Assistant App: **2.1.0**. Versione dell'app inclusa: **2.1.0**. Versione custom integration HACS: **1.1.6** (indipendente).
+Versione Home Assistant App: **2.1.1**. Versione dell'app inclusa: **2.1.1**. Versione custom integration HACS: **1.1.6** (indipendente).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). Tutti i diritti riservati salvo i permessi espressamente concessi.
 
@@ -577,7 +577,7 @@ See the [release notes](CHANGELOG.md) for changes in each version.
 
 Free use is permitted to individuals for personal, non-commercial purposes, subject to the licence terms. Professional, business and commercial uses require a written agreement.
 
-Home Assistant App version: **2.1.0**. Bundled application version: **2.1.0**. HACS custom integration version: **1.1.6** (independent).
+Home Assistant App version: **2.1.1**. Bundled application version: **2.1.1**. HACS custom integration version: **1.1.6** (independent).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). All rights reserved except where permissions are expressly granted.
 

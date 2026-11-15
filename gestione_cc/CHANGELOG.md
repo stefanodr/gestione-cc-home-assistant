@@ -1,3 +1,17 @@
+## [2.1.1] - 2026-11-15
+
+### Interfaccia smartphone
+- Corretta la visualizzazione del riquadro «Caricamento dati…»: l'attributo `hidden` ora prevale sulle regole CSS di visualizzazione.
+- Sostituita la sezione **Conti** nella navigazione smartphone con **Grafici**.
+- Aggiunto il confronto mensile di entrate e uscite e la ripartizione grafica delle uscite per categoria.
+- Mantenuta la consultazione in sola lettura e invariati database, PIN, certificati e configurazione di rete.
+
+### Smartphone interface
+- Fixed the persistent “Loading data…” overlay: the `hidden` attribute now takes precedence over CSS display rules.
+- Replaced the **Accounts** smartphone section with **Charts**.
+- Added a monthly income/expense comparison and a graphical expense breakdown by category.
+- Kept read-only access; database, PIN, certificates and network settings remain unchanged.
+
 ## [2.1.0] - 2026-11-15
 
 ### Interfaccia smartphone
