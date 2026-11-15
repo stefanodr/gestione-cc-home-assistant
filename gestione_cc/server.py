@@ -991,7 +991,7 @@ class Handler(BaseHTTPRequestHandler):
         if active_session and active_session.get("role") == "readonly" and path not in {
             "/", "/mobile", "/mobile/login", "/mobile.html", "/mobile.js", "/mobile.css",
             "/mobile.webmanifest", "/mobile-login.html", "/mobile-login.js", "/mobile-login.css",
-            "/financial-engine.js", "/brand-logo.svg", "/app-icon-192.png", "/app-icon-512.png", "/service-worker.js",
+            "/financial-engine.js", "/mobile/service-worker.js", "/brand-logo.svg", "/app-icon-192.png", "/app-icon-512.png", "/service-worker.js",
             "/api/status", "/api/mobile/state"
         }:
             self.send_json(HTTPStatus.FORBIDDEN, {"error": "Endpoint non disponibile nella modalità smartphone"})
@@ -1146,6 +1146,10 @@ class Handler(BaseHTTPRequestHandler):
             item = self.session()
             self.send_json(200, {"authenticated": bool(item), "role": item.get("role", "admin") if item else None, "csrf": item["csrf"] if item else None})
             return
+        if path == "/mobile/":
+            path = "/mobile"
+        if path == "/mobile/service-worker.js":
+            path = "/service-worker.js"
         if path == "/mobile/login":
             path = "/mobile-login.html"
         if path == "/mobile":
