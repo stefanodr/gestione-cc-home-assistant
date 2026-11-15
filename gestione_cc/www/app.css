@@ -636,7 +636,20 @@ body:not(.app-ready) .app-shell{visibility:hidden}
 @media(max-width:480px){#appLoading{padding:16px}#appLoading .app-loading-card{padding:23px 19px}}
 
 
-/* Il tasto Esci resta accessibile anche in verticale su smartphone. */
+/* Smartphone: le azioni principali restano in alto; Esci va sotto l'esportazione. */
 @media(max-width:620px){
-  .top-actions #exitApp{display:inline-flex!important;}
+  .top-actions{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto auto;
+    align-items:center;
+  }
+  .top-actions #exitApp{
+    display:inline-flex!important;
+    grid-column:1/-1;
+    justify-self:start;
+    width:max-content;
+    margin-left:0;
+    font-size:12px!important;
+    padding:9px 14px;
+  }
 }
