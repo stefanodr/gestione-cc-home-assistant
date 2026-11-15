@@ -92,6 +92,8 @@
    $('periodPrev').addEventListener('click',()=>shiftPeriod(-1));$('periodNext').addEventListener('click',()=>shiftPeriod(1));
    $('transactionFilter').addEventListener('change',()=>renderTransactions(transactionsIn(periodRange())));
    $('privacyButton').addEventListener('click',()=>{hideAmounts=!hideAmounts;applyPrivacy();});
+   $('logoutButton').addEventListener('click',logout);
+   if('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
    $('retryMobile').addEventListener('click',()=>location.reload());
    render();
   }catch(e){$('mobileLoading').hidden=true;$('mobileError').hidden=false;$('mobileErrorText').textContent=e.message||String(e);}
