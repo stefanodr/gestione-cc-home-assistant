@@ -948,7 +948,7 @@ class Handler(BaseHTTPRequestHandler):
         if active_session and active_session.get("role") == "readonly" and path not in {
             "/", "/mobile", "/mobile/login", "/mobile.html", "/mobile.js", "/mobile.css",
             "/mobile.webmanifest", "/mobile-login.html", "/mobile-login.js", "/mobile-login.css",
-            "/brand-logo.svg", "/app-icon-192.png", "/app-icon-512.png",
+            "/brand-logo.svg", "/app-icon-192.png", "/app-icon-512.png", "/service-worker.js",
             "/api/status", "/api/mobile/state"
         }:
             self.send_json(HTTPStatus.FORBIDDEN, {"error": "Endpoint non disponibile nella modalità smartphone"})
