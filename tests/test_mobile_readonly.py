@@ -92,7 +92,7 @@ class MobileReadOnlyStructureTest(unittest.TestCase):
         self.assertNotIn('id="importBankSecondary"', html)
         self.assertIn('id="logoutButton"', html)
         self.assertIn('class="money tx-amount', js)
-        self.assertIn("function isLiquid", js)
+        self.assertIn("const isLiquid=", js)
         self.assertIn("classifyHierarchy", js)
         self.assertIn("today=dateKey(new Date())", js)
 
