@@ -2,7 +2,7 @@
   'use strict';
 
   const APP_VERSION = '1.7.14';
-  const ADDON_VERSION = '1.0.44';
+  const ADDON_VERSION = '1.1.10';
   let privacyMode = false;
   let privacyObserver = null;
   function setAppProgress(value, label) {
@@ -618,7 +618,57 @@
     return changed;
   }
 
+
+  function setupNavigationLayout() {
+    const toggle = $('#sidebarToggle');
+    const backdrop = $('#sidebarBackdrop');
+    if (!toggle || !backdrop) return;
+    const mobileQuery = window.matchMedia('(max-width: 620px)');
+    const setState = (open) => {
+      document.body.classList.toggle('sidebar-open', mobileQuery.matches && open);
+      toggle.setAttribute('aria-expanded', String(mobileQuery.matches ? open : !document.body.classList.contains('sidebar-collapsed')));
+      toggle.setAttribute('aria-label', mobileQuery.matches
+        ? (open ? 'Chiudi menu' : 'Apri menu')
+        : (document.body.classList.contains('sidebar-collapsed') ? 'Espandi menu' : 'Comprimi menu'));
+      toggle.title = toggle.getAttribute('aria-label');
+    };
+    try {
+      if (localStorage.getItem('gestioneCcSidebar') === 'compact') document.body.classList.add('sidebar-collapsed');
+    } catch (_) {}
+    toggle.addEventListener('click', () => {
+      if (mobileQuery.matches) {
+        setState(!document.body.classList.contains('sidebar-open'));
+      } else {
+        const compact = !document.body.classList.contains('sidebar-collapsed');
+        document.body.classList.toggle('sidebar-collapsed', compact);
+        try { localStorage.setItem('gestioneCcSidebar', compact ? 'compact' : 'expanded'); } catch (_) {}
+        setState(false);
+      }
+    });
+    backdrop.addEventListener('click', () => setState(false));
+    mobileQuery.addEventListener?.('change', () => setState(false));
+    document.querySelectorAll('.nav-item').forEach(button => {
+      button.title = button.textContent.trim();
+      button.addEventListener('click', () => {
+        if (mobileQuery.matches) setState(false);
+      });
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && mobileQuery.matches) setState(false);
+    });
+    setState(false);
+  }
+
+  function registerAppServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    // Il worker abilita l'installazione PWA ma non conserva contenuti o dati finanziari.
+    navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+      .catch(error => console.warn('Installazione PWA non disponibile in questo browser:', error));
+  }
+
   function setupControls() {
+    setupNavigationLayout();
+    registerAppServiceWorker();
     // Wire modal controls first so a missing optional UI element cannot leave
     // the confirmation dialog with inert Cancel/Continue buttons.
     $$('[data-close-modal]').forEach(button => button.addEventListener('click', closeModals));
@@ -630,7 +680,7 @@
       catch (error) { console.error('Operazione di conferma non completata', error); closeModals(); showNotice('Operazione non completata', error?.message || String(error) || 'Errore inatteso dopo la conferma.'); }
     });
     $('#confirmExclude')?.addEventListener('click', async () => { const fn=confirmCallback; closeModals(); if(!fn)return; showNotice('Operazione in corso','Attendi il completamento.'); try{await fn(false);}catch(error){showNotice('Operazione non completata',error.message||String(error));} });
-    $$('.nav-item').forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
+    $$( '.nav-item' ).forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
     $('#closeAttachmentsModal')?.addEventListener('click',()=>$('#attachmentsModal').classList.add('hidden'));
     $('#doneAttachmentsModal')?.addEventListener('click',()=>$('#attachmentsModal').classList.add('hidden'));
     $('#uploadAttachmentButton')?.addEventListener('click',()=>$('#attachmentFilePicker').click());
@@ -1535,7 +1585,7 @@
 
   function navigate(view) {
     $$('.content-view').forEach(section => section.classList.toggle('active', section.id === `view-${view}`));
-    $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === view));
+    $$( '.nav-item' ).forEach(button => button.classList.toggle('active', button.dataset.view === view));
     const names = { overview: 'Panoramica', transactions: 'Movimenti', search: 'Ricerca avanzata', documents: 'Archivio documenti', budget: 'Budget', forecast: 'Previsioni', reports: 'Report', accounts: 'Piano dei conti', rules: 'Regole apprese', settings: 'Impostazioni', guide: 'Guida all’utilizzo' };
     $('#currentSection').textContent = names[view] || 'Panoramica';
     renderAll();
