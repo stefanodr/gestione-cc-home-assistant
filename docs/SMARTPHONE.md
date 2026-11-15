@@ -2,7 +2,7 @@
 
 ## Stato
 
-La prima implementazione è disponibile nel ramo di sviluppo `feature/mobile-readonly`. Non è ancora una release e non deve essere installata sull'istanza Home Assistant in uso finché non sono completate le verifiche funzionali su un ambiente di prova.
+La versione smartphone è stata integrata in `main` e inclusa nell'Home Assistant App **2.1.0**. I controlli automatici e la compilazione dell'add-on sono superati. È ora disponibile per il collaudo funzionale sull'istanza Home Assistant reale; l'installazione PWA e i calcoli vanno verificati con attenzione durante l'uso iniziale.
 
 ## Obiettivo
 
@@ -10,7 +10,7 @@ Fornire una seconda interfaccia, progettata per lo smartphone, che riutilizza l'
 
 ## Accesso
 
-- Percorso: `/mobile`.
+- Percorso: `/mobile/` (indirizzo completo: `https://<host-lan>:8443/mobile/`).
 - Accesso: `/mobile/login`.
 - Autenticazione: PIN amministratore esistente di sei cifre.
 - La sessione smartphone usa il cookie `cc_mobile_session`, distinto dalla sessione desktop `cc_session`.
@@ -50,7 +50,7 @@ Il workflow `Mobile read-only validation` controlla la sintassi Python e JavaScr
 
 ## Status
 
-The first implementation is available on the development branch `feature/mobile-readonly`. It is not a release and must not be installed on the active Home Assistant instance until functional checks have been completed in a test environment.
+The smartphone version has been merged into `main` and included in Home Assistant App **2.1.0**. Automated checks and the add-on build have passed. It is now available for functional testing on the real Home Assistant instance; PWA installation and calculations should be checked carefully during initial use.
 
 ## Goal
 
@@ -58,7 +58,7 @@ Provide a separate smartphone-first interface using the existing SQLite archive 
 
 ## Access
 
-- Path: `/mobile`.
+- Path: `/mobile/` (full address: `https://<lan-host>:8443/mobile/`).
 - Login: `/mobile/login`.
 - Authentication: the existing six-digit administrator PIN.
 - The smartphone session uses the `cc_mobile_session` cookie, separate from the desktop `cc_session` cookie.
