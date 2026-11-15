@@ -191,8 +191,6 @@ Per i dettagli aggiornati consulta il [README tecnico dell'integrazione](custom_
 
 ## PWA e installazione come app desktop
 
-## PWA e installazione come app desktop
-
 Gestione C/C può essere aperta come normale pagina web oppure installata come web app in una finestra dedicata. L'installazione non crea un programma Windows autonomo: il browser continua a fornire il motore di esecuzione.
 
 ### Prima di installare
@@ -228,7 +226,7 @@ L'App pubblica icone PNG dedicate da 192×192 e 512×512 pixel con il logo uffic
 - La PWA è una finestra d'accesso al servizio web, non una copia autonoma dell'archivio.
 
 Guide ufficiali dei browser: [Chrome](https://support.google.com/chrome/answer/9658361), [Microsoft Edge](https://support.microsoft.com/it-it/edge/installare-gestire-o-disinstallare-app-in-microsoft-edge), [Firefox per Windows](https://support.mozilla.org/en-US/kb/web-apps-firefox-windows).
-- Il service worker non memorizza nella cache dati contabili, risposte API, pagine HTML o documenti. La web app richiede il server Home Assistant raggiungibile.
+- Non è registrato un service worker: la web app non offre modalità offline e richiede sempre il server Home Assistant raggiungibile.
 - Le sessioni e le regole di autenticazione restano quelle dell'applicazione: la PWA non elimina la richiesta PIN quando necessaria.
 
 ## Configurazione e primo accesso
