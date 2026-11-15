@@ -916,6 +916,9 @@ class Handler(BaseHTTPRequestHandler):
         if not item:
             self.send_json(HTTPStatus.UNAUTHORIZED, {"error":"Autenticazione richiesta"})
             return None
+        if csrf and item.get("role") == "readonly":
+            self.send_json(HTTPStatus.FORBIDDEN, {"error":"Sessione smartphone in sola lettura"})
+            return None
         if csrf and not hmac.compare_digest(str(self.headers.get("X-CSRF-Token","")), item["csrf"]):
             self.send_json(HTTPStatus.FORBIDDEN, {"error":"Token CSRF non valido"})
             return None
@@ -940,6 +943,14 @@ class Handler(BaseHTTPRequestHandler):
             self.client_address[0], self.server.allowed_network, self.server.integration_network, "GET", path
         ):
             self.send_json(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
+            return
+        active_session = self.session()
+        if active_session and active_session.get("role") == "readonly" and path not in {
+            "/", "/mobile", "/mobile/login", "/mobile.html", "/mobile.js", "/mobile.css",
+            "/mobile.webmanifest", "/mobile-login.html", "/mobile-login.js",
+            "/api/status", "/api/mobile/state"
+        }:
+            self.send_json(HTTPStatus.FORBIDDEN, {"error": "Endpoint non disponibile nella modalità smartphone"})
             return
         if path == "/api/security/access-log":
             item = self.require_auth()
@@ -1089,8 +1100,27 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/status":
             item = self.session()
-            self.send_json(200, {"authenticated": bool(item), "csrf": item["csrf"] if item else None})
+            self.send_json(200, {"authenticated": bool(item), "role": item.get("role", "admin") if item else None, "csrf": item["csrf"] if item else None})
             return
+        if path == "/mobile/login":
+            path = "/mobile-login.html"
+        if path == "/mobile":
+            item = self.session()
+            if not item or item.get("role") != "readonly":
+                self.send_response(303)
+                self.send_header("Location", "/mobile/login")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
+            path = "/mobile.html"
+        if path in ("/mobile.html", "/mobile.js", "/mobile.css", "/mobile.webmanifest"):
+            item = self.session()
+            if not item or item.get("role") != "readonly":
+                self.send_response(303)
+                self.send_header("Location", "/mobile/login")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
         if path == "/login":
             path = "/login.html"
         if path == "/" and not self.session():
@@ -1100,7 +1130,30 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         if path == "/" and self.session():
+            if self.session().get("role") == "readonly":
+                self.send_response(303)
+                self.send_header("Location", "/mobile")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
             path = "/index.html"
+        if path == "/index.html":
+            item = self.session()
+            if not item or item.get("role") == "readonly":
+                self.send_response(303)
+                self.send_header("Location", "/login")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
+        if path == "/api/mobile/state":
+            item = self.require_auth()
+            if not item: return
+            if item.get("role") != "readonly":
+                self.send_json(HTTPStatus.FORBIDDEN, {"error": "Questa API è riservata alla modalità smartphone"})
+                return
+            with db() as c: row = c.execute("SELECT state_json,revision FROM app_state WHERE id=1").fetchone()
+            self.send_json(200, {"state": json.loads(row["state_json"]) if row else None, "revision": row["revision"] if row else 0})
+            return
         if path == "/api/storage-info":
             item = self.require_auth()
             if not item: return
@@ -1195,6 +1248,10 @@ class Handler(BaseHTTPRequestHandler):
             self.client_address[0], self.server.allowed_network, self.server.integration_network, "POST", path
         ):
             self.send_json(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
+            return
+        active_session = self.session()
+        if active_session and active_session.get("role") == "readonly" and path not in {"/api/mobile/login", "/api/mobile/logout"}:
+            self.send_json(HTTPStatus.FORBIDDEN, {"error": "Operazione non consentita: sessione smartphone in sola lettura"})
             return
         payload = {}
         raw_body = None
@@ -1551,7 +1608,7 @@ class Handler(BaseHTTPRequestHandler):
                 try: temp.unlink()
                 except OSError: pass
             return
-        if path == "/api/login":
+        if path in ("/api/login", "/api/mobile/login"):
             pin = str(payload.get("pin", ""))
             peer = self.client_address[0]
             now = time.time()
@@ -1569,9 +1626,21 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(401, {"error":"PIN non corretto"}); return
             login_failures.pop(peer, None)
             token = secrets.token_urlsafe(32); csrf = secrets.token_urlsafe(24)
-            sessions[token] = {"username":username,"csrf":csrf,"expires":time.time()+SESSION_SECONDS}
-            record_access_event("login", "success", peer, token)
-            self.send_json(200, {"ok":True,"csrf":csrf}, {"Set-Cookie":f"cc_session={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={SESSION_SECONDS}"})
+            role = "readonly" if path == "/api/mobile/login" else "admin"
+            sessions[token] = {"username":username,"role":role,"csrf":csrf,"expires":time.time()+SESSION_SECONDS}
+            record_access_event("mobile_login" if role == "readonly" else "login", "success", peer, token)
+            self.send_json(200, {"ok":True,"csrf":csrf,"role":role}, {"Set-Cookie":f"cc_session={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={SESSION_SECONDS}"})
+            return
+        if path == "/api/mobile/logout":
+            item = self.require_auth(csrf=True)
+            if not item: return
+            if item.get("role") != "readonly":
+                self.send_json(HTTPStatus.FORBIDDEN, {"error": "Sessione smartphone non valida"})
+                return
+            session_token = self.cookie_token()
+            record_access_event("mobile_logout", "success", self.client_address[0], session_token)
+            sessions.pop(session_token, None)
+            self.send_json(200, {"ok":True}, {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
             return
         if path == "/api/change-pin":
             item = self.require_auth(csrf=True)
