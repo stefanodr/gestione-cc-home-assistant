@@ -56,15 +56,23 @@
  <div class="filter-row"><select id="transactionFilter" aria-label="Filtra movimenti"><option value="all">Tutti</option><option value="income">Entrate</option><option value="expense">Uscite</option><option value="pending">Da classificare</option></select><span id="transactionCount"></span></div>
  <article class="panel"><div id="transactionList" class="transaction-list"></div></article>
 </section>
-<section id="screen-accounts" class="screen">
- <div class="section-title"><span class="eyebrow">PATRIMONIO</span><h1>Conti</h1><p>Saldi ricostruiti al termine del periodo</p></div>
- <article class="panel"><div id="accountList" class="account-list"></div></article>
+<section id="screen-charts" class="screen">
+ <div class="section-title"><span class="eyebrow">ANALISI VISIVA</span><h1>Grafici</h1><p>Andamento dei flussi e composizione delle uscite</p></div>
+ <article class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">ENTRATE E USCITE</span><h2>Andamento mensile</h2></div></div>
+  <div class="chart-legend"><span><i class="legend-dot income"></i>Entrate</span><span><i class="legend-dot expense"></i>Uscite</span></div>
+  <div id="trendChart" class="trend-chart"></div>
+ </article>
+ <article class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">CATEGORIE</span><h2>Composizione delle uscite</h2></div></div>
+  <div id="chartCategories" class="chart-categories"></div>
+ </article>
 </section>
 <nav class="bottom-nav" aria-label="Navigazione smartphone">
  <button class="bottom-item active" data-screen="overview" type="button"><span>⌂</span><small>Home</small></button>
  <button class="bottom-item" data-screen="expenses" type="button"><span>◔</span><small>Spese</small></button>
  <button class="bottom-item" data-screen="transactions" type="button"><span>⇄</span><small>Movimenti</small></button>
- <button class="bottom-item" data-screen="accounts" type="button"><span>▤</span><small>Conti</small></button>
+ <button class="bottom-item" data-screen="charts" type="button"><span>▥</span><small>Grafici</small></button>
 </nav>
 </main>
 <div id="mobileError" class="error-card" hidden><strong>Impossibile caricare i dati</strong><p id="mobileErrorText"></p><button id="retryMobile" type="button">Riprova</button></div>
