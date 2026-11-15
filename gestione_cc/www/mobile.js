@@ -78,13 +78,13 @@
  function setScreen(name){activeScreen=name;document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.id==='screen-'+name));document.querySelectorAll('.bottom-item').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));window.scrollTo({top:0,behavior:'smooth'});}
  function setPeriod(mode){periodMode=mode;document.querySelectorAll('.period-tab').forEach(el=>el.classList.toggle('active',el.dataset.period===mode));render();}
  function shiftPeriod(delta){const [y,m]=selectedMonth.split('-').map(Number),d=new Date(y,m-1+(periodMode==='year'?delta*12:delta),1);selectedMonth=dateKey(d).slice(0,7);if(selectedMonth>new Date().toISOString().slice(0,7))selectedMonth=new Date().toISOString().slice(0,7);render();}
- async function logout(){try{await fetch('/api/mobile/logout',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:'{}'});}finally{location.replace('/mobile/login');}}
+ async function logout(){try{await fetch('/api/mobile/logout',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:'{}'});}finally{location.replace('/mobile/login');}}
  async function init(){
   try{
    const response=await fetch('/api/mobile/state',{credentials:'same-origin',cache:'no-store'});
    if(response.status===401){location.replace('/mobile/login');return;}
    if(!response.ok)throw new Error('Errore server ('+response.status+')');
-   const data=await response.json();state=data.state;
+   const data=await response.json();state=data.state;csrf=data.csrf||'';
    if(!state)throw new Error('Archivio non inizializzato.');
    $('mobileLoading').hidden=true;$('mobileApp').hidden=false;
    document.querySelectorAll('[data-screen]').forEach(el=>el.addEventListener('click',()=>setScreen(el.dataset.screen)));
