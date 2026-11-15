@@ -11,7 +11,7 @@
 
 **Italiano · English**
 
-## Novità della versione 2.0.0 — per chi visita il repository
+## Novità della versione 2.0.0
 
 Questa distribuzione comprende **tre componenti distinti**, che svolgono ruoli diversi:
 
