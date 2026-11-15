@@ -656,33 +656,30 @@ body:not(.app-ready) .app-shell{visibility:hidden}
 }
 
 
-/* Impostazioni server: Registro accessi nella colonna destra; le altre sezioni riempiono le due colonne sottostanti. */
-#view-settings .settings-grid-server{
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  grid-template-areas:
-    "pin security access"
-    "integration archive access"
-    "backup drive access"
-    "delete . access";
+/* Impostazioni server: schede a sinistra in una griglia autonoma; registro accessi indipendente a destra. */
+#view-settings .settings-layout-server{
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(340px,.9fr);
+  gap:14px;
   align-items:start;
 }
-#view-settings .settings-grid-server > :nth-child(1){grid-area:pin}
-#view-settings .settings-grid-server > :nth-child(2){grid-area:security}
-#view-settings .settings-grid-server > :nth-child(3){grid-area:access}
-#view-settings .settings-grid-server > :nth-child(4){grid-area:integration}
-#view-settings .settings-grid-server > :nth-child(5){grid-area:archive}
-#view-settings .settings-grid-server > :nth-child(6){grid-area:backup}
-#view-settings .settings-grid-server > :nth-child(7){grid-area:drive}
-#view-settings .settings-grid-server > :nth-child(8){grid-area:delete}
-@media(max-width:900px){
-  #view-settings .settings-grid-server{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:none}
-  #view-settings .settings-grid-server > *{grid-area:auto}
+#view-settings .settings-grid-server-main{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+  align-items:start;
+  align-content:start;
+  min-width:0;
+}
+#view-settings .settings-grid-server-main > *,
+#view-settings .access-log-card{min-width:0}
+#view-settings .access-log-card{align-self:start}
+@media(max-width:760px){
+  #view-settings .settings-layout-server{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:620px){
-  #view-settings .settings-grid-server{grid-template-columns:minmax(0,1fr)}
+  #view-settings .settings-grid-server-main{grid-template-columns:minmax(0,1fr)}
 }
-
-
 /* Navigazione adattiva: barra laterale comprimibile e drawer touch su smartphone. */
 .sidebar-toggle{
   display:inline-flex;align-items:center;justify-content:center;flex:0 0 38px;
