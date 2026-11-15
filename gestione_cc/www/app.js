@@ -647,7 +647,7 @@
     });
     backdrop.addEventListener('click', () => setState(false));
     mobileQuery.addEventListener?.('change', () => setState(false));
-    $('.nav-item').forEach(button => button.addEventListener('click', () => {
+    $$('.nav-item').forEach(button => button.addEventListener('click', () => {
       if (mobileQuery.matches) setState(false);
     }));
     setState(false);
