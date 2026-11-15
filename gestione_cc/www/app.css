@@ -634,3 +634,9 @@ body:not(.app-ready) .app-shell{visibility:hidden}
 #appLoadingText{color:var(--muted,#71807e);font-size:12px;line-height:1.55}
 #appLoading.app-loading-error{background:var(--paper,#f5f8f7)}
 @media(max-width:480px){#appLoading{padding:16px}#appLoading .app-loading-card{padding:23px 19px}}
+
+
+/* Il tasto Esci resta accessibile anche in verticale su smartphone. */
+@media(max-width:620px){
+  .top-actions #exitApp{display:inline-flex!important;}
+}
