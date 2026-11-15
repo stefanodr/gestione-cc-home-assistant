@@ -1,12 +1,17 @@
 # Gestione C/C — Home Assistant App
 
-**Versione App: 2.0.0 · Versione applicazione inclusa: 2.0.0**
+**Versione App: 2.1.0 · Versione applicazione inclusa: 2.1.0**
 
 Applicazione web self-hosted per la gestione dei conti personali, distribuita come Home Assistant App. I dati operativi sono conservati in un database SQLite persistente sul server Home Assistant.
 
 **Italiano · English**
 
 ## Italiano
+
+### Novità 2.1.0
+
+- Aggiunta l'interfaccia smartphone PWA in sola lettura, con accesso dedicato e API a dati ridotti. Apri `https://<host-lan>:8443/mobile/` dopo aver aggiornato l'App.
+- L'interfaccia desktop resta invariata; la modalità smartphone non consente modifiche contabili.
 
 ### Presentazione e funzionalità
 
@@ -130,6 +135,6 @@ See the [full App manual](DOCS.md), the [main bilingual README](../README.md), t
 
 ---
 
-**Versions:** Home Assistant App **2.0.0** · bundled application **2.0.0** · HACS custom integration **1.1.6** (independent).
+**Versions:** Home Assistant App **2.1.0** · bundled application **2.1.0** · HACS custom integration **1.1.6** (independent).
 
 Support: [GitHub Issues](https://github.com/stefanodr/gestione-cc-home-assistant/issues). Never publish databases, backups, PINs, private certificates, cookies or real financial data.
