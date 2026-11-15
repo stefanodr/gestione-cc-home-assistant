@@ -1,3 +1,43 @@
+## [2.0.0] - 2026-11-15
+
+### Rilascio principale
+- Allineate a **2.0.0** la versione dell'Home Assistant App e quella dell'applicazione inclusa.
+- Rimossa dal piè di pagina dell'interfaccia la versione tecnica del pacchetto: viene mostrata soltanto la versione dell'app.
+- Consolidata la nuova interfaccia con navigazione laterale comprimibile su desktop e tablet.
+- Consolidato il supporto PWA: manifest aggiornato, icone PNG ufficiali da 192 e 512 px e istruzioni per Chrome, Edge e Firefox su Windows.
+- Aggiornata la documentazione per installazione PWA, collegamenti desktop e gestione dell'icona.
+- Documentata la custom integration HACS, distinta dall'App, con sensori tecnici, pulsanti di manutenzione e configurazione tramite token e CA privata.
+- Estesa la documentazione in italiano e inglese per installazione, sicurezza, privacy, backup e limitazioni operative.
+
+### Integrazione Home Assistant
+- La custom integration HACS mantiene la propria versione indipendente **1.1.6**.
+- L'integrazione espone esclusivamente informazioni tecniche e comandi autorizzati; non rende disponibili dati contabili, movimenti, saldi, documenti o backup.
+- Restano obbligatori HTTPS con verifica della CA privata, token dedicato e accesso limitato alla rete locale.
+
+### Dati e aggiornamento
+- Nessuna modifica intenzionale al formato del database SQLite o ai dati contabili.
+- Non disinstallare l'Home Assistant App e non cancellare il volume persistente per aggiornare.
+- Prima dell'aggiornamento principale, eseguire e verificare un backup indipendente.
+
+### Major release
+- Aligned the Home Assistant App and bundled application versions to **2.0.0**.
+- Removed the package's technical version from the application footer; only the application version is displayed.
+- Consolidated the new collapsible desktop/tablet sidebar navigation.
+- Consolidated PWA support: updated manifest, official 192 px and 512 px PNG icons, and installation guidance for Chrome, Edge and Firefox on Windows.
+- Updated PWA installation, desktop shortcut and app-icon documentation.
+- Documented the HACS custom integration as a component separate from the App, including technical sensors, maintenance buttons and setup using a dedicated token and private CA.
+- Expanded the Italian and English documentation for installation, security, privacy, backups and operational limitations.
+
+### Home Assistant integration
+- The HACS custom integration keeps its independent **1.1.6** version.
+- It exposes technical information and explicitly authorised commands only; it does not expose accounting data, transactions, balances, documents or backups.
+- HTTPS certificate verification, dedicated-token authentication and LAN-only access remain mandatory.
+
+### Data and upgrade
+- No intentional change to the SQLite database format or accounting data.
+- Do not uninstall the Home Assistant App or delete its persistent data volume when upgrading.
+- Create and verify an independent backup before this major upgrade.
+
 ## [1.0.44] - 2026-11-14
 
 ### Correzione certificati HTTPS
