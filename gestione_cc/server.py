@@ -893,15 +893,17 @@ class Handler(BaseHTTPRequestHandler):
         if length < 0 or length > MAX_BODY: raise ValueError("Richiesta troppo grande")
         return self.rfile.read(length)
 
-    def cookie_token(self):
+    def cookie_token(self, cookie_name="cc_session"):
         cookie = SimpleCookie()
         try: cookie.load(self.headers.get("Cookie", ""))
         except Exception: return None
-        morsel = cookie.get("cc_session")
+        morsel = cookie.get(cookie_name)
         return morsel.value if morsel else None
 
     def session(self):
-        token = self.cookie_token()
+        request_path = urlparse(self.path).path
+        cookie_name = "cc_mobile_session" if request_path.startswith("/mobile") or request_path.startswith("/api/mobile/") else "cc_session"
+        token = self.cookie_token(cookie_name)
         item = sessions.get(token) if token else None
         if not item: return None
         if item["expires"] < time.time():
@@ -1630,7 +1632,8 @@ class Handler(BaseHTTPRequestHandler):
             role = "readonly" if path == "/api/mobile/login" else "admin"
             sessions[token] = {"username":username,"role":role,"csrf":csrf,"expires":time.time()+SESSION_SECONDS}
             record_access_event("mobile_login" if role == "readonly" else "login", "success", peer, token)
-            self.send_json(200, {"ok":True,"csrf":csrf,"role":role}, {"Set-Cookie":f"cc_session={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={SESSION_SECONDS}"})
+            cookie_name = "cc_mobile_session" if role == "readonly" else "cc_session"
+            self.send_json(200, {"ok":True,"csrf":csrf,"role":role}, {"Set-Cookie":f"{cookie_name}={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={SESSION_SECONDS}"})
             return
         if path == "/api/mobile/logout":
             item = self.require_auth(csrf=True)
@@ -1638,10 +1641,10 @@ class Handler(BaseHTTPRequestHandler):
             if item.get("role") != "readonly":
                 self.send_json(HTTPStatus.FORBIDDEN, {"error": "Sessione smartphone non valida"})
                 return
-            session_token = self.cookie_token()
+            session_token = self.cookie_token("cc_mobile_session")
             record_access_event("mobile_logout", "success", self.client_address[0], session_token)
             sessions.pop(session_token, None)
-            self.send_json(200, {"ok":True}, {"Set-Cookie":"cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
+            self.send_json(200, {"ok":True}, {"Set-Cookie":"cc_mobile_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
             return
         if path == "/api/change-pin":
             item = self.require_auth(csrf=True)
