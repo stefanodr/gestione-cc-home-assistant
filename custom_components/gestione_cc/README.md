@@ -30,6 +30,34 @@ L'integrazione espone disponibilità app, versioni app/add-on, uptime, dimension
 
 Non vengono creati sensori finanziari e non vengono trasferiti conti, saldi, movimenti, descrizioni o contenuti documentali.
 
+## Pulsanti di manutenzione
+
+L'integrazione crea tre pulsanti nel dispositivo **Gestione C/C** di Home Assistant. Premendoli, Home Assistant invia un comando autenticato all'API tecnica dell'App. Il server accoda il lavoro e lo esegue in background: il pulsante non trasferisce il database dentro Home Assistant e non mostra il contenuto del backup.
+
+### Backup locale (backup totale)
+
+Crea una copia del database SQLite operativo nella cartella privata dei backup dell'App sul server Home Assistant. La copia viene generata con l'API di backup di SQLite, così da ottenere uno snapshot coerente anche se il database è in uso. Il server conserva le **ultime 30 copie locali** ed elimina quelle più vecchie.
+
+È una copia completa del **database SQLite**, non un'esportazione CSV/JSON e non un invio a Google Drive. Rimane sullo stesso server: è utile per recuperare una versione precedente, ma non sostituisce una copia indipendente su un altro dispositivo o supporto.
+
+### Backup Google Drive
+
+Richiede che Google Drive sia già collegato e autorizzato nella sezione **Impostazioni → Backup · Google Drive** dell'App. Se non è collegato, il comando viene rifiutato e non parte alcun backup.
+
+Quando viene premuto:
+1. il server crea uno snapshot temporaneo del database SQLite;
+2. carica il file nel Drive configurato, nella cartella di backup dell'app;
+3. aggiorna la data dell'ultimo backup notturno registrato;
+4. conserva gli ultimi **3 backup notturni** ed elimina quelli precedenti della stessa serie.
+
+Il pulsante avvia quindi una copia su Google Drive, distinta dal backup locale. Il trasferimento avviene dal server verso Google Drive; Home Assistant riceve solo lo stato tecnico, non il file. I backup SQLite su Drive **non sono cifrati dall'app**: proteggi l'account Google e l'accesso alla cartella.
+
+### Controllo integrità database
+
+Esegue il comando SQLite `PRAGMA integrity_check` sul database operativo. Registra data ed esito dell'ultimo controllo e aggiorna il relativo sensore binario. Non crea un backup e non modifica intenzionalmente i dati.
+
+**Nota sul nome:** nell'integrazione l'entità è denominata *Backup locale*; per “backup totale” si intende la copia SQLite del database, non un backup dell'intero server Home Assistant o della sua configurazione.
+
 ## PWA e collegamento Home Assistant Companion
 
 L'add-on serve un manifest PWA con apertura `standalone`. Non viene registrato un service worker e non è attivata una cache offline: dati contabili, risposte API, pagine HTML e documenti non vengono memorizzati nella cache. Le risposte HTML/API restano `no-store` per evitare la persistenza di dati contabili sul dispositivo.
@@ -84,6 +112,34 @@ The integration provides technical status and monitoring for app availability, v
 No financial sensors are created. Home Assistant cannot retrieve transactions, account names, balances, descriptions, documents or backup contents through this integration. TLS verification is mandatory; HTTP and public URLs are rejected. The add-on allows the configured LAN and a narrowly scoped /32 peer for Home Assistant Core, restricted to technical endpoints and the three maintenance commands. No WAN access is opened.
 
 The token is stored in Home Assistant configuration and is not an encrypted vault. Protect Home Assistant backups and administrative access. To rotate the token, generate a new one in the app and reconfigure the integration using the replacement token; the old token is invalidated when the new one is generated.
+
+## Maintenance buttons
+
+The integration creates three buttons on the **Gestione C/C** device in Home Assistant. Pressing a button sends an authenticated command to the App's technical API. The server queues the task and runs it in the background: the button does not transfer the database into Home Assistant or display backup contents.
+
+### Local backup (full database backup)
+
+Creates a copy of the live SQLite database in the App's private backup directory on the Home Assistant host. It uses SQLite's backup API to produce a consistent snapshot while the database is in use. The server retains the **latest 30 local copies** and removes older ones.
+
+This is a complete copy of the **SQLite database**, not a CSV/JSON export and not an upload to Google Drive. It remains on the same server, so it is useful for recovering an earlier database state but does not replace an independent copy on another device or medium.
+
+### Google Drive backup
+
+Google Drive must already be connected and authorised under the App's **Settings → Backup · Google Drive** section. If Drive is not connected, the command is rejected and no backup starts.
+
+When pressed:
+1. the server creates a temporary SQLite database snapshot;
+2. uploads the file to the configured Drive backup folder;
+3. updates the recorded latest nightly-backup timestamp;
+4. retains the latest **3 nightly backups** and deletes older files in that same backup series.
+
+This button therefore starts a Google Drive copy, separate from the local backup. The server uploads directly to Google Drive; Home Assistant receives only technical status, not the file. SQLite backups stored in Drive are **not encrypted by the app**: protect your Google account and the backup folder.
+
+### Database integrity check
+
+Runs SQLite's `PRAGMA integrity_check` command against the live database. It records the time and result of the latest check and updates the corresponding binary sensor. It does not create a backup and is not intended to modify data.
+
+**Naming note:** the integration entity is labelled *Local backup*. “Full backup” here means a SQLite database snapshot, not a backup of the entire Home Assistant server or its configuration.
 
 ### PWA and examples
 The hosted web app can be installed from Chrome or Edge as a dedicated window. Firefox 143+ on Windows supports taskbar web apps (Firefox 150+ for Microsoft Store installations). The service worker does not cache accounting data, API responses, HTML or documents.
