@@ -1,8 +1,8 @@
 {
   "name": "Gestione C/C - Smartphone",
   "short_name": "Gestione C/C",
-  "start_url": "/mobile",
-  "scope": "/",
+  "start_url": "/mobile/",
+  "scope": "/mobile/",
   "display": "standalone",
   "background_color": "#f3f7f5",
   "theme_color": "#f3f7f5",
