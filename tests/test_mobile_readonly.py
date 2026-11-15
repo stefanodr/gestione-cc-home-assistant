@@ -21,6 +21,9 @@ class MobileReadOnlyStructureTest(unittest.TestCase):
         self.assertIn('cookie_name = "cc_mobile_session" if request_path.startswith("/mobile") or request_path.startswith("/api/mobile/") else "cc_session"', self.server)
         self.assertIn('cookie_name = "cc_mobile_session" if role == "readonly" else "cc_session"', self.server)
         self.assertIn('self.cookie_token("cc_mobile_session")', self.server)
+        self.assertIn('cc_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0', self.server)
+        self.assertIn('cc_mobile_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0', self.server)
+        self.assertIn('isinstance(v, (list, tuple))', self.server)
 
     def test_mobile_session_is_read_only_for_all_other_post_routes(self):
         self.assertIn('active_session.get("role") == "readonly" and path not in {"/api/mobile/login", "/api/mobile/logout"}', self.server)
