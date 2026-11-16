@@ -94,9 +94,14 @@ class MobileReadOnlyStructureTest(unittest.TestCase):
         self.assertNotIn('id="importBankSecondary"', html)
         self.assertIn('id="logoutButton"', html)
         self.assertIn('class="money tx-amount', js)
-        self.assertIn("const isLiquid=", js)
-        self.assertIn("classifyHierarchy", js)
         self.assertIn("today=dateKey(new Date())", js)
+        # The mobile chart must count each income split only in its actual
+        # counterpart account, not again in every parent account.
+        self.assertIn("function incomeTotals(rows)", js)
+        self.assertIn("if(a?.type==='INCOME')", js)
+        income_block = js.split("function incomeTotals(rows){", 1)[1].split("\\n }", 1)[0]
+        self.assertNotIn("while(a&&!seen.has", income_block)
+        self.assertIn("Math.abs(num(value))", income_block)
 
 
 if __name__ == "__main__":
