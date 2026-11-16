@@ -1,3 +1,17 @@
+## [2.1.2] - 2026-11-16
+
+### Interfaccia smartphone
+- Resa esplicita e uniforme la formattazione italiana degli importi, con separatore delle migliaia, virgola decimale e simbolo euro (es. 12.345,67 €).
+- Ampliata la sezione Grafici con grafici ad anello per le spese e le entrate per categoria.
+- Aggiunto il grafico dell'andamento mensile del saldo netto, mantenendo il confronto di entrate e uscite.
+- Conservati consultazione in sola lettura, mascheramento importi e perimetro dei dati mobile; nessuna modifica a database, PIN, certificati o rete.
+
+### Smartphone interface
+- Made Italian amount formatting explicit and consistent, with thousands separators, decimal comma and euro symbol (e.g. 12.345,67 €).
+- Expanded Charts with doughnut charts for expenses and income by category.
+- Added a monthly net-balance trend while retaining the income/expense comparison.
+- Preserved read-only access, amount masking and the mobile data scope; no changes to the database, PIN, certificates or network settings.
+
 ## [2.1.1] - 2026-11-15
 
 ### Interfaccia smartphone
