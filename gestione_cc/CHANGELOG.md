@@ -1,3 +1,15 @@
+## [2.1.4] - 2026-11-16
+
+### Correzione grafico entrate smartphone
+- Eliminato il doppio conteggio delle entrate nei conti gerarchici: ogni ripartizione viene attribuita soltanto al conto di contropartita effettivo, senza sommarla nuovamente ai conti genitori.
+- Mantenuto il riconoscimento degli importi con segno negativo, usando il valore assoluto come nell'interfaccia principale.
+- Modifica limitata al grafico mobile e ai metadati di versione; nessuna modifica ai movimenti, al database, al PIN, ai certificati o alla rete.
+
+### Smartphone income chart fix
+- Prevented duplicate income totals in hierarchical accounts: each split is assigned only to its actual counterpart account and is not added again to parent accounts.
+- Kept support for negative-signed split values by using their absolute amount, matching the main interface.
+- Change limited to the mobile chart and version metadata; no changes to transactions, database, PIN, certificates or network settings.
+
 ## [2.1.3] - 2026-11-16
 
 ### Correzioni smartphone e sensori versione
