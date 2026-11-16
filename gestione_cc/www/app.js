@@ -1877,6 +1877,7 @@
       $('#reportChartTitle').textContent = `${reportPeriodLabel()} · confronto con i tre anni precedenti`;
       return;
     }
+    const [year] = monthSelection().split('-').map(Number);
     // Use the same date-clipped rows as PDF/Excel so on-screen and exported charts agree.
     const rows = reportChartRows();
     drawBarChart($('#reportChart'), rows, $('#reportLegend'));
