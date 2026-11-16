@@ -1,8 +1,8 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.5';
-  const ADDON_VERSION = '2.1.5';
+  const APP_VERSION = '2.1.6';
+  const ADDON_VERSION = '2.1.6';
   let privacyMode = false;
   let privacyObserver = null;
   function setAppProgress(value, label) {
@@ -2859,43 +2859,159 @@
       }
     });
   }
+  function externalAccountType(rawValue, path, classification) {
+    const raw=normalize(rawValue).toUpperCase(), compact=raw.replace(/[\s_-]+/g,'');
+    const aliases={BANK:'BANK',BANKACCOUNT:'BANK',CONTOCORRENTE:'BANK',BANCA:'BANK',CASH:'CASH',CASSA:'CASH',CONTANTI:'CASH',
+      CREDIT:'CREDIT',CREDITCARD:'CREDIT',CARTADICREDITO:'CREDIT',LIABILITY:'LIABILITY',LIABILITIES:'LIABILITY',PASSIVITA:'LIABILITY',
+      DEBITO:'LIABILITY',DEBITI:'LIABILITY',EQUITY:'EQUITY',PATRIMONIONETTO:'EQUITY',INCOME:'INCOME',REVENUE:'INCOME',
+      ENTRATA:'INCOME',ENTRATE:'INCOME',RICAVO:'INCOME',RICAVI:'INCOME',EXPENSE:'EXPENSE',COST:'EXPENSE',COSTS:'EXPENSE',
+      USCITA:'EXPENSE',USCITE:'EXPENSE',SPESA:'EXPENSE',SPESE:'EXPENSE',COSTO:'EXPENSE',COSTI:'EXPENSE',ASSET:'ASSET',
+      ASSETS:'ASSET',ATTIVITA:'ASSET',ATTIVO:'ASSET',ATTIVI:'ASSET',PATRIMONIALE:'ASSET',TRADING:'TRADING',TECNICA:'TRADING',
+      STOCK:'STOCK',MUTUAL:'MUTUAL',CURRENCY:'CURRENCY',RECEIVABLE:'RECEIVABLE',PAYABLE:'PAYABLE',CREDITLINE:'CREDITLINE'};
+    const allowed=['BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','ASSET','TRADING','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','CREDITLINE'];
+    if(aliases[compact]) return aliases[compact];
+    if(allowed.includes(raw)) return raw;
+    const p=normalize(path), has=words=>words.some(word=>p.includes(word));
+    if(has(['trading'])) return 'TRADING';
+    if(has(['carta credito','carte credito'])) return 'CREDIT';
+    if(has(['conto corrente','conto deposito','banca','banche','liquidita','disponibilita liquide','cassa','cash']))
+      return has(['cassa','cash'])&&!has(['banca','conto'])?'CASH':'BANK';
+    if(has(['mutuo','finanziamento','prestito','debito','debiti','passivita'])) return 'LIABILITY';
+    if(has(['fornitori'])) return 'PAYABLE';
+    if(has(['credito','crediti','clienti'])) return 'RECEIVABLE';
+    if(has(['patrimonio netto','capitale proprio'])) return 'EQUITY';
+    if(has(['entrata','entrate','ricavo','ricavi','stipendio','pensione','interessi attivi'])) return 'INCOME';
+    if(has(['spesa','spese','uscita','uscite','costo','costi','utenze','alimentari'])) return 'EXPENSE';
+    if(normalize(classification)==='economica') return 'EXPENSE';
+    return 'ASSET';
+  }
+  function externalBoolean(value) {
+    const v=normalize(value);
+    if(!v)return null;
+    if(['si','s','yes','y','true','1','vero','x'].includes(v))return true;
+    if(['no','n','false','0','falso'].includes(v))return false;
+    return null;
+  }
+  function accountImportPath(value) {
+    return String(value??'').trim().replace(/^:+|:+$/g,'').split(':').map(part=>part.trim()).filter(Boolean).join(':');
+  }
+  function accountImportIsLiquid(item) {
+    const type=String(item.type||'').toUpperCase();
+    if(['BANK','CASH'].includes(type))return true;
+    const p=normalize(item.path||'');
+    return type==='ASSET'&&['conto corrente','conto deposito','banca','cassa','liquidita','disponibilita liquide'].some(token=>p.includes(token));
+  }
+  function accountImportTypeOptions(selected) {
+    const values=['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','TRADING','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','CREDITLINE'];
+    return values.map(type=>`<option value="${type}" ${type===selected?'selected':''}>${type} · ${classifyType(type)}</option>`).join('');
+  }
   async function importAccountsFromExcel(event) {
-    const file = event.target.files?.[0]; if (!file) return;
+    const file=event.target.files?.[0];if(!file)return;
+    let overlay=null;
     try {
-      const ext = file.name.toLowerCase().split('.').pop();
-      const rows = ext === 'xlsx' ? await parseXlsx(file, true) : ext === 'csv' ? parseCsvRows(await file.text()) : null;
-      if (!rows) throw new Error('Seleziona un file Excel .xlsx oppure CSV.');
-      const hi = rows.findIndex(row => row.some(v => /percorso|conto|account/i.test(String(v))) && row.some(v => /tipo|type|classificazione/i.test(String(v))));
-      if (hi < 0) throw new Error('Intestazioni non riconosciute. Scarica e usa il modello Excel.');
-      const headers = rows[hi].map(v => normalize(v));
-      const pc = headers.findIndex(v => /percorso|conto|account/.test(v));
-      const tc = headers.findIndex(v => /tipo|type/.test(v));
-      const cc = headers.findIndex(v => /classificazione/.test(v));
-      if (pc < 0 || (tc < 0 && cc < 0)) throw new Error('Servono Percorso conto e Tipo GnuCash o Classificazione.');
-      const aliases = { ENTRATA:'INCOME', ENTRATE:'INCOME', RICAVO:'INCOME', USCITA:'EXPENSE', USCITE:'EXPENSE', SPESA:'EXPENSE', SPESE:'EXPENSE', PATRIMONIALE:'ASSET', TECNICA:'TRADING' };
-      const allowed = ['ROOT','ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','TRADING','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','CREDITLINE'];
-      const parsed = rows.slice(hi+1).filter(row => String(row[pc] ?? '').trim()).map(row => {
-        const path = String(row[pc]).trim().replace(/^:+|:+$/g,''); const raw = normalize(tc >= 0 ? row[tc] : row[cc]).toUpperCase(); const type = aliases[raw] || raw;
-        if (!path || !allowed.includes(type)) throw new Error('Tipo non valido per il conto ' + path + ': ' + type); return {path,type};
+      const ext=file.name.toLowerCase().split('.').pop();
+      const rows=ext==='xlsx'?await parseXlsx(file,true):ext==='csv'?parseCsvRows(await file.text()):null;
+      if(!rows)throw new Error('Seleziona un file Excel .xlsx oppure CSV.');
+      const headerIndex=rows.findIndex(row=>row.some(v=>/percorso|path|conto|account|nome/i.test(normalize(v)))&&row.some(v=>/tipo|type|classificazione|categoria/i.test(normalize(v))));
+      if(headerIndex<0)throw new Error('Intestazioni non riconosciute. Usa il modello ContiChiari oppure inserisci Percorso conto e Tipo/Classificazione.');
+      const headers=rows[headerIndex].map(v=>normalize(v));
+      const col=patterns=>headers.findIndex(h=>patterns.some(re=>re.test(h)));
+      const pathCol=col([/^percorso( conto)?$/,/^path$/,/^nome conto$/,/^account name$/,/^conto$/,/^account$/]);
+      const typeCol=col([/^tipo( gnucash| conto)?$/,/^type$/,/^account type$/]);
+      const classCol=col([/^classificazione$/,/^categoria contabile$/,/^classification$/]);
+      const idCol=col([/^id( esterno| conto| account)?$/,/^guid$/,/^account id$/,/^codice conto$/,/^codice$/]);
+      const budgetCol=col([/^includi nel budget$/,/^budget$/,/^include in budget$/]);
+      const mortgageCol=col([/^mutuo$/,/^mortgage$/,/^finanziamento$/]);
+      if(pathCol<0)throw new Error('Manca la colonna del percorso o nome del conto.');
+      if(typeCol<0&&classCol<0)throw new Error('Serve una colonna Tipo GnuCash oppure Classificazione.');
+      const parsed=[];
+      for(const row of rows.slice(headerIndex+1).filter(r=>String(r[pathCol]??'').trim())){
+        const path=accountImportPath(row[pathCol]);if(!path)continue;
+        const rawType=typeCol>=0?String(row[typeCol]??'').trim():'';
+        const rawClass=classCol>=0?String(row[classCol]??'').trim():'';
+        const type=externalAccountType(rawType,path,rawClass);
+        const mortgageGuess=/mutuo|finanziamento|prestito/.test(normalize(path))&&!accountImportIsLiquid({type,path});
+        const item={path,type,rawType,rawClass,externalId:idCol>=0?String(row[idCol]??'').trim():'',
+          includeInBudget:budgetCol>=0?externalBoolean(row[budgetCol])??mortgageGuess:mortgageGuess,
+          mortgage:mortgageCol>=0?externalBoolean(row[mortgageCol])??mortgageGuess:mortgageGuess,generatedParent:false};
+        const old=parsed.find(x=>normalize(x.path)===normalize(path));
+        if(old){if(old.type!==item.type)throw new Error('Il conto "'+path+'" compare con tipi differenti nel file.');if(!old.externalId)old.externalId=item.externalId;}
+        else parsed.push(item);
+      }
+      if(!parsed.length)throw new Error('Non ho trovato conti importabili.');
+      const existing=new Set(state.accounts.map(x=>normalize(x.path||x.name)));
+      const known=new Set(parsed.map(x=>normalize(x.path))), parents=[];
+      for(const item of [...parsed])for(let n=1;n<item.path.split(':').length;n++){
+        const path=item.path.split(':').slice(0,n).join(':'),key=normalize(path);
+        if(!existing.has(key)&&!known.has(key)){parents.push({path,type:externalAccountType('',path,''),externalId:'',includeInBudget:false,mortgage:false,generatedParent:true});known.add(key);}
+      }
+      const items=[...parents,...parsed].sort((x,y)=>x.path.split(':').length-y.path.split(':').length||x.path.localeCompare(y.path,'it'));
+      const existingCount=items.filter(x=>existing.has(normalize(x.path))).length,newCount=items.length-existingCount;
+      const table=items.map((item,i)=>{
+        const isOld=existing.has(normalize(item.path)),locked=isOld?'disabled':'';
+        const flagsLocked=isOld||accountImportIsLiquid(item)||classifyType(item.type)!=='Patrimoniale';
+        const status=isOld?'Già presente · invariato':item.generatedParent?'Mastro ricostruito':'Nuovo conto';
+        return `<tr style="border-top:1px solid #e2e8f0"><td style="padding:8px;min-width:220px"><b>${safeText(item.path)}</b><small style="display:block;color:#64748b">${item.generatedParent?'Conto padre ricostruito':item.rawType?'Tipo sorgente: '+safeText(item.rawType):item.rawClass?'Classificazione: '+safeText(item.rawClass):'Tipo dedotto dal percorso'}${item.externalId?' · ID '+safeText(item.externalId):''}</small></td>
+        <td style="padding:8px;min-width:180px"><select data-coa-type="${i}" ${locked} style="width:100%;padding:7px">${accountImportTypeOptions(item.type)}</select><small data-coa-class="${i}">${classifyType(item.type)}</small></td>
+        <td style="text-align:center"><input type="checkbox" data-coa-budget="${i}" ${item.includeInBudget?'checked':''} ${flagsLocked?'disabled':''}></td>
+        <td style="text-align:center"><input type="checkbox" data-coa-mortgage="${i}" ${item.mortgage?'checked':''} ${flagsLocked?'disabled':''}></td>
+        <td style="padding:8px;white-space:nowrap">${status}</td></tr>`;
+      }).join('');
+      overlay=document.createElement('div');
+      overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Riconciliazione del piano dei conti');
+      overlay.style.cssText='position:fixed;inset:0;z-index:10050;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:16px';
+      overlay.innerHTML=`<style>.coa-review-scroll{max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px}.coa-review-table{width:100%;border-collapse:collapse;font-size:13px}.coa-review-table th{position:sticky;top:0;background:#f1f5f9;text-align:left;padding:9px}.coa-review-table td{vertical-align:middle}@media(max-width:700px){.coa-review-table{min-width:700px}}</style>
+      <div style="background:var(--panel,#fff);color:var(--text,#17212b);width:min(1100px,100%);max-height:94vh;overflow:auto;border-radius:14px;padding:20px;box-shadow:0 20px 60px #0005">
+      <h2>Riconciliazione del piano dei conti</h2><p>Le proposte riconducono il file alla struttura contabile GnuCash e alle funzioni di ContiChiari. Verifica e correggi prima di importare. I conti già presenti non verranno modificati.</p>
+      <p><b>${items.length} conti</b> · ${newCount} nuovi · ${existingCount} già presenti · ${parents.length} mastri ricostruiti</p>
+      <label>Software di provenienza (facoltativo)<input id="coaSourceSystem" maxlength="80" value="${safeText(file.name.replace(/\.[^.]+$/,''))}" style="display:block;width:100%;max-width:420px;padding:8px;margin:5px 0 12px"></label>
+      <div class="coa-review-scroll"><table class="coa-review-table"><thead><tr><th>Conto / provenienza</th><th>Tipo GnuCash proposto</th><th>Budget / Report</th><th>Mutuo</th><th>Esito</th></tr></thead><tbody>${table}</tbody></table></div>
+      <p style="font-size:12px;color:var(--muted,#64748b)">Le opzioni Budget e Mutuo si applicano ai conti patrimoniali non liquidi. I conti economici conservano la propria natura di entrata o spesa.</p>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button type="button" data-coa-cancel class="button button-quiet">Annulla</button><button type="button" data-coa-confirm class="button button-primary">Conferma e importa ${newCount} conti</button></div></div>`;
+      document.body.append(overlay);
+      const close=()=>{overlay?.remove();overlay=null;};
+      overlay.querySelector('[data-coa-cancel]').addEventListener('click',close);
+      overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+      overlay.querySelectorAll('[data-coa-type]').forEach(select=>select.addEventListener('change',()=>{
+        const i=Number(select.dataset.coaType),item=items[i];item.type=select.value;
+        const row=select.closest('tr'),eligible=!accountImportIsLiquid(item)&&classifyType(item.type)==='Patrimoniale';
+        row.querySelector('[data-coa-class="'+i+'"]').textContent=classifyType(item.type);
+        ['budget','mortgage'].forEach(flag=>{const input=row.querySelector('[data-coa-'+flag+'="'+i+'"]');input.disabled=!eligible;if(!eligible)input.checked=false;});
+      }));
+      overlay.querySelector('[data-coa-confirm]').addEventListener('click',async()=>{
+        const button=overlay.querySelector('[data-coa-confirm]');button.disabled=true;button.textContent='Importazione in corso…';
+        try{
+          items.forEach((item,i)=>{
+            const type=overlay.querySelector('[data-coa-type="'+i+'"]'),budget=overlay.querySelector('[data-coa-budget="'+i+'"]'),mortgage=overlay.querySelector('[data-coa-mortgage="'+i+'"]');
+            if(type&&!type.disabled)item.type=type.value;
+            if(budget&&!budget.disabled)item.includeInBudget=budget.checked;
+            if(mortgage&&!mortgage.disabled)item.mortgage=mortgage.checked;
+          });
+          const source=overlay.querySelector('#coaSourceSystem').value.trim()||'Excel',oldAccounts=state.accounts,oldDemo=state.demo,added=[];
+          const byPath=new Map(state.accounts.map(x=>[normalize(x.path||x.name),x]));
+          for(const item of items){
+            const key=normalize(item.path);if(byPath.has(key))continue;
+            const parentPath=item.path.split(':').slice(0,-1).join(':'),parent=parentPath?byPath.get(normalize(parentPath)):state.accounts.find(x=>x.type==='ROOT');
+            if(parentPath&&!parent)throw new Error('Conto padre mancante per "'+item.path+'".');
+            const account={id:uid('a'),name:item.path.split(':').pop(),path:item.path,type:item.type,classification:classifyType(item.type),parentId:parent?.id||'root',includeInBudget:item.includeInBudget===true,mortgage:item.mortgage===true,importSource:source,importGeneratedParent:item.generatedParent===true};
+            if(item.externalId)account.externalAccountIds=[{source,id:item.externalId}];
+            state.accounts.push(account);byPath.set(key,account);added.push(account);
+          }
+          state.demo=false;normalizeState();
+          const saved=await saveState();
+          if(!saved){state.accounts=oldAccounts;state.demo=oldDemo;throw new Error('Salvataggio non confermato: le modifiche sono state annullate.');}
+          close();renderAll();showNotice('Riconciliazione completata',added.length+' conti aggiunti e classificati. '+existingCount+' conti già presenti lasciati invariati.');
+        }catch(error){button.disabled=false;button.textContent='Riprova importazione';showNotice('Importazione non completata',error.message||'Verifica il file e riprova.');}
       });
-      if (!parsed.length) throw new Error('Il foglio non contiene conti.');
-      const seen = new Set(); const unique = parsed.filter(a => !seen.has(a.path) && seen.add(a.path));
-      const old = new Set(state.accounts.map(a => a.path)); const fresh = unique.filter(a => !old.has(a.path)); const dup = unique.length-fresh.length;
-      showConfirm('Importare il piano dei conti?', 'Trovati '+unique.length+' conti: '+fresh.length+' nuovi e '+dup+' già presenti. I conti esistenti non saranno sovrascritti.', async () => {
-        for (const item of fresh.sort((a,b)=>a.path.split(':').length-b.path.split(':').length)) {
-          const parentPath=item.path.split(':').slice(0,-1).join(':'); const parent=state.accounts.find(a=>a.path===parentPath);
-          if (parentPath && !parent) throw new Error('Manca il conto padre '+parentPath+'. Includilo nel foglio.');
-          state.accounts.push({id:uid('a'),name:item.path.split(':').pop(),path:item.path,type:item.type,classification:classifyType(item.type),parentId:parent?.id||'root'});
-        }
-        state.demo=false; await saveState(); renderAll(); showNotice('Piano dei conti importato',fresh.length+' conti aggiunti. '+dup+' già presenti lasciati invariati.');
-      });
-    } catch(error) { showNotice('Importazione piano dei conti non riuscita',error.message||'File non leggibile.'); }
+    }catch(error){overlay?.remove();showNotice('Importazione piano dei conti non riuscita',error.message||'File non leggibile.');}
     event.target.value='';
   }
   function downloadAccountTemplate() {
-    const accounts=state.accounts.filter(account=>account.type!=='ROOT').slice().sort((a,b)=>String(a.path||'').localeCompare(String(b.path||''),'it'));
-    const rows=[['Percorso conto','Tipo GnuCash','Classificazione'],...accounts.map(account=>[account.path||account.name||'',account.type||'ASSET',account.classification||classifyType(account.type||'ASSET')])];
-    downloadXlsx('Modello-piano-dei-conti-completo.xlsx',[{name:'Piano dei conti',rows,widths:[52,22,24],headerRow:0,autoFilter:true}]);
+    const accounts=state.accounts.filter(a=>a.type!=='ROOT').slice().sort((a,b)=>String(a.path||'').localeCompare(String(b.path||''),'it'));
+    const rows=[['ID esterno','Percorso conto','Tipo GnuCash','Classificazione','Includi nel budget','Mutuo'],...accounts.map(a=>[
+      (a.externalAccountIds||[]).find(x=>x.source===a.importSource)?.id||a.sourceAccountId||'',a.path||a.name||'',a.type||'ASSET',
+      a.classification||classifyType(a.type||'ASSET'),a.includeInBudget===true?'Sì':'No',a.mortgage===true?'Sì':'No'])];
+    downloadXlsx('Modello-piano-dei-conti-ContiChiari.xlsx',[{name:'Piano dei conti',rows,widths:[24,52,22,24,22,14],headerRow:0,autoFilter:true}]);
   }
   function exportAccountsPdf() {
     const accounts=state.accounts.filter(account=>account.type!=='ROOT').slice().sort((a,b)=>String(a.path||'').localeCompare(String(b.path||''),'it'));
