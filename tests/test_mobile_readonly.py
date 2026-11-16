@@ -102,6 +102,20 @@ class MobileReadOnlyStructureTest(unittest.TestCase):
         income_block = js.split("function incomeTotals(rows){", 1)[1].split("\\n }", 1)[0]
         self.assertNotIn("while(a&&!seen.has", income_block)
         self.assertIn("Math.abs(num(value))", income_block)
+        # Mobile expense categories must count only the actual counterpart account.
+        expense_block = js.split("function expenseTotals(rows){", 1)[1].split("\\n }", 1)[0]
+        self.assertIn("const a=account(id)", expense_block)
+        self.assertNotIn("while(a&&!seen.has", expense_block)
+        # Annual mobile chart clips the current month at today and excludes future months.
+        self.assertIn("key>today.slice(0,7)?key+'-00'", js)
+        self.assertIn("key===today.slice(0,7)?today", js)
+
+    def test_annual_desktop_chart_reuses_export_date_clipping(self):
+        app = (WWW / "app.js").read_text(encoding="utf-8")
+        chart = app.split("function drawReportChart()", 1)[1].split("function canvasContext", 1)[0]
+        self.assertIn("const rows = reportChartRows();", chart)
+        rows = app.split("function reportChartRows()", 1)[1].split("function reportChartSvg", 1)[0]
+        self.assertIn("const dayEnd = year === new Date().getFullYear() && month === new Date().getMonth() ? new Date().getDate()", rows)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.4';
-  const ADDON_VERSION = '2.1.4';
+  const APP_VERSION = '2.1.5';
+  const ADDON_VERSION = '2.1.5';
   let privacyMode = false;
   let privacyObserver = null;
   function setAppProgress(value, label) {
@@ -1877,16 +1877,9 @@
       $('#reportChartTitle').textContent = `${reportPeriodLabel()} · confronto con i tre anni precedenti`;
       return;
     }
-    const [year, selectedMonth] = monthSelection().split('-').map(Number);
-    const startMonth = 0;
-    let cutoffMonth = year === new Date().getFullYear() ? Math.min(selectedMonth - 1, new Date().getMonth()) : 11;
-    const monthLabels = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
-    const rows = monthLabels.slice(startMonth, cutoffMonth + 1).map((label, offset) => {
-      const month = startMonth + offset;
-      const tx = periodTransactions(year, month, month, new Date(year, month + 1, 0).getDate());
-      const totals = cashFlowTotals(tx);
-      return { label, income: totals.income, expense: totals.expense };
-    });
+    const [year] = monthSelection().split('-').map(Number);
+    // Use the same date-clipped rows as PDF/Excel so on-screen and exported charts agree.
+    const rows = reportChartRows();
     drawBarChart($('#reportChart'), rows, $('#reportLegend'));
     $('#reportChartTitle').textContent = reportMode === 'annual' ? `Entrate e uscite mese per mese · ${year}` : `${reportPeriodLabel()} · flussi mensili`;
   }
