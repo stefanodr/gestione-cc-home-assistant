@@ -13,7 +13,7 @@
 
 ## Novità della versione 2.1.3
 
-La versione **2.1.1** introduce una PWA dedicata allo smartphone, in sola lettura:
+La versione **2.1.3** include la PWA dedicata allo smartphone, in sola lettura, con correzione dei grafici delle entrate per categoria e aggiornamento dei sensori versione:
 - Accesso con PIN esistente e sessione smartphone separata.
 - Panoramica, entrate, uscite, categorie, movimenti e grafici.
 - API mobile con dati ridotti e controlli server-side che impediscono le modifiche contabili.
@@ -21,9 +21,9 @@ La versione **2.1.1** introduce una PWA dedicata allo smartphone, in sola lettur
 
 Dopo l'aggiornamento dell'Home Assistant App, apri `https://<host-lan>:8443/mobile/` dal telefono. La funzione resta LAN-only e richiede il certificato CA HTTPS già installato sul dispositivo.
 
-### What's new in version 2.1.1
+### What's new in version 2.1.3
 
-Version **2.1.3** adds a dedicated read-only smartphone PWA:
+Version **2.1.3** includes the dedicated read-only smartphone PWA, with a fix for income-by-category charts and updated version sensors:
 - Existing PIN authentication with a separate smartphone session.
 - Overview, income, expenses, categories, transactions and balances.
 - Reduced-data mobile API and server-side controls preventing accounting changes.
