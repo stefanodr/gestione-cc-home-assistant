@@ -1,7 +1,7 @@
 'use strict';
 (() => {
  let state=null,periodMode='month',selectedMonth='',activeScreen='overview',hideAmounts=false,csrf='';
- const $=id=>document.getElementById(id),money=new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
+ const $=id=>document.getElementById(id),moneyNumber=new Intl.NumberFormat('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:true}),money={format:value=>{const n=num(value),sign=n<0?'−':'';return sign+moneyNumber.format(Math.abs(n))+' €';}};
  const num=n=>Number.isFinite(Number(n))?Number(n):0;
  const dateKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
  selectedMonth=dateKey(new Date()).slice(0,7);
@@ -25,6 +25,12 @@
   const totals=new Map();
   const add=(id,value)=>{let a=account(id),seen=new Set();while(a&&!seen.has(String(a.id))){seen.add(String(a.id));if(isExpense(a))totals.set(String(a.id),(totals.get(String(a.id))||0)+Math.abs(num(value)));a=a.parentId?account(a.parentId):null;}};
   for(const t of rows){if(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.length)t.counterpartSplits.forEach(s=>add(s.accountId,s.value));else add(t.counterpartAccountId,t.amount);}
+  return [...totals.entries()].map(([id,value])=>({id,name:accountName(id),value})).sort((a,b)=>b.value-a.value);
+ }
+ function incomeTotals(rows){
+  const totals=new Map();
+  const add=(id,value)=>{let a=account(id),seen=new Set();while(a&&!seen.has(String(a.id))){seen.add(String(a.id));if(a.type==='INCOME')totals.set(String(a.id),(totals.get(String(a.id))||0)+Math.abs(num(value)));a=a.parentId?account(a.parentId):null;}};
+  for(const t of rows){if(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.length)t.counterpartSplits.forEach(s=>{if(num(s.value)>0)add(s.accountId,s.value);});else if(num(t.amount)>0)add(t.counterpartAccountId,t.amount);}
   return [...totals.entries()].map(([id,value])=>({id,name:accountName(id),value})).sort((a,b)=>b.value-a.value);
  }
  function balanceFor(filter,cutoff){const base=filter==='all'||String(filter)===String(state.bankAccountId)?num(state.openingBalance):0;return base+state.transactions.filter(t=>t.date<=cutoff&&t.status!=='duplicate'&&(filter==='all'||String(t.bankAccountId)===String(filter))).reduce((sum,t)=>sum+num(t.amount),0);}
@@ -73,11 +79,18 @@
   $('transactionCount').textContent=filtered.length+' movimenti';
   $('transactionList').innerHTML=filtered.length?filtered.map(transactionHtml).join(''):'<div class="empty">Nessun movimento corrispondente</div>';
  }
+ function renderDonut(containerId,items,emptyText){
+  const palette=['#278568','#d27b70','#6b83bd','#d4a64d','#8d70b2','#55a5a0','#cb7caa','#8c9a64'];
+  const sorted=[...items].sort((a,b)=>b.value-a.value),top=sorted.slice(0,7),other=sorted.slice(7).reduce((sum,item)=>sum+item.value,0);
+  if(other>0)top.push({name:'Altre categorie',value:other});
+  const total=top.reduce((sum,item)=>sum+item.value,0),el=$(containerId);
+  if(!total){el.innerHTML='<div class="empty">'+emptyText+'</div>';return;}
+  let cursor=0;const stops=top.map((item,index)=>{const from=cursor;cursor+=item.value/total*100;return palette[index%palette.length]+' '+from.toFixed(2)+'% '+cursor.toFixed(2)+'%';}).join(',');
+  el.innerHTML='<div class="donut-layout"><div class="donut" role="img" aria-label="Grafico a torta: '+esc(top.map(item=>item.name+' '+Math.round(item.value/total*100)+'%').join(', '))+'" style="background:conic-gradient('+stops+')"><div class="donut-hole"><strong>'+money.format(total)+'</strong><small>Totale</small></div></div><div class="donut-legend">'+top.map((item,index)=>'<div class="donut-legend-row"><i style="background:'+palette[index%palette.length]+'"></i><span>'+esc(item.name)+'</span><strong class="money">'+money.format(item.value)+'</strong><small>'+(item.value/total*100).toFixed(1).replace('.',',')+'%</small></div>').join('')+'</div></div>';
+ }
  function renderCharts(rows){
   const [year,month]=selectedMonth.split('-').map(Number);
-  const months=periodMode==='year'
-   ?Array.from({length:12},(_,i)=>new Date(year,i,1))
-   :Array.from({length:6},(_,i)=>new Date(year,month-5+i,1));
+  const months=periodMode==='year'?Array.from({length:12},(_,i)=>new Date(year,i,1)):Array.from({length:6},(_,i)=>new Date(year,month-5+i,1));
   const series=months.map(date=>{
    const key=dateKey(date).slice(0,7),last=new Date(date.getFullYear(),date.getMonth()+1,0).getDate();
    const totals=flowTotals(transactionsIn({start:key+'-01',end:key+'-'+String(last).padStart(2,'0')}));
@@ -85,8 +98,10 @@
   });
   const maxFlow=Math.max(1,...series.map(x=>Math.max(x.income,x.expense)));
   $('trendChart').innerHTML=series.map(x=>'<div class="trend-row"><span class="trend-month">'+esc(x.label)+'</span><div class="trend-bars"><div class="trend-track"><div class="trend-fill income" style="width:'+(x.income/maxFlow*100)+'%"></div></div><div class="trend-track"><div class="trend-fill expense" style="width:'+(x.expense/maxFlow*100)+'%"></div></div></div><div class="trend-values"><span class="money">'+money.format(x.income)+'</span><span class="money">'+money.format(x.expense)+'</span></div></div>').join('');
-  const allCategories=expenseTotals(rows),total=allCategories.reduce((sum,item)=>sum+item.value,0),categories=allCategories.slice(0,8),maxCategory=Math.max(1,...categories.map(item=>item.value));
-  $('chartCategories').innerHTML=categories.length?categories.map(item=>'<div class="chart-category"><div class="chart-category-heading"><span>'+esc(item.name)+'</span><strong class="money">'+money.format(item.value)+'</strong></div><div class="chart-category-track"><div class="chart-category-fill" style="width:'+(item.value/maxCategory*100)+'%"></div></div><small>'+ (total?Math.round(item.value/total*100):0)+'% delle uscite</small></div>').join(''):'<div class="empty">Nessuna spesa categorizzata nel periodo</div>';
+  const maxNet=Math.max(1,...series.map(x=>Math.abs(x.net)));
+  $('netTrendChart').innerHTML=series.map(x=>'<div class="net-chart-row"><span class="trend-month">'+esc(x.label)+'</span><div class="net-track"><span class="net-bar '+(x.net>=0?'positive':'negative')+'" style="width:'+(Math.abs(x.net)/maxNet*50)+'%"></span></div><strong class="money '+(x.net>=0?'amount-in':'amount-out')+'">'+money.format(x.net)+'</strong></div>').join('');
+  renderDonut('expenseDonut',expenseTotals(rows),'Nessuna spesa categorizzata nel periodo');
+  renderDonut('incomeDonut',incomeTotals(rows),'Nessuna entrata categorizzata nel periodo');
  }
  function applyPrivacy(){document.querySelectorAll('.money').forEach(el=>el.classList.toggle('masked',hideAmounts));$('privacyButton').textContent=hideAmounts?'◎':'◉';$('privacyButton').setAttribute('aria-label',hideAmounts?'Mostra importi':'Nascondi importi');}
  function setScreen(name){activeScreen=name;document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.id==='screen-'+name));document.querySelectorAll('.bottom-item').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));window.scrollTo({top:0,behavior:'smooth'});}
