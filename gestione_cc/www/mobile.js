@@ -30,7 +30,10 @@
  function incomeTotals(rows){
   const totals=new Map();
   const add=(id,value)=>{let a=account(id),seen=new Set();while(a&&!seen.has(String(a.id))){seen.add(String(a.id));if(a.type==='INCOME')totals.set(String(a.id),(totals.get(String(a.id))||0)+Math.abs(num(value)));a=a.parentId?account(a.parentId):null;}};
-  for(const t of rows){if(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.length)t.counterpartSplits.forEach(s=>{if(num(s.value)>0)add(s.accountId,s.value);});else if(num(t.amount)>0)add(t.counterpartAccountId,t.amount);}
+  // Income split values may be negative depending on the bank-side sign convention.
+  // Match the desktop economicIncomeTotals logic: classify by counterpart account
+  // and use the absolute value, rather than filtering on the split sign.
+  for(const t of rows){if(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.length)t.counterpartSplits.forEach(s=>add(s.accountId,s.value));else add(t.counterpartAccountId,t.amount);}
   return [...totals.entries()].map(([id,value])=>({id,name:accountName(id),value})).sort((a,b)=>b.value-a.value);
  }
  function balanceFor(filter,cutoff){const base=filter==='all'||String(filter)===String(state.bankAccountId)?num(state.openingBalance):0;return base+state.transactions.filter(t=>t.date<=cutoff&&t.status!=='duplicate'&&(filter==='all'||String(t.bankAccountId)===String(filter))).reduce((sum,t)=>sum+num(t.amount),0);}
