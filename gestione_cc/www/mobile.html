@@ -57,15 +57,23 @@
  <article class="panel"><div id="transactionList" class="transaction-list"></div></article>
 </section>
 <section id="screen-charts" class="screen">
- <div class="section-title"><span class="eyebrow">ANALISI VISIVA</span><h1>Grafici</h1><p>Andamento dei flussi e composizione delle uscite</p></div>
+ <div class="section-title"><span class="eyebrow">ANALISI VISIVA</span><h1>Grafici</h1><p>Flussi mensili, saldo netto e ripartizione per categoria</p></div>
  <article class="panel">
   <div class="panel-heading"><div><span class="eyebrow">ENTRATE E USCITE</span><h2>Andamento mensile</h2></div></div>
   <div class="chart-legend"><span><i class="legend-dot income"></i>Entrate</span><span><i class="legend-dot expense"></i>Uscite</span></div>
   <div id="trendChart" class="trend-chart"></div>
  </article>
  <article class="panel">
-  <div class="panel-heading"><div><span class="eyebrow">CATEGORIE</span><h2>Composizione delle uscite</h2></div></div>
-  <div id="chartCategories" class="chart-categories"></div>
+  <div class="panel-heading"><div><span class="eyebrow">RISULTATO MENSILE</span><h2>Andamento del saldo netto</h2></div></div>
+  <div id="netTrendChart" class="net-trend-chart"></div>
+ </article>
+ <article class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">USCITE</span><h2>Spese per categoria</h2></div></div>
+  <div id="expenseDonut" class="donut-container"></div>
+ </article>
+ <article class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">ENTRATE</span><h2>Entrate per categoria</h2></div></div>
+  <div id="incomeDonut" class="donut-container"></div>
  </article>
 </section>
 <nav class="bottom-nav" aria-label="Navigazione smartphone">
