@@ -23,7 +23,8 @@
  function flowTotals(rows){let income=0,expense=0;for(const t of rows){if(num(t.amount)>0)income+=num(t.amount);else expense+=Math.abs(num(t.amount));}return{income,expense,net:income-expense};}
  function expenseTotals(rows){
   const totals=new Map();
-  const add=(id,value)=>{let a=account(id),seen=new Set();while(a&&!seen.has(String(a.id))){seen.add(String(a.id));if(isExpense(a))totals.set(String(a.id),(totals.get(String(a.id))||0)+Math.abs(num(value)));a=a.parentId?account(a.parentId):null;}};
+  // Attribute each expense split only to its actual counterpart account. Parent roll-ups belong to desktop reports, not category charts.
+  const add=(id,value)=>{const a=account(id);if(isExpense(a))totals.set(String(a.id),(totals.get(String(a.id))||0)+Math.abs(num(value)));};
   for(const t of rows){if(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.length)t.counterpartSplits.forEach(s=>add(s.accountId,s.value));else add(t.counterpartAccountId,t.amount);}
   return [...totals.entries()].map(([id,value])=>({id,name:accountName(id),value})).sort((a,b)=>b.value-a.value);
  }
@@ -97,8 +98,10 @@
   const [year,month]=selectedMonth.split('-').map(Number);
   const months=periodMode==='year'?Array.from({length:12},(_,i)=>new Date(year,i,1)):Array.from({length:6},(_,i)=>new Date(year,month-5+i,1));
   const series=months.map(date=>{
-   const key=dateKey(date).slice(0,7),last=new Date(date.getFullYear(),date.getMonth()+1,0).getDate();
-   const totals=flowTotals(transactionsIn({start:key+'-01',end:key+'-'+String(last).padStart(2,'0')}));
+   const key=dateKey(date).slice(0,7),last=new Date(date.getFullYear(),date.getMonth()+1,0).getDate(),today=dateKey(new Date());
+   // Match the annual total: completed historical months, current month through today, and no future months.
+   const end=key>today.slice(0,7)?key+'-00':key===today.slice(0,7)?today:key+'-'+String(last).padStart(2,'0');
+   const totals=flowTotals(transactionsIn({start:key+'-01',end}));
    return{label:new Intl.DateTimeFormat('it-IT',{month:'short'}).format(date).replace('.',''),key,...totals};
   });
   const maxFlow=Math.max(1,...series.map(x=>Math.max(x.income,x.expense)));
