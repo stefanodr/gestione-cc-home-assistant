@@ -29,10 +29,12 @@
  }
  function incomeTotals(rows){
   const totals=new Map();
-  const add=(id,value)=>{let a=account(id),seen=new Set();while(a&&!seen.has(String(a.id))){seen.add(String(a.id));if(a.type==='INCOME')totals.set(String(a.id),(totals.get(String(a.id))||0)+Math.abs(num(value)));a=a.parentId?account(a.parentId):null;}};
+  // Count only the exact counterpart account, as in the desktop chart logic.
+  // Walking up the account tree here would count the same split again in each
+  // parent income account and inflate the category totals.
+  const add=(id,value)=>{const a=account(id);if(a?.type==='INCOME')totals.set(String(a.id),(totals.get(String(a.id))||0)+Math.abs(num(value)));};
   // Income split values may be negative depending on the bank-side sign convention.
-  // Match the desktop economicIncomeTotals logic: classify by counterpart account
-  // and use the absolute value, rather than filtering on the split sign.
+  // Use the absolute value, but never aggregate the same amount into ancestors.
   for(const t of rows){if(Array.isArray(t.counterpartSplits)&&t.counterpartSplits.length)t.counterpartSplits.forEach(s=>add(s.accountId,s.value));else add(t.counterpartAccountId,t.amount);}
   return [...totals.entries()].map(([id,value])=>({id,name:accountName(id),value})).sort((a,b)=>b.value-a.value);
  }
