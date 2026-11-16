@@ -1,3 +1,23 @@
+## [2.1.6] - 2026-11-16
+
+### Riconciliazione guidata del piano dei conti Excel
+- L'importazione Excel/CSV propone una classificazione compatibile con la struttura contabile GnuCash e con le regole di ContiChiari.
+- Riconoscimento di tipi GnuCash e denominazioni comuni; proposta di tipo per i conti privi di una tipologia esplicita.
+- Anteprima guidata per correggere il tipo e confermare l'inclusione nel Budget/Report e la natura di mutuo.
+- Ricostruzione dei conti mastro mancanti quando il file contiene percorsi gerarchici con sottoconti.
+- I conti già presenti non vengono sovrascritti; gli ID esterni sono conservati per i nuovi conti.
+- Modello Excel aggiornato con ID esterno, tipo, classificazione, inclusione nel budget e indicatore mutuo.
+- Importazione GnuCash integrata e movimenti esistenti invariati.
+
+### Guided Excel chart-of-accounts reconciliation
+- Excel/CSV import proposes a classification compatible with the GnuCash accounting structure and ContiChiari rules.
+- Recognizes GnuCash types and common labels, and proposes a type when the source does not provide one.
+- Adds a review step to correct account types and confirm Budget/Report inclusion and mortgage classification.
+- Reconstructs missing parent accounts from hierarchical account paths.
+- Existing accounts are not overwritten; external IDs are retained for newly imported accounts.
+- Excel template now includes external ID, type, classification, budget inclusion and mortgage fields.
+- Integrated GnuCash import and existing transactions remain unchanged.
+
 ## [2.1.5] - 2026-11-16
 
 ### Correzioni grafici annuali e categorie smartphone
