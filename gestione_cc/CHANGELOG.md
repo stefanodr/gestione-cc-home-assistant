@@ -1,3 +1,15 @@
+## [2.1.3] - 2026-11-16
+
+### Correzioni smartphone e sensori versione
+- Corretto il grafico delle entrate per categoria: ora considera anche le ripartizioni con importi di segno negativo, coerentemente con il calcolo delle entrate dell'interfaccia principale.
+- Aggiornati i valori di versione esposti dall'API tecnica: versione applicazione e versione Home Assistant App sono ora valorizzate esplicitamente e allineate alla release 2.1.3.
+- Nessuna modifica alla versione HACS dell'integrazione (1.1.6), al database, al PIN, ai certificati o alla configurazione di rete.
+
+### Smartphone and version sensor fixes
+- Fixed the income-by-category chart to include split entries with negative signed values, matching the main interface's income calculation.
+- Updated the version values exposed by the technical API: application and Home Assistant App versions are now explicitly set to release 2.1.3.
+- No changes to the HACS integration version (1.1.6), database, PIN, certificates or network configuration.
+
 ## [2.1.2] - 2026-11-16
 
 ### Interfaccia smartphone
