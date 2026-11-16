@@ -1,3 +1,17 @@
+## [2.1.5] - 2026-11-16
+
+### Correzioni grafici annuali e categorie smartphone
+- Il grafico annuale mobile ora rispetta lo stesso intervallo del totale annuale: mesi passati completi, mese corrente fino a oggi e mesi futuri esclusi.
+- Il grafico annuale desktop riutilizza gli stessi dati con limite temporale impiegati per PDF ed Excel, evitando differenze tra schermo ed esportazioni.
+- I grafici a torta e l'elenco delle spese mobile attribuiscono ogni importo soltanto al conto di contropartita effettivo, evitando il doppio conteggio delle categorie genitrici.
+- Nessuna modifica ai movimenti, al database, al PIN, ai certificati, all'accesso LAN o all'integrazione HACS.
+
+### Annual charts and smartphone categories fixes
+- The mobile annual chart now follows the annual total's date range: completed past months, current month through today, and no future months.
+- The desktop annual chart reuses the same date-clipped rows as PDF and Excel, keeping on-screen and exported charts consistent.
+- Mobile expense charts and category lists assign each amount only to its actual counterpart account, avoiding duplicate parent-category totals.
+- No changes to transactions, database, PIN, certificates, LAN access or the HACS integration.
+
 ## [2.1.4] - 2026-11-16
 
 ### Correzione grafico entrate smartphone
