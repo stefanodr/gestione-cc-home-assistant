@@ -1,8 +1,8 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.3';
-  const ADDON_VERSION = '2.1.3';
+  const APP_VERSION = '2.1.4';
+  const ADDON_VERSION = '2.1.4';
   let privacyMode = false;
   let privacyObserver = null;
   function setAppProgress(value, label) {
