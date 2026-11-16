@@ -11,7 +11,7 @@
 
 **Italiano · English**
 
-## Novità della versione 2.1.1
+## Novità della versione 2.1.3
 
 La versione **2.1.1** introduce una PWA dedicata allo smartphone, in sola lettura:
 - Accesso con PIN esistente e sessione smartphone separata.
@@ -23,7 +23,7 @@ Dopo l'aggiornamento dell'Home Assistant App, apri `https://<host-lan>:8443/mobi
 
 ### What's new in version 2.1.1
 
-Version **2.1.1** adds a dedicated read-only smartphone PWA:
+Version **2.1.3** adds a dedicated read-only smartphone PWA:
 - Existing PIN authentication with a separate smartphone session.
 - Overview, income, expenses, categories, transactions and balances.
 - Reduced-data mobile API and server-side controls preventing accounting changes.
