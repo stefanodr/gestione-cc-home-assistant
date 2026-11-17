@@ -1,3 +1,21 @@
+## [2.1.9] - 2026-11-17
+
+### Importazione contabile e riconciliazione GnuCash
+- Allineata l'importazione del Piano dei conti Excel/CSV alla versione Windows: controlli più espliciti su intestazioni, conti duplicati con tipi incompatibili e righe non importabili.
+- Aggiunta la riconciliazione obbligatoria dei tipi GnuCash, inclusa la linea di credito, e mantenuta la classificazione separata tra natura economica e patrimoniale.
+- Esteso il riconoscimento del foglio «Piano dei conti» nei file Excel con più fogli.
+- Allineato l'importatore dei movimenti: conserva codici conto e contropartita, riconcilia gli ID esterni, evita l'assegnazione automatica non richiesta del conto liquido e permette la scelta esplicita solo come ripiego.
+- I movimenti con contropartite non riconciliate restano da classificare; i duplicati sono gestiti prima del salvataggio.
+- Se il salvataggio sul server non riesce, lo stato in memoria viene ripristinato e l'importazione non viene dichiarata completata.
+
+### Accounting import and GnuCash reconciliation
+- Aligned Excel/CSV chart-of-accounts import with the Windows version, with clearer validation for headers, duplicate accounts with incompatible types, and non-importable rows.
+- Added mandatory GnuCash account-type reconciliation, including credit lines, while keeping economic and balance-sheet classification distinct.
+- Added preferred selection of the “Chart of Accounts” worksheet in multi-sheet Excel files.
+- Aligned movement import to preserve account and counterpart codes, resolve external IDs, avoid unrequested automatic bank-account assignment, and request an explicit account only as a fallback.
+- Unresolved counterpart accounts remain pending classification; duplicates are handled before saving.
+- If server persistence fails, in-memory state is restored and the import is not reported as successful.
+
 ## [2.1.8] - 2026-11-17
 
 ### Versioni applicazione e add-on rilevate correttamente
