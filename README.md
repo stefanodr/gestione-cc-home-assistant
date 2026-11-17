@@ -11,7 +11,7 @@
 
 **Italiano · English**
 
-## Novità della versione 2.1.3
+## Novità dalla versione 2.1.3
 
 La versione **2.1.3** include la PWA dedicata allo smartphone, in sola lettura, con correzione dei grafici delle entrate per categoria e aggiornamento dei sensori versione:
 - Accesso con PIN esistente e sessione smartphone separata.
