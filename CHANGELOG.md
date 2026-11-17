@@ -1,3 +1,11 @@
+## [2.1.13] - 2026-11-17
+
+### Correzioni Piano dei conti
+- Sostituita la conferma nativa `window.confirm` con il modal di conferma già gestito dall'app, compatibile con i browser integrati di Home Assistant.
+- Ripetuto il controllo dei movimenti al momento della conferma, prima della cancellazione.
+- Allineato il pulsante **Elimina** a destra con larghezza fissa e senza margine sinistro aggiuntivo.
+- Nessuna modifica a backend, SQLite, API, autenticazione o dati esistenti.
+
 ## [2.1.12] - 2026-11-17
 
 ### Correzioni Piano dei conti
