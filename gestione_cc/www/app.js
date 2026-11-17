@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.14';
+  const APP_VERSION = '2.1.15';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -512,7 +512,7 @@
     setupControls();
     setupPrivacyControls();
     const versionLabel = $('#appVersion');
-    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + '</span><span class="sidebar-copyright">© Stefano Di Ricco</span>';
+    if (versionLabel) versionLabel.innerHTML = '<span>Gestione C/C · app ' + APP_VERSION + '</span><span class="sidebar-copyright">Stefano Di Ricco ©</span>';
     const currentMonth = localDateKey(new Date()).slice(0, 7);
     const storedMonth = String(state.selectedMonth || '');
     const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonth) ? storedMonth : currentMonth;
@@ -2789,7 +2789,15 @@
       return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><select data-gnucash-type-account="${safeText(a.id)}" aria-label="Tipo GnuCash di ${safeText(a.path)}" style="max-width:210px;padding:6px;border:1px solid #dce5e2;border-radius:6px;background:var(--panel,#fff);color:var(--text,#17212b)">${typeOptions}</select></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td class="num account-movement-cell">${txCount > 0 ? '<button type="button" class="account-movement-count" data-account-movements="'+safeText(a.id)+'" aria-label="Apri '+txCount+' movimenti di '+safeText(a.path)+'">'+txCount+'</button>' : '0'}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+' > Includi nel Budget/Report</label>' : '—'}</td><td>${mortgageEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-mortgage-account="'+safeText(a.id)+'" '+(a.mortgage===true?'checked':'')+'> Mutuo</label>' : '—'}</td><td><button type="button" class="row-action row-action-danger" data-delete-account="'+safeText(a.id)+'">Elimina</button></td></tr>`;
     }).join('');
     $('#accountsBody').querySelectorAll('[data-account-movements]').forEach(button=>button.addEventListener('click',()=>openAccountMovements(button.dataset.accountMovements)));
-    $('#accountsBody').querySelectorAll('[data-delete-account]').forEach(button=>button.addEventListener('click',async()=>{button.disabled=true;try{await deleteAccount(button.dataset.deleteAccount);}finally{button.disabled=false;}}));
+    // Associa ogni pulsante direttamente al conto della stessa riga renderizzata.
+    // Non dipendiamo da dataset/attributi HTML per recuperare l'ID da eliminare.
+    $('#accountsBody').querySelectorAll('[data-delete-account]').forEach((button, index)=>button.addEventListener('click',async()=>{
+      const account = accounts[index];
+      if (!account) return;
+      button.disabled = true;
+      try { await deleteAccount(account.id); }
+      finally { button.disabled = false; }
+    }));
     $('#accountsBody').querySelectorAll('[data-rename-account]').forEach(button=>button.addEventListener('click',()=>renameAccount(button.dataset.renameAccount)));
     $('#accountsBody').querySelectorAll('[data-tags-account]').forEach(button=>button.addEventListener('click',()=>editAccountTags(button.dataset.tagsAccount)));
     $('#accountsBody').querySelectorAll('[data-gnucash-type-account]').forEach(select => select.addEventListener('change', async () => {
