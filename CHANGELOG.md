@@ -1,3 +1,15 @@
+## [2.1.7] - 2026-11-17
+
+### Correzione privacy nei grafici mobile
+- Corretto il mascheramento degli importi nelle torte di entrate e uscite: anche il totale visualizzato al centro del grafico viene ora nascosto quando è attiva l'opzione «Nascondi importi».
+- Il totale torna visibile quando si disattiva la modalità privacy.
+- La correzione si applica sia alla visualizzazione mensile sia a quella annuale e non modifica dati, calcoli o grafici.
+
+### Mobile chart privacy fix
+- Fixed amount masking in the income and expense doughnut charts: the total displayed in the center of each chart is now hidden when «Hide amounts» is enabled.
+- Totals become visible again when privacy mode is disabled.
+- The fix applies to both monthly and annual views and does not change data, calculations or chart rendering.
+
 ## [2.1.6] - 2026-11-16
 
 ### Riconciliazione guidata del piano dei conti Excel
