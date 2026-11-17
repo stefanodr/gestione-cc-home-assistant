@@ -1993,7 +1993,9 @@
       banner.classList.add('hidden');
       return;
     }
-    label.textContent = 'Movimenti collegati a «' + account.path + '»: conto corrente, contropartita, suggerimenti e ripartizioni. Puoi selezionarli e cambiare la contropartita con la funzione già disponibile.';
+    const bankCount = state.transactions.filter(item => item.bankAccountId === account.id).length;
+    const counterpartCount = state.transactions.filter(item => item.counterpartAccountId === account.id || item.suggestionId === account.id || (item.counterpartSplits || []).some(split => split.accountId === account.id)).length;
+    label.textContent = 'Movimenti collegati a «' + account.path + '»: ' + bankCount + ' come conto corrente e ' + counterpartCount + ' come contropartita, suggerimento o ripartizione. La modifica massiva disponibile cambia la contropartita; i movimenti in cui il conto è usato come conto corrente richiedono una riassegnazione specifica.';
     banner.classList.remove('hidden');
   }
   function openAccountMovements(accountId) {
@@ -2855,7 +2857,11 @@
     if (!account) return;
     const movementCount = accountMovementCount(accountId);
     if (movementCount > 0) {
-      showNotice('Prima sposta i movimenti', 'Impossibile eliminare «' + account.path + '»: sono ancora presenti ' + movementCount + ' movimenti collegati. Clicca il numero nella colonna Movimenti, seleziona le registrazioni e assegna loro un’altra contropartita. Poi riprova.');
+      const bankMovementCount = state.transactions.filter(item => item.bankAccountId === accountId).length;
+      const instruction = bankMovementCount
+        ? ' Di questi, ' + bankMovementCount + ' usano il conto come conto corrente: la modifica massiva della contropartita non li sposta e richiedono una riassegnazione specifica.'
+        : ' Apri i movimenti dal conteggio, seleziona le registrazioni e assegna loro un’altra contropartita.';
+      showNotice('Prima sposta i movimenti', 'Impossibile eliminare «' + account.path + '»: sono ancora presenti ' + movementCount + ' movimenti collegati.' + instruction + ' Riprova quando il conteggio sarà zero.');
       return;
     }
     const children = state.accounts.filter(item => item.parentId === accountId);
