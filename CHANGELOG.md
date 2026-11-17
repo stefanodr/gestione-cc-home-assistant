@@ -1,3 +1,9 @@
+## [2.1.14] - 2026-11-17
+
+### Correzione eliminazione conto
+- Risolta la ricerca del conto da eliminare confrontando gli identificativi come stringhe, poi riutilizzando l'ID originale per i controlli e il salvataggio. Corregge il caso in cui l'ID importato è numerico ma l'attributo HTML lo restituisce come stringa.
+- Nessuna modifica a backend, SQLite, API o dati esistenti.
+
 ## [2.1.13] - 2026-11-17
 
 ### Correzioni Piano dei conti

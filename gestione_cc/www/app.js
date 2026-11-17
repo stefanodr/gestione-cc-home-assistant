@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.13';
+  const APP_VERSION = '2.1.14';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -2853,7 +2853,10 @@
     }));
   }
   function deleteAccount(accountId) {
-    const account = accountById(accountId);
+    // Gli ID renderizzati negli attributi HTML arrivano sempre come stringhe;
+    // i dati importati possono invece conservarli come numeri. Risolviamo per valore.
+    const account = state.accounts.find(item => String(item.id) === String(accountId));
+    if (account) accountId = account.id;
     if (!account) {
       showNotice('Conto non trovato', 'Non è stato possibile individuare il conto da eliminare. Aggiorna il Piano dei conti e riprova.');
       return;
