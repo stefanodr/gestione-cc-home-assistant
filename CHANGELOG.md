@@ -1,3 +1,23 @@
+## [2.1.11] - 2026-11-17
+
+### Gestione dei movimenti e cancellazione sicura dei conti
+- Il numero nella colonna **Movimenti** del Piano dei conti è cliccabile e apre il registro filtrato su tutte le registrazioni collegate al conto, come conto corrente, contropartita, suggerimento o ripartizione.
+- Il filtro contestuale mostra chiaramente il conto selezionato e può essere rimosso per tornare all'intero registro.
+- La selezione multipla e il cambio massivo della contropartita restano disponibili per riassegnare i movimenti.
+- Aggiunta l'azione **Elimina** nel Piano dei conti. La cancellazione è bloccata se esistono movimenti, sottoconti, regole apprese, ricorrenze o collegamenti al conto bancario principale.
+- Se il conto ha movimenti, il messaggio indica quanti sono e invita ad aprirli dal conteggio, riassegnarli e riprovare quando il conteggio è zero.
+- Il salvataggio della cancellazione è verificato: in caso di errore il conto viene ripristinato in memoria.
+- Nessuna modifica al backend, allo schema SQLite, alle API, all'autenticazione, ai backup o a HTTPS.
+
+### Account movement management and safe deletion
+- The **Movements** count in the chart of accounts is clickable and opens the transaction register filtered to every transaction linked to that account as bank account, counterpart, suggestion or split.
+- The contextual filter identifies the selected account and can be cleared to return to the full register.
+- Existing multi-selection and bulk counterpart reassignment remain available.
+- Added a **Delete** action to the chart of accounts. Deletion is blocked while transactions, subaccounts, learned rules, recurring schedules or the primary bank-account setting still reference the account.
+- When transactions remain, the warning shows their count and instructs the user to open them from the count, reassign them and retry when the count reaches zero.
+- Deletion save is checked; if saving fails, the account is restored in memory.
+- No changes to backend, SQLite schema, API, authentication, backups or HTTPS.
+
 ## [2.1.7] - 2026-11-17
 
 ### Correzione privacy nei grafici mobile

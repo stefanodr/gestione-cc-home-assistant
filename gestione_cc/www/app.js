@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.10';
+  const APP_VERSION = '2.1.11';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -83,6 +83,7 @@
   let state;
   let reportMode = 'monthly';
   let transactionPage = 0;
+  let accountMovementFilterId = null;
   let documentSearchOffset = 0;
   let advancedSearchResults = [];
   let attachmentCounts = {};
@@ -725,7 +726,13 @@
     $('#reportPeriodNext')?.addEventListener('click', () => moveSelectedPeriod(1, 'report'));
     $('#accountPicker').addEventListener('change', () => { state.reportAccountId = $('#accountPicker').value; $('#reportAccountPicker').value = state.reportAccountId; saveState(); renderAll(); });
     $('#reportAccountPicker').addEventListener('change', () => { state.reportAccountId = $('#reportAccountPicker').value; $('#accountPicker').value = state.reportAccountId; saveState(); renderAll(); });
-    const resetTransactionFilters = () => { transactionSelection.clear(); transactionPage = 0; renderTransactions(); };
+    const resetTransactionFilters = () => { accountMovementFilterId = null; transactionSelection.clear(); transactionPage = 0; renderTransactions(); };
+    $('#clearAccountMovementFilter')?.addEventListener('click', () => {
+      accountMovementFilterId = null;
+      transactionSelection.clear();
+      transactionPage = 0;
+      renderTransactions();
+    });
     $('#transactionFilter').addEventListener('change', resetTransactionFilters);
     $('#transactionDateFrom')?.addEventListener('change', resetTransactionFilters);
     $('#transactionDateTo')?.addEventListener('change', resetTransactionFilters);
@@ -1968,6 +1975,41 @@
   function isBulkEditableTransaction(item) {
     return !(Array.isArray(item.counterpartSplits) && item.counterpartSplits.length > 1);
   }
+  function isTransactionLinkedToAccount(item, accountId) {
+    return item.bankAccountId === accountId ||
+      item.counterpartAccountId === accountId ||
+      item.suggestionId === accountId ||
+      (item.counterpartSplits || []).some(split => split.accountId === accountId);
+  }
+  function accountMovementCount(accountId) {
+    return state.transactions.filter(item => isTransactionLinkedToAccount(item, accountId)).length;
+  }
+  function renderAccountMovementFilterBanner() {
+    const banner = $('#accountMovementFilterBanner');
+    const label = $('#accountMovementFilterText');
+    if (!banner || !label) return;
+    const account = accountMovementFilterId ? accountById(accountMovementFilterId) : null;
+    if (!account) {
+      banner.classList.add('hidden');
+      return;
+    }
+    const bankCount = state.transactions.filter(item => item.bankAccountId === account.id).length;
+    const counterpartCount = state.transactions.filter(item => item.counterpartAccountId === account.id || item.suggestionId === account.id || (item.counterpartSplits || []).some(split => split.accountId === account.id)).length;
+    label.textContent = 'Movimenti collegati a «' + account.path + '»: ' + bankCount + ' come conto corrente e ' + counterpartCount + ' come contropartita, suggerimento o ripartizione. La modifica massiva disponibile cambia la contropartita; i movimenti in cui il conto è usato come conto corrente richiedono una riassegnazione specifica.';
+    banner.classList.remove('hidden');
+  }
+  function openAccountMovements(accountId) {
+    const account = accountById(accountId);
+    if (!account) return;
+    accountMovementFilterId = accountId;
+    $('#transactionFilter').value = 'all';
+    $('#transactionDateFrom').value = '';
+    $('#transactionDateTo').value = '';
+    $('#transactionCounterpartFilter').value = 'all';
+    transactionSelection.clear();
+    transactionPage = 0;
+    navigate('transactions');
+  }
   function filteredTransactions() {
     const filter = $('#transactionFilter')?.value || 'all';
     const dateFrom = $('#transactionDateFrom')?.value || '';
@@ -1984,6 +2026,7 @@
         return ids.includes(counterpartFilter);
       });
     }
+    if (accountMovementFilterId) tx = tx.filter(item => isTransactionLinkedToAccount(item, accountMovementFilterId));
     return tx;
   }
   function populateTransactionCounterpartControls() {
@@ -2105,6 +2148,7 @@
     refreshAccountSearchOptions();
     populateTransactionCounterpartControls();
     const tx = filteredTransactions();
+    renderAccountMovementFilterBanner();
     const body = $('#transactionsBody'); if (!body) return;
     $('#emptyTransactions').classList.toggle('hidden', tx.length > 0);
     const pageSize = 100;
@@ -2734,7 +2778,7 @@
     accounts.forEach(a => { if (counts[a.classification] !== undefined) counts[a.classification]++; });
     $('#accountSummary').innerHTML = Object.entries(counts).map(([label, count]) => `<div class="account-summary-card"><span>Conti ${label.toLowerCase()}</span><strong>${count}</strong></div>`).join('');
     $('#accountsBody').innerHTML = accounts.map(a => {
-      const txCount = state.transactions.filter(t => t.counterpartAccountId === a.id || t.bankAccountId === a.id || (t.counterpartSplits || []).some(sp => sp.accountId === a.id)).length;
+      const txCount = accountMovementCount(a.id);
       const cls = a.classification === 'Economica' ? 'class-economic' : a.classification === 'Patrimoniale' ? 'class-balance' : a.classification === 'Tecnica' ? 'class-technical' : 'class-structural';
       const options = ['automatico','Mastro','Mastro e conto','Conto'].map(v => `<option value="${v}" ${(v === 'automatico' ? !a.hierarchyTypeOverride : a.hierarchyType === v && a.hierarchyTypeSource === 'manuale') ? 'selected' : ''}>${v === 'automatico' ? 'Automatico · ' + safeText(a.hierarchyTypeProposal || a.hierarchyType) : v}</option>`).join('');
       const budgetEligible=a.classification==='Patrimoniale'&&!isLiquidAccount(a)&&a.hierarchyType!=='Mastro';
@@ -2742,8 +2786,10 @@
       const tags=Array.isArray(a.tags)?a.tags:[];
       const tagMarkup=tags.length?'<small class="account-tags">'+tags.map(tag=>'<span>'+safeText(tag)+'</span>').join(' ')+'</small>':'';
       const typeOptions = (isGnuCashAccountType(a.type) ? '' : `<option value="${safeText(a.type || '')}" selected>${safeText(a.type || 'Da verificare')} · tipo attuale</option>`) + GNUCASH_ACCOUNT_TYPES.map(type => `<option value="${type}" ${type === String(a.type || '').toUpperCase() ? 'selected' : ''}>${safeText(accountTypeLabel(type))} · ${type}</option>`).join('');
-      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><select data-gnucash-type-account="${safeText(a.id)}" aria-label="Tipo GnuCash di ${safeText(a.path)}" style="max-width:210px;padding:6px;border:1px solid #dce5e2;border-radius:6px;background:var(--panel,#fff);color:var(--text,#17212b)">${typeOptions}</select></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+' > Includi nel Budget/Report</label>' : '—'}</td><td>${mortgageEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-mortgage-account="'+safeText(a.id)+'" '+(a.mortgage===true?'checked':'')+'> Mutuo</label>' : '—'}</td></tr>`;
+      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><select data-gnucash-type-account="${safeText(a.id)}" aria-label="Tipo GnuCash di ${safeText(a.path)}" style="max-width:210px;padding:6px;border:1px solid #dce5e2;border-radius:6px;background:var(--panel,#fff);color:var(--text,#17212b)">${typeOptions}</select></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount > 0 ? '<button type="button" class="account-movement-count" data-account-movements="'+safeText(a.id)+'" aria-label="Apri '+txCount+' movimenti di '+safeText(a.path)+'">'+txCount+'</button>' : '0'}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+' > Includi nel Budget/Report</label>' : '—'}</td><td>${mortgageEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-mortgage-account="'+safeText(a.id)+'" '+(a.mortgage===true?'checked':'')+'> Mutuo</label>' : '—'}</td><td><button type="button" class="row-action row-action-danger" data-delete-account="'+safeText(a.id)+'">Elimina</button></td></tr>`;
     }).join('');
+    $('#accountsBody').querySelectorAll('[data-account-movements]').forEach(button=>button.addEventListener('click',()=>openAccountMovements(button.dataset.accountMovements)));
+    $('#accountsBody').querySelectorAll('[data-delete-account]').forEach(button=>button.addEventListener('click',()=>deleteAccount(button.dataset.deleteAccount)));
     $('#accountsBody').querySelectorAll('[data-rename-account]').forEach(button=>button.addEventListener('click',()=>renameAccount(button.dataset.renameAccount)));
     $('#accountsBody').querySelectorAll('[data-tags-account]').forEach(button=>button.addEventListener('click',()=>editAccountTags(button.dataset.tagsAccount)));
     $('#accountsBody').querySelectorAll('[data-gnucash-type-account]').forEach(select => select.addEventListener('change', async () => {
@@ -2805,6 +2851,57 @@
       account.mortgage=input.checked;
       await saveState();renderAccounts();renderReports();
     }));
+  }
+  function deleteAccount(accountId) {
+    const account = accountById(accountId);
+    if (!account) return;
+    const movementCount = accountMovementCount(accountId);
+    if (movementCount > 0) {
+      const bankMovementCount = state.transactions.filter(item => item.bankAccountId === accountId).length;
+      const instruction = bankMovementCount
+        ? ' Di questi, ' + bankMovementCount + ' usano il conto come conto corrente: la modifica massiva della contropartita non li sposta e richiedono una riassegnazione specifica.'
+        : ' Apri i movimenti dal conteggio, seleziona le registrazioni e assegna loro un’altra contropartita.';
+      showNotice('Prima sposta i movimenti', 'Impossibile eliminare «' + account.path + '»: sono ancora presenti ' + movementCount + ' movimenti collegati.' + instruction + ' Riprova quando il conteggio sarà zero.');
+      return;
+    }
+    const children = state.accounts.filter(item => item.parentId === accountId);
+    if (children.length) {
+      showNotice('Conto non eliminabile', '«' + account.path + '» contiene ' + children.length + ' sottoconti. Prima elimina o sposta i sottoconti.');
+      return;
+    }
+    if (state.bankAccountId === accountId) {
+      showNotice('Conto non eliminabile', '«' + account.path + '» è configurato come conto bancario principale. Configura prima un altro conto.');
+      return;
+    }
+    const linkedRules = (state.rules || []).filter(rule => rule.accountId === accountId).length;
+    if (linkedRules) {
+      showNotice('Conto non eliminabile', '«' + account.path + '» è ancora utilizzato da ' + linkedRules + ' regole apprese. Modifica o rimuovi prima le regole associate.');
+      return;
+    }
+    const linkedSchedules = (state.recurringRules || []).filter(rule =>
+      rule.bankAccountId === accountId || rule.accountId === accountId || rule.categoryId === accountId
+    ).length;
+    if (linkedSchedules) {
+      showNotice('Conto non eliminabile', '«' + account.path + '» è ancora utilizzato da ' + linkedSchedules + ' impegni o ricorrenze. Modifica prima le relative impostazioni.');
+      return;
+    }
+    showConfirm('Eliminare il conto?', 'Il conto «' + account.path + '» non ha movimenti né sottoconti e non risulta collegato a impostazioni o regole. La cancellazione rimuoverà il conto dal Piano dei conti.', async () => {
+      const index = state.accounts.findIndex(item => item.id === accountId);
+      const previousReportAccountId = state.reportAccountId;
+      state.accounts.splice(index, 1);
+      if (state.reportAccountId === accountId) state.reportAccountId = 'all';
+      if (accountMovementFilterId === accountId) accountMovementFilterId = null;
+      const saved = await saveState();
+      if (!saved) {
+        state.accounts.splice(index, 0, account);
+        state.reportAccountId = previousReportAccountId;
+        renderAll();
+        showNotice('Eliminazione non salvata', 'Il server non ha confermato il salvataggio. Il conto è stato ripristinato; non è stato eliminato.');
+        return;
+      }
+      renderAll();
+      showNotice('Conto eliminato', '«' + account.path + '» è stato rimosso dal Piano dei conti.');
+    });
   }
   function renderRules() {
     const body = $('#rulesBody');
