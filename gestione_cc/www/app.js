@@ -1671,7 +1671,7 @@
     return 'Da verificare';
   }
   function isLiquidAccount(account) {
-    if (!account || !isGnuCashAccountType(account.type)) return false;
+    if (!account || !['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE'].includes(String(account.type || '').toUpperCase())) return false;
     // CREDIT represents a liability (credit card), not immediately available liquidity.
     if (['BANK', 'CASH'].includes(String(account.type || '').toUpperCase())) return true;
     // Some GnuCash books classify named current-account subaccounts as ASSET.
