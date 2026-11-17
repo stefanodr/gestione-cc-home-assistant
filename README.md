@@ -577,7 +577,7 @@ See the [release notes](CHANGELOG.md) for changes in each version.
 
 Free use is permitted to individuals for personal, non-commercial purposes, subject to the licence terms. Professional, business and commercial uses require a written agreement.
 
-Home Assistant App version: **2.1.11**. Bundled application version: **2.1.11**. HACS custom integration version: **1.1.6** (independent).
+Home Assistant App version: **2.1.12**. Bundled application version: **2.1.12**. HACS custom integration version: **1.1.6** (independent).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). All rights reserved except where permissions are expressly granted.
 

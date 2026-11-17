@@ -748,3 +748,9 @@ body.sidebar-collapsed .local-card{justify-content:center;padding:11px 7px}
 
 /* Collegamento dal Piano dei conti al registro dei movimenti e filtro contestuale. */
 .account-movement-count{border:0;background:transparent;color:var(--teal);font-weight:750;text-decoration:underline;cursor:pointer;padding:4px 8px;border-radius:5px}.account-movement-count:hover{background:#e8f3f0}.account-movement-count:focus-visible{outline:2px solid var(--teal);outline-offset:2px}.account-movement-filter-banner{align-items:center;flex-wrap:wrap;background:#eef6f3;border:1px solid #dcebe6;border-radius:8px;padding:10px 12px;margin:-8px 0 12px}.account-movement-filter-banner p{flex:1 1 260px;color:#49645d}
+
+
+/* Piano dei conti: il conteggio dei movimenti è allineato a destra come gli altri valori numerici. */
+#view-accounts .data-table th.account-movement-heading,
+#view-accounts .data-table td.account-movement-cell{text-align:right!important;white-space:nowrap}
+#view-accounts .account-movement-count{display:inline-flex;justify-content:flex-end;min-width:2.5em}

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.11';
+  const APP_VERSION = '2.1.12';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -2786,10 +2786,10 @@
       const tags=Array.isArray(a.tags)?a.tags:[];
       const tagMarkup=tags.length?'<small class="account-tags">'+tags.map(tag=>'<span>'+safeText(tag)+'</span>').join(' ')+'</small>':'';
       const typeOptions = (isGnuCashAccountType(a.type) ? '' : `<option value="${safeText(a.type || '')}" selected>${safeText(a.type || 'Da verificare')} · tipo attuale</option>`) + GNUCASH_ACCOUNT_TYPES.map(type => `<option value="${type}" ${type === String(a.type || '').toUpperCase() ? 'selected' : ''}>${safeText(accountTypeLabel(type))} · ${type}</option>`).join('');
-      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><select data-gnucash-type-account="${safeText(a.id)}" aria-label="Tipo GnuCash di ${safeText(a.path)}" style="max-width:210px;padding:6px;border:1px solid #dce5e2;border-radius:6px;background:var(--panel,#fff);color:var(--text,#17212b)">${typeOptions}</select></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount > 0 ? '<button type="button" class="account-movement-count" data-account-movements="'+safeText(a.id)+'" aria-label="Apri '+txCount+' movimenti di '+safeText(a.path)+'">'+txCount+'</button>' : '0'}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+' > Includi nel Budget/Report</label>' : '—'}</td><td>${mortgageEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-mortgage-account="'+safeText(a.id)+'" '+(a.mortgage===true?'checked':'')+'> Mutuo</label>' : '—'}</td><td><button type="button" class="row-action row-action-danger" data-delete-account="'+safeText(a.id)+'">Elimina</button></td></tr>`;
+      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><select data-gnucash-type-account="${safeText(a.id)}" aria-label="Tipo GnuCash di ${safeText(a.path)}" style="max-width:210px;padding:6px;border:1px solid #dce5e2;border-radius:6px;background:var(--panel,#fff);color:var(--text,#17212b)">${typeOptions}</select></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td class="num account-movement-cell">${txCount > 0 ? '<button type="button" class="account-movement-count" data-account-movements="'+safeText(a.id)+'" aria-label="Apri '+txCount+' movimenti di '+safeText(a.path)+'">'+txCount+'</button>' : '0'}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+' > Includi nel Budget/Report</label>' : '—'}</td><td>${mortgageEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-mortgage-account="'+safeText(a.id)+'" '+(a.mortgage===true?'checked':'')+'> Mutuo</label>' : '—'}</td><td><button type="button" class="row-action row-action-danger" data-delete-account="'+safeText(a.id)+'">Elimina</button></td></tr>`;
     }).join('');
     $('#accountsBody').querySelectorAll('[data-account-movements]').forEach(button=>button.addEventListener('click',()=>openAccountMovements(button.dataset.accountMovements)));
-    $('#accountsBody').querySelectorAll('[data-delete-account]').forEach(button=>button.addEventListener('click',()=>deleteAccount(button.dataset.deleteAccount)));
+    $('#accountsBody').querySelectorAll('[data-delete-account]').forEach(button=>button.addEventListener('click',async()=>{button.disabled=true;try{await deleteAccount(button.dataset.deleteAccount);}finally{button.disabled=false;}}));
     $('#accountsBody').querySelectorAll('[data-rename-account]').forEach(button=>button.addEventListener('click',()=>renameAccount(button.dataset.renameAccount)));
     $('#accountsBody').querySelectorAll('[data-tags-account]').forEach(button=>button.addEventListener('click',()=>editAccountTags(button.dataset.tagsAccount)));
     $('#accountsBody').querySelectorAll('[data-gnucash-type-account]').forEach(select => select.addEventListener('change', async () => {
@@ -2852,7 +2852,7 @@
       await saveState();renderAccounts();renderReports();
     }));
   }
-  function deleteAccount(accountId) {
+  async function deleteAccount(accountId) {
     const account = accountById(accountId);
     if (!account) return;
     const movementCount = accountMovementCount(accountId);
@@ -2885,23 +2885,31 @@
       showNotice('Conto non eliminabile', '«' + account.path + '» è ancora utilizzato da ' + linkedSchedules + ' impegni o ricorrenze. Modifica prima le relative impostazioni.');
       return;
     }
-    showConfirm('Eliminare il conto?', 'Il conto «' + account.path + '» non ha movimenti né sottoconti e non risulta collegato a impostazioni o regole. La cancellazione rimuoverà il conto dal Piano dei conti.', async () => {
-      const index = state.accounts.findIndex(item => item.id === accountId);
-      const previousReportAccountId = state.reportAccountId;
-      state.accounts.splice(index, 1);
-      if (state.reportAccountId === accountId) state.reportAccountId = 'all';
-      if (accountMovementFilterId === accountId) accountMovementFilterId = null;
-      const saved = await saveState();
-      if (!saved) {
-        state.accounts.splice(index, 0, account);
-        state.reportAccountId = previousReportAccountId;
-        renderAll();
-        showNotice('Eliminazione non salvata', 'Il server non ha confermato il salvataggio. Il conto è stato ripristinato; non è stato eliminato.');
-        return;
-      }
+    const linkedBudgets = (state.budgets || []).filter(item => item.accountId === accountId).length;
+    if (linkedBudgets) {
+      showNotice('Conto non eliminabile', '«' + account.path + '» è ancora utilizzato in ' + linkedBudgets + ' voci di budget. Rimuovi prima il collegamento al budget.');
+      return;
+    }
+    const confirmed = window.confirm(
+      'Eliminare il conto «' + account.path + '»?\n\nIl conto non ha movimenti né sottoconti e non risulta collegato a regole, ricorrenze o budget. La cancellazione è definitiva.'
+    );
+    if (!confirmed) return;
+    const index = state.accounts.findIndex(item => item.id === accountId);
+    if (index < 0) return;
+    const previousReportAccountId = state.reportAccountId;
+    state.accounts.splice(index, 1);
+    if (state.reportAccountId === accountId) state.reportAccountId = 'all';
+    if (accountMovementFilterId === accountId) accountMovementFilterId = null;
+    const saved = await saveState();
+    if (!saved) {
+      state.accounts.splice(index, 0, account);
+      state.reportAccountId = previousReportAccountId;
       renderAll();
-      showNotice('Conto eliminato', '«' + account.path + '» è stato rimosso dal Piano dei conti.');
-    });
+      showNotice('Eliminazione non salvata', 'Il server non ha confermato il salvataggio. Il conto è stato ripristinato; non è stato eliminato.');
+      return;
+    }
+    renderAll();
+    showNotice('Conto eliminato', '«' + account.path + '» è stato rimosso dal Piano dei conti.');
   }
   function renderRules() {
     const body = $('#rulesBody');
@@ -3187,7 +3195,7 @@
     }).join('');
     const summary=[['Patrimoniale',accounts.filter(a=>a.classification==='Patrimoniale').length],['Economica',accounts.filter(a=>a.classification==='Economica').length],['Tecnica',accounts.filter(a=>a.classification==='Tecnica').length]];
     const summaryHtml=summary.map(item=>'<div>Conti '+item[0].toLowerCase()+'<strong>'+item[1]+'</strong></div>').join('');
-    const content='<h1>Piano dei conti</h1><div class="sub">Esportazione completa · '+accounts.length+' conti · '+new Date().toLocaleDateString('it-IT')+'</div><div class="summary">'+summaryHtml+'</div><table><thead><tr><th>ID</th><th>Percorso conto</th><th>Tipo GnuCash</th><th>Classificazione</th><th>Gerarchia</th><th>Conto padre</th><th class="num">Movimenti</th><th>Budget/Report</th><th>Mutuo</th><th>Ha sottoconti</th><th>Decorrenza nome</th><th>Tag</th><th>Storico denominazioni</th></tr></thead><tbody>'+(rows||'<tr><td colspan="13">Nessun conto presente.</td></tr>')+'</tbody></table><p class="foot">Il documento include i conti e i metadati attualmente presenti nell’archivio. I movimenti non sono esportati.</p>';
+    const content='<h1>Piano dei conti</h1><div class="sub">Esportazione completa · '+accounts.length+' conti · '+new Date().toLocaleDateString('it-IT')+'</div><div class="summary">'+summaryHtml+'</div><table><thead><tr><th>ID</th><th>Percorso conto</th><th>Tipo GnuCash</th><th>Classificazione</th><th>Gerarchia</th><th>Conto padre</th><th class="num account-movement-heading">Movimenti</th><th>Budget/Report</th><th>Mutuo</th><th>Ha sottoconti</th><th>Decorrenza nome</th><th>Tag</th><th>Storico denominazioni</th></tr></thead><tbody>'+(rows||'<tr><td colspan="13">Nessun conto presente.</td></tr>')+'</tbody></table><p class="foot">Il documento include i conti e i metadati attualmente presenti nell’archivio. I movimenti non sono esportati.</p>';
     printHtml('Piano-dei-conti',content,{reportToolbar:true,toolbarTitle:'Piano dei conti · esportazione PDF'});
   }
   function openAddAccount() {
