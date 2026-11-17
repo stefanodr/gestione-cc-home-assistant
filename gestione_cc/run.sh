@@ -6,6 +6,7 @@ export DATA_DIR=/data
 export WWW_DIR=/app/www
 export ADDON_OPTIONS_FILE=/data/options.json
 export SSL_DIR=/data/tls
+export ADDON_VERSION="$(bashio::addon.version)"
 HOSTNAME_CFG="$(bashio::config 'hostname')"
 HOSTNAME_CFG="${HOSTNAME_CFG:-homeassistant.local}"
 if ! echo "$HOSTNAME_CFG" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'; then
