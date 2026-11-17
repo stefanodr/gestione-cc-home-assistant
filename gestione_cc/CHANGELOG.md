@@ -1,3 +1,15 @@
+## [2.1.8] - 2026-11-17
+
+### Versioni applicazione e add-on rilevate correttamente
+- La versione dell'applicazione è ora aggiornata a 2.1.8.
+- Il server comunica all'integrazione la versione effettiva dell'add-on fornita da Home Assistant Supervisor, senza ricavarla dal file JavaScript dell'app.
+- Corretto il rilevamento separato delle due versioni mostrate dai sensori Home Assistant.
+
+### Correct application and add-on version reporting
+- The application version is now 2.1.8.
+- The server reports the actual add-on version supplied by Home Assistant Supervisor, instead of deriving it from the app JavaScript file.
+- Fixed separate detection of the two versions displayed by Home Assistant sensors.
+
 ## [2.1.6] - 2026-11-16
 
 ### Riconciliazione guidata del piano dei conti Excel
