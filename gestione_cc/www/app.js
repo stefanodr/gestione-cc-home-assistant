@@ -3139,21 +3139,22 @@
         const originalState = JSON.parse(JSON.stringify(state));
         if (replaceDemo) { state = { ...createDemoState(), accounts: defaultAccounts(), transactions: [], rules: [], demo: false, openingBalance: 0 }; }
         const liquidAccounts=state.accounts.filter(isLiquidAccount).sort((a,b)=>a.path.localeCompare(b.path,'it'));
-        if(!liquidAccounts.length){showNotice('Nessun conto liquido','Importa prima il Piano dei conti e riconcilia almeno un conto come Banca o Contanti.');return;}
+        if(!liquidAccounts.length){state=originalState;renderAll();showNotice('Nessun conto liquido','Importa prima il Piano dei conti e riconcilia almeno un conto come Banca o Contanti.');return;}
         const unique = imported.filter(tx => !isDuplicate(tx));
         const duplicates = imported.length - unique.length;
-        if(!unique.length){showNotice('Nessun nuovo movimento',duplicates+' movimenti erano già presenti e sono stati ignorati.');return;}
+        if(!unique.length){state=originalState;renderAll();showNotice('Nessun nuovo movimento',duplicates+' movimenti erano già presenti e sono stati ignorati.');return;}
         const unresolvedSourceRows=unique.filter(tx=>{
           const a=resolveExternalAccount(tx.accountExternalId),b=resolveExternalAccount(tx.counterpartExternalId);
           return !isCashFlowSourceAccount(a)&&!isCashFlowSourceAccount(b)&&!(!String(tx.accountExternalId||'').trim()&&!String(tx.counterpartExternalId||'').trim());
         });
         if(unresolvedSourceRows.length){
+          state=originalState;renderAll();
           const details=[...new Set(unresolvedSourceRows.map(tx=>[tx.accountExternalId,tx.counterpartExternalId].filter(Boolean).join(' / ')))];
           throw new Error('Non trovo un conto di movimentazione riconciliato per questi movimenti. Verifica i codici Conto / Contropartita nel PDC: '+details.join(', ')+'. Nessun movimento è stato importato.');
         }
         const needsFallback=unique.some(tx=>!isCashFlowSourceAccount(resolveExternalAccount(tx.accountExternalId))&&!isCashFlowSourceAccount(resolveExternalAccount(tx.counterpartExternalId)));
         const selectedImportAccount=needsFallback?await chooseImportBankAccount(liquidAccounts):null;
-        if(needsFallback&&!selectedImportAccount)return;
+        if(needsFallback&&!selectedImportAccount){state=originalState;renderAll();return;}
         const importedBankIds=new Set();
         let unresolvedCounterparts=0;
         unique.forEach(tx=>{
@@ -3162,7 +3163,7 @@
           // Nel formato del dataset la contropartita è il conto di movimentazione; nei trasferimenti tra due conti patrimoniali si mantiene questa convenzione.
           const sourceAccount=isCashFlowSourceAccount(counterpart)?counterpart:isCashFlowSourceAccount(account)?account:accountById(selectedImportAccount);
           const otherAccount=sourceAccount?.id===counterpart?.id?account:counterpart;
-          if(!sourceAccount||!isCashFlowSourceAccount(sourceAccount))throw new Error('Conto di movimentazione non riconosciuto per il movimento '+(tx.description||tx.date)+'.');
+          if(!sourceAccount||!isCashFlowSourceAccount(sourceAccount)){state=originalState;renderAll();throw new Error('Conto di movimentazione non riconosciuto per il movimento '+(tx.description||tx.date)+'.');}
           tx.bankAccountId=sourceAccount.id;importedBankIds.add(sourceAccount.id);
           let suggestion;
           if(otherAccount&&isGnuCashAccountType(otherAccount.type))suggestion={id:otherAccount.id,label:accountLabel(otherAccount.id),confidence:1};
