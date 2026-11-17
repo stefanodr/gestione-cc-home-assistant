@@ -1,7 +1,9 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.8';
+  const APP_VERSION = '2.1.9';
+  const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
+  const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
   let privacyObserver = null;
   function setAppProgress(value, label) {
@@ -1669,7 +1671,7 @@
     return 'Da verificare';
   }
   function isLiquidAccount(account) {
-    if (!account) return false;
+    if (!account || !isGnuCashAccountType(account.type)) return false;
     // CREDIT represents a liability (credit card), not immediately available liquidity.
     if (['BANK', 'CASH'].includes(String(account.type || '').toUpperCase())) return true;
     // Some GnuCash books classify named current-account subaccounts as ASSET.
@@ -2901,18 +2903,19 @@
     return type==='ASSET'&&['conto corrente','conto deposito','banca','cassa','liquidita','disponibilita liquide'].some(token=>p.includes(token));
   }
   function accountImportTypeOptions(selected) {
-    const values=['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','TRADING','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','CREDITLINE'];
-    return values.map(type=>`<option value="${type}" ${type===selected?'selected':''}>${type} · ${classifyType(type)}</option>`).join('');
+    return `<option value="" ${!isGnuCashAccountType(selected) ? 'selected' : ''}>— Da riconciliare —</option>` +
+      GNUCASH_ACCOUNT_TYPES.map(type => `<option value="${type}" ${type === selected ? 'selected' : ''}>${safeText(accountTypeLabel(type))} · ${type}</option>`).join('');
   }
+
   async function importAccountsFromExcel(event) {
     const file=event.target.files?.[0];if(!file)return;
     let overlay=null;
     try {
       const ext=file.name.toLowerCase().split('.').pop();
-      const rows=ext==='xlsx'?await parseXlsx(file,true):ext==='csv'?parseCsvRows(await file.text()):null;
+      const rows=ext==='xlsx'?await parseXlsx(file,true,'Piano dei conti'):ext==='csv'?parseCsvRows(await file.text()):null;
       if(!rows)throw new Error('Seleziona un file Excel .xlsx oppure CSV.');
       const headerIndex=rows.findIndex(row=>row.some(v=>/percorso|path|conto|account|nome/i.test(normalize(v)))&&row.some(v=>/tipo|type|classificazione|categoria/i.test(normalize(v))));
-      if(headerIndex<0)throw new Error('Intestazioni non riconosciute. Usa il modello ContiChiari oppure inserisci Percorso conto e Tipo/Classificazione.');
+      if(headerIndex<0)throw new Error('Non trovo le intestazioni del Piano dei conti. Il file deve contenere una colonna Percorso/Nome conto e una colonna Tipo GnuCash o Classificazione. Nessun conto è stato importato.');
       const headers=rows[headerIndex].map(v=>normalize(v));
       const col=patterns=>headers.findIndex(h=>patterns.some(re=>re.test(h)));
       const pathCol=col([/^percorso( conto)?$/,/^path$/,/^nome conto$/,/^account name$/,/^conto$/,/^account$/]);
@@ -2921,8 +2924,8 @@
       const idCol=col([/^id( esterno| conto| account)?$/,/^guid$/,/^account id$/,/^codice conto$/,/^codice$/]);
       const budgetCol=col([/^includi nel budget$/,/^budget$/,/^include in budget$/]);
       const mortgageCol=col([/^mutuo$/,/^mortgage$/,/^finanziamento$/]);
-      if(pathCol<0)throw new Error('Manca la colonna del percorso o nome del conto.');
-      if(typeCol<0&&classCol<0)throw new Error('Serve una colonna Tipo GnuCash oppure Classificazione.');
+      if(pathCol<0)throw new Error('Manca la colonna Percorso conto o Nome conto: indica il nome completo del conto, mantenendo la gerarchia con i due punti. Nessun conto è stato importato.');
+      if(typeCol<0&&classCol<0)throw new Error('Manca la colonna Tipo GnuCash o Classificazione. Aggiungi una delle due colonne e ripeti l’importazione. Nessun conto è stato importato.');
       const parsed=[];
       for(const row of rows.slice(headerIndex+1).filter(r=>String(r[pathCol]??'').trim())){
         const path=accountImportPath(row[pathCol]);if(!path)continue;
@@ -2934,10 +2937,10 @@
           includeInBudget:budgetCol>=0?externalBoolean(row[budgetCol])??mortgageGuess:mortgageGuess,
           mortgage:mortgageCol>=0?externalBoolean(row[mortgageCol])??mortgageGuess:mortgageGuess,generatedParent:false};
         const old=parsed.find(x=>normalize(x.path)===normalize(path));
-        if(old){if(old.type!==item.type)throw new Error('Il conto "'+path+'" compare con tipi differenti nel file.');if(!old.externalId)old.externalId=item.externalId;}
+        if(old){if(old.type!==item.type)throw new Error('Il conto "'+path+'" compare più volte con tipi GnuCash differenti ("'+(old.rawType||old.rawClass||'non indicato')+'" e "'+(rawType||rawClass||'non indicato')+'"). Controlla le righe del file. Nessun conto è stato importato.');if(!old.externalId)old.externalId=item.externalId;}
         else parsed.push(item);
       }
-      if(!parsed.length)throw new Error('Non ho trovato conti importabili.');
+      if(!parsed.length)throw new Error('Non ho trovato righe di conto da importare sotto le intestazioni. Controlla che il foglio Piano dei conti contenga i percorsi dei conti. Nessun conto è stato importato.');
       const existing=new Set(state.accounts.map(x=>normalize(x.path||x.name)));
       const known=new Set(parsed.map(x=>normalize(x.path))), parents=[];
       for(const item of [...parsed])for(let n=1;n<item.path.split(':').length;n++){
@@ -2973,7 +2976,7 @@
       overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
       overlay.querySelectorAll('[data-coa-type]').forEach(select=>select.addEventListener('change',()=>{
         const i=Number(select.dataset.coaType),item=items[i];item.type=select.value;
-        const row=select.closest('tr'),eligible=!accountImportIsLiquid(item)&&classifyType(item.type)==='Patrimoniale';
+        const row=select.closest('tr'),eligible=isGnuCashAccountType(item.type)&&!accountImportIsLiquid(item)&&classifyType(item.type)==='Patrimoniale';
         row.querySelector('[data-coa-class="'+i+'"]').textContent=classifyType(item.type);
         ['budget','mortgage'].forEach(flag=>{const input=row.querySelector('[data-coa-'+flag+'="'+i+'"]');input.disabled=!eligible;if(!eligible)input.checked=false;});
       }));
@@ -2986,7 +2989,15 @@
             if(budget&&!budget.disabled)item.includeInBudget=budget.checked;
             if(mortgage&&!mortgage.disabled)item.mortgage=mortgage.checked;
           });
-          const source=overlay.querySelector('#coaSourceSystem').value.trim()||'Excel',oldAccounts=state.accounts,oldDemo=state.demo,added=[];
+          const unresolved=items.filter(item=>!isGnuCashAccountType(item.type));
+          if(unresolved.length){
+            button.disabled=false;button.textContent='Conferma e importa '+newCount+' conti';
+            const details=unresolved.slice(0,10).map(item=>'• '+item.path+' — '+(item.rawType||item.rawClass||'tipo non riconosciuto')).join('\n');
+            const remaining=unresolved.length>10?'\n… e altri '+(unresolved.length-10)+' conti.':'';
+            showNotice('Importazione non eseguita',unresolved.length+' conti su '+items.length+' non hanno un tipo GnuCash riconosciuto.\n\n'+details+remaining+'\n\nSeleziona il tipo corretto per ciascun conto e riprova. Nessun conto è stato importato.');
+            const first=items.findIndex(item=>!isGnuCashAccountType(item.type));overlay.querySelector('[data-coa-type="'+first+'"]').focus();return;
+          }
+          const source=overlay.querySelector('#coaSourceSystem').value.trim()||'Excel',oldAccounts=state.accounts.slice(),oldDemo=state.demo,added=[];
           const byPath=new Map(state.accounts.map(x=>[normalize(x.path||x.name),x]));
           for(const item of items){
             const key=normalize(item.path);if(byPath.has(key))continue;
@@ -3002,8 +3013,19 @@
           close();renderAll();showNotice('Riconciliazione completata',added.length+' conti aggiunti e classificati. '+existingCount+' conti già presenti lasciati invariati.');
         }catch(error){button.disabled=false;button.textContent='Riprova importazione';showNotice('Importazione non completata',error.message||'Verifica il file e riprova.');}
       });
-    }catch(error){overlay?.remove();showNotice('Importazione piano dei conti non riuscita',error.message||'File non leggibile.');}
+    }catch(error){overlay?.remove();showNotice('Importazione piano dei conti non riuscita',(error.message||'Non riesco a leggere il file.')+'\n\nNessun conto è stato importato. Controlla formato, foglio e intestazioni, quindi riprova.');}
     event.target.value='';
+  }
+    function accountTypeLabel(type) {
+    const labels = {
+      ASSET: 'Attività', LIABILITY: 'Passività', EQUITY: 'Patrimonio netto',
+      INCOME: 'Entrate', EXPENSE: 'Spese', BANK: 'Banca', CASH: 'Contanti',
+      CREDIT: 'Carta di credito', STOCK: 'Titoli', MUTUAL: 'Fondi comuni',
+      CURRENCY: 'Valuta', RECEIVABLE: 'Crediti', PAYABLE: 'Debiti verso fornitori',
+      CREDITLINE: 'Linea di credito', TRADING: 'Trading', ROOT: 'Strutturale'
+    };
+    const key = String(type || '').toUpperCase();
+    return labels[key] || key || 'Da verificare';
   }
   function downloadAccountTemplate() {
     const accounts=state.accounts.filter(a=>a.type!=='ROOT').slice().sort((a,b)=>String(a.path||'').localeCompare(String(b.path||''),'it'));
@@ -3071,33 +3093,106 @@
     showNotice('Conto creato', 'Il conto “' + path + '” è stato aggiunto al piano dei conti.');
   }
 
-  async function onBankFile(event) {
-    const file=event.target.files?.[0]; if(!file)return;
-    try {
-      let imported; const ext=file.name.toLowerCase().split('.').pop();
-      if(ext==='qif'||ext==='txt') imported=parseQif(await file.text()); else if(ext==='ofx') imported=parseOfx(await file.text()); else if(ext==='csv') imported=parseCsv(await file.text()); else if(ext==='xlsx') imported=await parseXlsx(file); else throw new Error('Formato non supportato.');
-      if(!imported.length) throw new Error('Non ho trovato movimenti con data e importo.');
-      const start=replaceDemo=>{
-        if(replaceDemo) state={...createDemoState(),accounts:defaultAccounts(),transactions:[],rules:[],demo:false,openingBalance:0};
-        const known=new Set(state.transactions.filter(tx=>tx.status!=='duplicate').map(transactionFingerprint));
-        const duplicates=findImportDuplicates(imported);
-        const commit=include=>{
-          const selected=state.reportAccountId&&state.reportAccountId!=='all'&&isLiquidAccount(accountById(state.reportAccountId))?state.reportAccountId:state.bankAccountId;
-          const batchKeys=new Set();
-          const chosen=imported.filter(tx=>{const key=transactionFingerprint(tx);const duplicate=known.has(key)||batchKeys.has(key);batchKeys.add(key);return include||!duplicate;});
-          chosen.forEach(tx=>{const key=transactionFingerprint(tx);const suggestion=tx.split?{id:null,label:'Movimento suddiviso · rivedi le righe',confidence:.1}:suggestionFor(tx);tx.suggestionId=suggestion.id;tx.suggestionLabel=suggestion.label;tx.confidence=suggestion.confidence;if(tx.category){const cat=findAccountByLabel(tx.category);if(cat){tx.suggestionId=cat.id;tx.suggestionLabel=cat.path;tx.confidence=.96;}}tx.id=uid();tx.status='pending';tx.bankAccountId=selected;tx.source=ext;if(known.has(key))tx.duplicateOverride=true;});
-          state.transactions.push(...chosen);state.demo=false;const latest=imported.map(tx=>tx.date).filter(Boolean).sort().at(-1);
-          if(latest){state.selectedMonth=latest.slice(0,7);$('#monthPicker').value=state.selectedMonth;syncReportPeriodPicker(state.selectedMonth);}
-          state.reportAccountId=selected;$('#accountPicker').value=selected;$('#reportAccountPicker').value=selected;
-          saveState().then(()=>{renderAll();navigate('transactions');showNotice('Importazione completata',chosen.length+' movimenti aggiunti. '+(duplicates.length?(include?duplicates.length+' duplicati inseriti comunque.':duplicates.length+' duplicati esclusi.'):'')+' '+chosen.filter(t=>t.status==='pending').length+' da classificare.');});
-        };
-        if(duplicates.length) showDuplicateChoice('Movimenti già presenti','Trovati '+duplicates.length+' possibili duplicati su '+imported.length+' righe. Scegli se escluderli oppure importarli comunque.',commit); else commit(false);
-      };
-      if(state.demo) showConfirm('Sostituire i dati dimostrativi?','Ho trovato '+imported.length+' movimenti. I dati dimostrativi saranno rimossi.',()=>start(true)); else start(false);
-    }catch(error){showNotice('Importazione non riuscita',error.message||'Non riesco a leggere il file.');}event.target.value='';
-  }  function isDuplicate(candidate) {
+  function isCashFlowSourceAccount(account) {
+    return isLiquidAccount(account) || String(account?.type || '').toUpperCase() === 'CREDIT';
+  }
+  function resolveExternalAccount(externalId) {
+    const key=String(externalId??'').trim();
+    if(!key)return null;
+    const matches=state.accounts.filter(account=>Array.isArray(account.externalAccountIds)&&account.externalAccountIds.some(item=>String(item.id??'').trim()===key));
+    return matches.length===1?matches[0]:null;
+  }
+  function chooseImportBankAccount(accounts) {
+    return new Promise(resolve => {
+      const overlay=document.createElement('div');
+      overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Selezione conto liquido');
+      overlay.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:16px';
+      const options=accounts.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(a.path||a.name)+'</option>').join('');
+      overlay.innerHTML='<div style="background:var(--panel,#fff);color:var(--text,#17212b);width:min(520px,100%);border-radius:14px;padding:22px"><h2>Seleziona il conto da movimentare</h2><p>Non assegnerò i movimenti a un conto liquido automaticamente. Scegli il conto a cui appartiene il file che stai importando.</p><label for="importBankAccount">Conto liquido</label><select id="importBankAccount" style="display:block;width:100%;padding:10px;margin:8px 0 16px"><option value="">— Seleziona un conto —</option>'+options+'</select><div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" data-import-cancel class="button button-quiet">Annulla</button><button type="button" data-import-confirm class="button button-primary" disabled>Continua</button></div></div>';
+      document.body.append(overlay);
+      const select=overlay.querySelector('#importBankAccount'),confirm=overlay.querySelector('[data-import-confirm]');
+      const finish=value=>{overlay.remove();resolve(value);};
+      select.addEventListener('change',()=>{confirm.disabled=!select.value;});
+      overlay.querySelector('[data-import-cancel]').addEventListener('click',()=>finish(null));
+      confirm.addEventListener('click',()=>finish(select.value||null));
+      overlay.addEventListener('click',e=>{if(e.target===overlay)finish(null);});
+      select.focus();
+    });
+  }
+  function isDuplicate(candidate) {
+    if (candidate.fitid && state.transactions.some(tx => tx.status !== 'duplicate' && tx.fitid && tx.fitid === candidate.fitid)) return true;
     const key = transactionFingerprint(candidate);
     return state.transactions.some(tx => tx.status !== 'duplicate' && transactionFingerprint(tx) === key);
+  }
+  async function onBankFile(event) {
+    const file = event.target.files?.[0]; if (!file) return;
+    try {
+      let imported;
+      const ext = file.name.toLowerCase().split('.').pop();
+      if (ext === 'qif' || ext === 'txt') imported = parseQif(await file.text());
+      else if (ext === 'ofx') imported = parseOfx(await file.text());
+      else if (ext === 'csv') imported = parseCsv(await file.text());
+      else if (ext === 'xlsx') imported = await parseXlsx(file, false, 'Movimenti');
+      else throw new Error('Formato non supportato. Seleziona QIF, OFX, CSV o XLSX.');
+      if (!imported.length) throw new Error('Non ho trovato movimenti con data e importo nel file.');
+      const continueImport = async (replaceDemo) => {
+        const originalState = JSON.parse(JSON.stringify(state));
+        if (replaceDemo) { state = { ...createDemoState(), accounts: defaultAccounts(), transactions: [], rules: [], demo: false, openingBalance: 0 }; }
+        const liquidAccounts=state.accounts.filter(isLiquidAccount).sort((a,b)=>a.path.localeCompare(b.path,'it'));
+        if(!liquidAccounts.length){showNotice('Nessun conto liquido','Importa prima il Piano dei conti e riconcilia almeno un conto come Banca o Contanti.');return;}
+        const unique = imported.filter(tx => !isDuplicate(tx));
+        const duplicates = imported.length - unique.length;
+        if(!unique.length){showNotice('Nessun nuovo movimento',duplicates+' movimenti erano già presenti e sono stati ignorati.');return;}
+        const unresolvedSourceRows=unique.filter(tx=>{
+          const a=resolveExternalAccount(tx.accountExternalId),b=resolveExternalAccount(tx.counterpartExternalId);
+          return !isCashFlowSourceAccount(a)&&!isCashFlowSourceAccount(b)&&!(!String(tx.accountExternalId||'').trim()&&!String(tx.counterpartExternalId||'').trim());
+        });
+        if(unresolvedSourceRows.length){
+          const details=[...new Set(unresolvedSourceRows.map(tx=>[tx.accountExternalId,tx.counterpartExternalId].filter(Boolean).join(' / ')))];
+          throw new Error('Non trovo un conto di movimentazione riconciliato per questi movimenti. Verifica i codici Conto / Contropartita nel PDC: '+details.join(', ')+'. Nessun movimento è stato importato.');
+        }
+        const needsFallback=unique.some(tx=>!isCashFlowSourceAccount(resolveExternalAccount(tx.accountExternalId))&&!isCashFlowSourceAccount(resolveExternalAccount(tx.counterpartExternalId)));
+        const selectedImportAccount=needsFallback?await chooseImportBankAccount(liquidAccounts):null;
+        if(needsFallback&&!selectedImportAccount)return;
+        const importedBankIds=new Set();
+        let unresolvedCounterparts=0;
+        unique.forEach(tx=>{
+          const account=String(tx.accountExternalId||'').trim()?resolveExternalAccount(tx.accountExternalId):null;
+          const counterpart=String(tx.counterpartExternalId||'').trim()?resolveExternalAccount(tx.counterpartExternalId):null;
+          // Nel formato del dataset la contropartita è il conto di movimentazione; nei trasferimenti tra due conti patrimoniali si mantiene questa convenzione.
+          const sourceAccount=isCashFlowSourceAccount(counterpart)?counterpart:isCashFlowSourceAccount(account)?account:accountById(selectedImportAccount);
+          const otherAccount=sourceAccount?.id===counterpart?.id?account:counterpart;
+          if(!sourceAccount||!isCashFlowSourceAccount(sourceAccount))throw new Error('Conto di movimentazione non riconosciuto per il movimento '+(tx.description||tx.date)+'.');
+          tx.bankAccountId=sourceAccount.id;importedBankIds.add(sourceAccount.id);
+          let suggestion;
+          if(otherAccount&&isGnuCashAccountType(otherAccount.type))suggestion={id:otherAccount.id,label:accountLabel(otherAccount.id),confidence:1};
+          else if(String(tx.accountExternalId||'').trim()||String(tx.counterpartExternalId||'').trim()){
+            suggestion={id:null,label:'Codice contropartita non riconciliato',confidence:.1};unresolvedCounterparts++;
+          } else suggestion=tx.split?{id:null,label:'Movimento suddiviso · rivedi le righe',confidence:.1}:suggestionFor(tx);
+          tx.suggestionId=suggestion.id;tx.suggestionLabel=suggestion.label;tx.confidence=suggestion.confidence;
+          if(!otherAccount&&tx.category){
+            const category=findAccountByLabel(tx.category);
+            if(category){tx.suggestionId=category.id;tx.suggestionLabel=category.path;tx.confidence=.96;}
+          }
+          tx.id=tx.id||uid();tx.status='pending';tx.source=ext;
+        });
+        state.transactions.push(...unique);state.demo=false;
+        const bankIds=[...importedBankIds];
+        state.bankAccountId=bankIds[0]||selectedImportAccount||state.bankAccountId;
+        const reportAccount=bankIds.length===1?bankIds[0]:'all';
+        const mostRecentImport=unique.map(tx=>tx.date).filter(Boolean).sort().at(-1);
+        if(mostRecentImport){const month=mostRecentImport.slice(0,7);state.selectedMonth=month;$('#monthPicker').value=month;syncReportPeriodPicker(month);$('#statementMonth').value=month;}
+        state.reportAccountId=reportAccount;
+        $('#accountPicker').value=reportAccount;$('#reportAccountPicker').value=reportAccount;
+        const saved = await saveState();
+        if (!saved) { state = originalState; renderAll(); throw new Error('Salvataggio non riuscito: nessun movimento è stato importato nel database. Verifica la connessione e riprova.'); }
+        renderAll();navigate('transactions');
+        showNotice('Importazione completata',`${unique.length} movimenti aggiunti${duplicates?` · ${duplicates} duplicati ignorati`:''}. ${bankIds.length===1?'Conto utilizzato: '+accountLabel(bankIds[0]):'Movimenti distribuiti su '+bankIds.length+' conti liquidi; panoramica impostata su tutti.'} ${unresolvedCounterparts?unresolvedCounterparts+' codici contropartita non riconciliati: i movimenti resteranno da classificare. ':''}${unique.filter(t=>t.status==='pending').length} da classificare. File elaborato sul dispositivo.`);
+      };
+      if (state.demo) showConfirm('Sostituire i dati dimostrativi?', `Ho trovato ${imported.length} movimenti nel file. I dati dimostrativi saranno rimossi; il file sarà elaborato soltanto in questo browser.`, () => continueImport(true));
+      else await continueImport(false);
+    } catch (error) { showNotice('Importazione non riuscita', error.message || 'Non riesco a leggere il file.'); }
+    event.target.value = '';
   }
   function transactionFingerprint(tx) { if(tx.fitid)return 'OFX|'+String(tx.fitid).trim()+'|'+parseDate(tx.date)+'|'+Number(tx.amount).toFixed(2); return [parseDate(tx.date), Number(tx.amount).toFixed(2), normalize(transactionDescription(tx)), normalize(transactionCausale(tx))].join('|'); }
   function findImportDuplicates(rows) {
@@ -3177,12 +3272,13 @@
     if (cell || row.length) { row.push(cell); rows.push(row); }
     return rows.map(r => r.map(v => String(v).trim()));
   }
-  async function parseXlsx(file, returnGrid = false) {
+  async function parseXlsx(file, returnGrid = false, preferredSheetName = '') {
     if (!window.JSZip) throw new Error('Lettore Excel non disponibile. Riprova usando il file CSV esportato da Excel.');
     const zip = await JSZip.loadAsync(file);
     const workbookXml = await readZipText(zip, 'xl/workbook.xml');
     const workbookDoc = parseXml(workbookXml);
-    const sheetNode = [...workbookDoc.getElementsByTagName('*')].find(el => el.localName === 'sheet');
+    const sheetNodes = [...workbookDoc.getElementsByTagName('*')].filter(el => el.localName === 'sheet');
+    const sheetNode = sheetNodes.find(el => normalize(el.getAttribute('name')) === normalize(preferredSheetName)) || sheetNodes[0];
     if (!sheetNode) throw new Error('Il foglio Excel non contiene una tabella leggibile.');
     const relId = sheetNode.getAttribute('r:id') || sheetNode.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
     const relsDoc = parseXml(await readZipText(zip, 'xl/_rels/workbook.xml.rels'));
@@ -3283,7 +3379,11 @@
     const descCols = headers.map((h, i) => /descr|causal|benef|payee|esercente|merchant|operazione|movimento|memo|dettaglio|note/.test(h) ? i : -1).filter(i => i >= 0);
     const descriptionCol = headers.findIndex(h => /descrizion|description|beneficiario|beneficiary|payee|esercente|merchant/.test(h));
     const causaleCol = headers.findIndex((h, i) => i !== descriptionCol && /causale|causal|memo|dettaglio|note|operazione|movimento/.test(h));
-    const categoryCol = headers.findIndex(h => /categor|conto di contropartita/.test(h));
+    const categoryCol = headers.findIndex(h => /categor|contropartita/.test(h));
+    const movementTypeCol = headers.findIndex(h => /^(tipo movimento|movement type|direction)$/.test(h));
+    const accountCodeCol = headers.findIndex(h => /^(codice conto|codice account|account code)$/.test(h));
+    const counterpartCodeCol = headers.findIndex(h => /^(codice contropartita|codice conto contropartita|counterpart code|counterpart account code)$/.test(h));
+    const referenceCol = headers.findIndex(h => /^(riferimento esterno|external reference|reference)$/.test(h));
     const dateCol = dateCols[0] ?? findMostDateLike(data);
     const textCol = (descriptionCol >= 0 ? descriptionCol : causaleCol >= 0 ? causaleCol : descCols.find(i => i !== dateCol)) ?? findMostTextColumn(data, dateCol, amountCols);
     const debitCol = headers.findIndex(h => /dare|addebito|uscita/.test(h));
@@ -3299,11 +3399,14 @@
       let amount;
       if (debitCol >= 0 && creditCol >= 0) amount = Math.abs(parseAmount(row[creditCol] || 0)) - Math.abs(parseAmount(row[debitCol] || 0));
       else amount = parseAmount(row[amountCol]);
+      const movementType = movementTypeCol >= 0 ? normalize(row[movementTypeCol]) : '';
+      if (/(uscita|spesa|addebito|pagamento|expense|debit)/.test(movementType)) amount = -Math.abs(amount);
+      else if (/(entrata|ricavo|accredito|incasso|income|credit)/.test(movementType)) amount = Math.abs(amount);
       const textValue = String(row[textCol] ?? '').trim();
       const description = descriptionCol >= 0 ? String(row[descriptionCol] ?? '').trim() : (causaleCol === textCol ? '' : textValue);
       const causale = memoCol >= 0 ? String(row[memoCol] ?? '').trim() : (causaleCol === textCol ? textValue : '');
       const payee = description || (descriptionCol < 0 && causaleCol < 0 ? textValue : '');
-      return { id: uid('x'), date, amount, description, causale, payee, memo: causale, category: categoryCol >= 0 ? String(row[categoryCol] ?? '').trim() : '' };
+      return { id: uid('x'), date, amount, description, causale, payee, memo: causale, category: categoryCol >= 0 ? String(row[categoryCol] ?? '').trim() : '', accountExternalId: accountCodeCol >= 0 ? String(row[accountCodeCol] ?? '').trim() : '', counterpartExternalId: counterpartCodeCol >= 0 ? String(row[counterpartCodeCol] ?? '').trim() : '', externalReference: referenceCol >= 0 ? String(row[referenceCol] ?? '').trim() : '' };
     }).filter(tx => tx.date && Number.isFinite(tx.amount));
   }
   function parseFlexibleDate(value) {
