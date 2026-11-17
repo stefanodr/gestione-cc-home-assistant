@@ -734,15 +734,15 @@ def enqueue_integration_job(operation):
 def integration_status(path):
     now = time.time()
     if path == "/api/integration/v1/health":
-        app_version = addon_version = None
+        app_version = None
         try:
             script = (WWW / "app.js").read_text(encoding="utf-8")
-            app_match = re.search(r"const APP_VERSION = '([^']+)'", script)
-            addon_match = re.search(r"const ADDON_VERSION = '([^']+)'", script)
+            app_match = re.search(r"""const APP_VERSION\s*=\s*['"]([^'"]+)['"]""", script)
             app_version = app_match.group(1) if app_match else None
-            addon_version = addon_match.group(1) if addon_match else None
         except OSError:
             pass
+        # Supplied by the Supervisor at add-on startup; never inferred from the app bundle.
+        addon_version = os.environ.get("ADDON_VERSION") or None
         return {"available": True, "app_version": app_version, "addon_version": addon_version, "uptime_seconds": max(0, int(now - SERVER_STARTED_AT))}
     if path == "/api/integration/v1/database/status":
         try:
