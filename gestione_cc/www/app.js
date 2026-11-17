@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.12';
+  const APP_VERSION = '2.1.13';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -2852,9 +2852,12 @@
       await saveState();renderAccounts();renderReports();
     }));
   }
-  async function deleteAccount(accountId) {
+  function deleteAccount(accountId) {
     const account = accountById(accountId);
-    if (!account) return;
+    if (!account) {
+      showNotice('Conto non trovato', 'Non è stato possibile individuare il conto da eliminare. Aggiorna il Piano dei conti e riprova.');
+      return;
+    }
     const movementCount = accountMovementCount(accountId);
     if (movementCount > 0) {
       const bankMovementCount = state.transactions.filter(item => item.bankAccountId === accountId).length;
@@ -2890,26 +2893,39 @@
       showNotice('Conto non eliminabile', '«' + account.path + '» è ancora utilizzato in ' + linkedBudgets + ' voci di budget. Rimuovi prima il collegamento al budget.');
       return;
     }
-    const confirmed = window.confirm(
-      'Eliminare il conto «' + account.path + '»?\n\nIl conto non ha movimenti né sottoconti e non risulta collegato a regole, ricorrenze o budget. La cancellazione è definitiva.'
+    // Usa il modal di conferma già gestito dall'app: window.confirm non è affidabile
+    // in tutti i browser integrati, incluso il pannello Home Assistant.
+    showConfirm(
+      'Eliminare il conto?',
+      'Vuoi eliminare definitivamente «' + account.path + '»? Il conto non ha movimenti, sottoconti o collegamenti alle altre funzioni.',
+      async () => {
+        const currentAccount = accountById(accountId);
+        if (!currentAccount) {
+          showNotice('Conto non trovato', 'Il conto non è più presente nel Piano dei conti.');
+          return;
+        }
+        if (accountMovementCount(accountId) > 0) {
+          showNotice('Eliminazione bloccata', 'Nel frattempo sono stati associati nuovi movimenti al conto. Spostali prima di riprovare.');
+          return;
+        }
+        const index = state.accounts.findIndex(item => item.id === accountId);
+        if (index < 0) return;
+        const previousReportAccountId = state.reportAccountId;
+        state.accounts.splice(index, 1);
+        if (state.reportAccountId === accountId) state.reportAccountId = 'all';
+        if (accountMovementFilterId === accountId) accountMovementFilterId = null;
+        const saved = await saveState();
+        if (!saved) {
+          state.accounts.splice(index, 0, currentAccount);
+          state.reportAccountId = previousReportAccountId;
+          renderAll();
+          showNotice('Eliminazione non salvata', 'Il server non ha confermato il salvataggio. Il conto è stato ripristinato; non è stato eliminato.');
+          return;
+        }
+        renderAll();
+        showNotice('Conto eliminato', '«' + currentAccount.path + '» è stato rimosso dal Piano dei conti.');
+      }
     );
-    if (!confirmed) return;
-    const index = state.accounts.findIndex(item => item.id === accountId);
-    if (index < 0) return;
-    const previousReportAccountId = state.reportAccountId;
-    state.accounts.splice(index, 1);
-    if (state.reportAccountId === accountId) state.reportAccountId = 'all';
-    if (accountMovementFilterId === accountId) accountMovementFilterId = null;
-    const saved = await saveState();
-    if (!saved) {
-      state.accounts.splice(index, 0, account);
-      state.reportAccountId = previousReportAccountId;
-      renderAll();
-      showNotice('Eliminazione non salvata', 'Il server non ha confermato il salvataggio. Il conto è stato ripristinato; non è stato eliminato.');
-      return;
-    }
-    renderAll();
-    showNotice('Conto eliminato', '«' + account.path + '» è stato rimosso dal Piano dei conti.');
   }
   function renderRules() {
     const body = $('#rulesBody');
