@@ -47,7 +47,7 @@ class IntegrationApiDtoTest(unittest.TestCase):
         self.www_dir = self.root / "www"
         self.backup_dir.mkdir()
         self.www_dir.mkdir()
-        (self.www_dir / "app.js").write_text("const APP_VERSION = '1.7.14';\\nconst ADDON_VERSION = '1.0.43';", encoding="utf-8")
+        (self.www_dir / "app.js").write_text("const APP_VERSION = '1.7.14';", encoding="utf-8")
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
         connection.executescript("""
@@ -93,7 +93,8 @@ class IntegrationApiDtoTest(unittest.TestCase):
         self.assertNotEqual(digest, "test-secret-token")
 
     def test_health_dto_has_only_technical_fields(self):
-        result = NAMESPACE["integration_status"]("/api/integration/v1/health")
+        with patch.dict(os.environ, {"ADDON_VERSION": "1.0.43"}):
+            result = NAMESPACE["integration_status"]("/api/integration/v1/health")
         self.assertEqual(set(result), {"available", "app_version", "addon_version", "uptime_seconds"})
         self.assertTrue(result["available"])
         self.assertEqual(result["app_version"], "1.7.14")
