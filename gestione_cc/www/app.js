@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.9';
+  const APP_VERSION = '2.1.10';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -2741,10 +2741,54 @@
       const mortgageEligible=a.classification==='Patrimoniale'&&!isLiquidAccount(a);
       const tags=Array.isArray(a.tags)?a.tags:[];
       const tagMarkup=tags.length?'<small class="account-tags">'+tags.map(tag=>'<span>'+safeText(tag)+'</span>').join(' ')+'</small>':'';
-      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><span class="account-type">${safeText(a.type || '—')}</span></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+' > Includi nel Budget/Report</label>' : '—'}</td><td>${mortgageEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-mortgage-account="'+safeText(a.id)+'" '+(a.mortgage===true?'checked':'')+'> Mutuo</label>' : '—'}</td></tr>`;
+      const typeOptions = (isGnuCashAccountType(a.type) ? '' : `<option value="${safeText(a.type || '')}" selected>${safeText(a.type || 'Da verificare')} · tipo attuale</option>`) + GNUCASH_ACCOUNT_TYPES.map(type => `<option value="${type}" ${type === String(a.type || '').toUpperCase() ? 'selected' : ''}>${safeText(accountTypeLabel(type))} · ${type}</option>`).join('');
+      return `<tr><td class="name-primary account-path-cell" title="${safeText(a.path)}">${safeText(a.path)}${tagMarkup}<div class="account-row-actions"><button class="row-action" data-rename-account="${safeText(a.id)}">Rinomina</button><button class="row-action" data-tags-account="${safeText(a.id)}">Tag</button></div></td><td><select data-gnucash-type-account="${safeText(a.id)}" aria-label="Tipo GnuCash di ${safeText(a.path)}" style="max-width:210px;padding:6px;border:1px solid #dce5e2;border-radius:6px;background:var(--panel,#fff);color:var(--text,#17212b)">${typeOptions}</select></td><td><span class="account-class ${cls}">${safeText(a.classification || 'Da verificare')}</span></td><td><select data-hierarchy-account="${safeText(a.id)}" aria-label="Classificazione gerarchica di ${safeText(a.path)}" style="max-width:190px;padding:6px;border:1px solid #dce5e2;border-radius:6px">${options}</select><small style="display:block;color:#71817d">${a.hasChildren ? (a.hasDirectMovements ? 'Ha sottoconti e movimenti diretti' : 'Ha sottoconti') : 'Conto senza sottoconti'}</small></td><td>${txCount}</td><td>${budgetEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-budget-include-account="'+safeText(a.id)+'" '+(a.includeInBudget===true?'checked':'')+' > Includi nel Budget/Report</label>' : '—'}</td><td>${mortgageEligible ? '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-mortgage-account="'+safeText(a.id)+'" '+(a.mortgage===true?'checked':'')+'> Mutuo</label>' : '—'}</td></tr>`;
     }).join('');
     $('#accountsBody').querySelectorAll('[data-rename-account]').forEach(button=>button.addEventListener('click',()=>renameAccount(button.dataset.renameAccount)));
     $('#accountsBody').querySelectorAll('[data-tags-account]').forEach(button=>button.addEventListener('click',()=>editAccountTags(button.dataset.tagsAccount)));
+    $('#accountsBody').querySelectorAll('[data-gnucash-type-account]').forEach(select => select.addEventListener('change', async () => {
+      const account = accountById(select.dataset.gnucashTypeAccount);
+      const nextType = String(select.value || '').toUpperCase();
+      if (!account || !isGnuCashAccountType(nextType)) { renderAccounts(); return; }
+      const previous = JSON.parse(JSON.stringify(account));
+      const previousType = String(account.type || '').toUpperCase();
+      if (nextType === previousType) return;
+      const linkedBankMovements = state.transactions.filter(tx => tx.bankAccountId === account.id).length;
+      const isConfiguredBankAccount = state.bankAccountId === account.id;
+      account.type = nextType;
+      account.classification = classifyType(nextType);
+      const remainsLiquid = isLiquidAccount(account);
+      if ((linkedBankMovements > 0 || isConfiguredBankAccount) && !remainsLiquid) {
+        Object.assign(account, previous);
+        renderAccounts();
+        const reason = isConfiguredBankAccount ? 'È il conto liquido principale configurato' : 'È utilizzato come conto di liquidità in ' + linkedBankMovements + ' movimenti';
+        showNotice('Modifica non consentita', reason + '. Prima configura un altro conto bancario/cassa valido e, se necessario, riassegna i movimenti.');
+        return;
+      }
+      const eligibleForBudget = account.classification === 'Patrimoniale' && !remainsLiquid;
+      if (!eligibleForBudget) {
+        account.includeInBudget = false;
+        account.mortgage = false;
+      }
+      const oldLabel = accountTypeLabel(previousType) + ' · ' + previousType;
+      const newLabel = accountTypeLabel(nextType) + ' · ' + nextType;
+      const confirmed = window.confirm('Modificare il tipo GnuCash di "' + (account.path || account.name) + '"?\n\n' + oldLabel + ' → ' + newLabel + '\nClassificazione: ' + account.classification + '\n\nGli ID dei conti e i movimenti collegati resteranno invariati.');
+      if (!confirmed) { Object.assign(account, previous); renderAccounts(); return; }
+      const saved = await saveState();
+      if (!saved) {
+        Object.assign(account, previous);
+        renderAll();
+        showNotice('Modifica non salvata', 'Il server non ha confermato il salvataggio. Il tipo GnuCash precedente è stato ripristinato.');
+        return;
+      }
+      renderAccountFilters();
+      renderAccounts();
+      renderOverview();
+      renderTransactions();
+      renderReports();
+      renderBudgetView();
+      renderForecastSelection();
+    }));
     $('#accountsBody').querySelectorAll('[data-hierarchy-account]').forEach(select => select.addEventListener('change', async () => {
       const account = accountById(select.dataset.hierarchyAccount); if (!account) return;
       if (select.value === 'automatico') delete account.hierarchyTypeOverride;

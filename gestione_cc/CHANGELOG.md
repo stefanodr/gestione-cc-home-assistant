@@ -1,3 +1,19 @@
+## [2.1.10] - 2026-11-17
+
+### Modifica del tipo GnuCash nel Piano dei conti
+- Il tipo GnuCash di ogni conto esistente è modificabile direttamente dalla tabella del Piano dei conti tramite un selettore con descrizione italiana e codice originale.
+- La modifica aggiorna la classificazione patrimoniale/economica/tecnica e ricalcola le opzioni collegate a Budget/Report e Mutuo.
+- Richiesta di conferma prima del salvataggio; gli ID dei conti e i collegamenti ai movimenti non vengono riscritti.
+- Impedito di trasformare in conto non liquido il conto bancario principale o un conto usato come conto di liquidità nei movimenti.
+- In caso di salvataggio server non riuscito, il tipo precedente viene ripristinato.
+
+### Edit GnuCash account types in the Chart of Accounts
+- Existing account GnuCash types can now be edited directly in the Chart of Accounts table using a selector with Italian descriptions and the original type code.
+- The change updates balance-sheet/income classification and recalculates Budget/Report and Mortgage eligibility.
+- Confirmation is required before saving; account IDs and transaction links are preserved.
+- Prevents changing the configured main liquidity account or an account used as transaction liquidity into a non-liquid type.
+- Restores the previous type if server persistence fails.
+
 ## [2.1.9] - 2026-11-17
 
 ### Importazione contabile e riconciliazione GnuCash
