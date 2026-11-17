@@ -1,6 +1,6 @@
 # Integrazione Home Assistant — Gestione C/C
 
-Custom integration HACS per il monitoraggio tecnico dell'Home Assistant App Gestione C/C e l'avvio di operazioni di manutenzione autorizzate. Versione dell'integrazione: **1.1.6**. Versione dell'applicazione distribuita con Home Assistant App 2.1.3: **2.1.3**.
+Custom integration HACS per il monitoraggio tecnico dell'Home Assistant App Gestione C/C e l'avvio di operazioni di manutenzione autorizzate. Versione dell'integrazione: **1.1.6**. Versione dell'applicazione distribuita con Home Assistant App 2.1.8: **2.1.8**.
 
 L'integrazione non legge né trasferisce dati contabili, movimenti, saldi, documenti, file di backup o registro accessi.
 
@@ -94,7 +94,7 @@ Sono disponibili esempi YAML in `docs/dashboard_gestione_cc.yaml` e `docs/automa
 
 # Home Assistant integration — Gestione C/C
 
-HACS custom integration for technical monitoring of the Gestione C/C Home Assistant App and for starting explicitly authorised maintenance operations. Integration version: **1.1.6**. Application version bundled with Home Assistant App 2.1.3: **2.1.3**.
+HACS custom integration for technical monitoring of the Gestione C/C Home Assistant App and for starting explicitly authorised maintenance operations. Integration version: **1.1.6**. Application version bundled with Home Assistant App 2.1.8: **2.1.8**.
 
 The integration does not read or transfer accounting data, transactions, balances, documents, backup files or access logs.
 
