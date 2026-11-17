@@ -2754,13 +2754,15 @@
       const previousType = String(account.type || '').toUpperCase();
       if (nextType === previousType) return;
       const linkedBankMovements = state.transactions.filter(tx => tx.bankAccountId === account.id).length;
+      const isConfiguredBankAccount = state.bankAccountId === account.id;
       account.type = nextType;
       account.classification = classifyType(nextType);
       const remainsLiquid = isLiquidAccount(account);
-      if (linkedBankMovements > 0 && !remainsLiquid) {
+      if ((linkedBankMovements > 0 || isConfiguredBankAccount) && !remainsLiquid) {
         Object.assign(account, previous);
         renderAccounts();
-        showNotice('Modifica non consentita', 'Questo conto è utilizzato come conto di liquidità in ' + linkedBankMovements + ' movimenti. Prima assegna quei movimenti a un conto bancario/cassa valido.');
+        const reason = isConfiguredBankAccount ? 'È il conto liquido principale configurato' : 'È utilizzato come conto di liquidità in ' + linkedBankMovements + ' movimenti';
+        showNotice('Modifica non consentita', reason + '. Prima configura un altro conto bancario/cassa valido e, se necessario, riassegna i movimenti.');
         return;
       }
       const eligibleForBudget = account.classification === 'Patrimoniale' && !remainsLiquid;
