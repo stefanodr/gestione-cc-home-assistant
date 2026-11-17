@@ -2982,6 +2982,7 @@
       }));
       overlay.querySelector('[data-coa-confirm]').addEventListener('click',async()=>{
         const button=overlay.querySelector('[data-coa-confirm]');button.disabled=true;button.textContent='Importazione in corso…';
+        const originalAccounts=JSON.parse(JSON.stringify(state.accounts)),originalDemo=state.demo;
         try{
           items.forEach((item,i)=>{
             const type=overlay.querySelector('[data-coa-type="'+i+'"]'),budget=overlay.querySelector('[data-coa-budget="'+i+'"]'),mortgage=overlay.querySelector('[data-coa-mortgage="'+i+'"]');
@@ -2997,7 +2998,7 @@
             showNotice('Importazione non eseguita',unresolved.length+' conti su '+items.length+' non hanno un tipo GnuCash riconosciuto.\n\n'+details+remaining+'\n\nSeleziona il tipo corretto per ciascun conto e riprova. Nessun conto è stato importato.');
             const first=items.findIndex(item=>!isGnuCashAccountType(item.type));overlay.querySelector('[data-coa-type="'+first+'"]').focus();return;
           }
-          const source=overlay.querySelector('#coaSourceSystem').value.trim()||'Excel',oldAccounts=state.accounts.slice(),oldDemo=state.demo,added=[];
+          const source=overlay.querySelector('#coaSourceSystem').value.trim()||'Excel',added=[];
           const byPath=new Map(state.accounts.map(x=>[normalize(x.path||x.name),x]));
           for(const item of items){
             const key=normalize(item.path);if(byPath.has(key))continue;
@@ -3009,9 +3010,9 @@
           }
           state.demo=false;normalizeState();
           const saved=await saveState();
-          if(!saved){state.accounts=oldAccounts;state.demo=oldDemo;throw new Error('Salvataggio non confermato: le modifiche sono state annullate.');}
+          if(!saved){state.accounts=originalAccounts;state.demo=originalDemo;throw new Error('Salvataggio non confermato: le modifiche sono state annullate.');}
           close();renderAll();showNotice('Riconciliazione completata',added.length+' conti aggiunti e classificati. '+existingCount+' conti già presenti lasciati invariati.');
-        }catch(error){button.disabled=false;button.textContent='Riprova importazione';showNotice('Importazione non completata',error.message||'Verifica il file e riprova.');}
+        }catch(error){state.accounts=originalAccounts;state.demo=originalDemo;normalizeState();renderAll();button.disabled=false;button.textContent='Riprova importazione';showNotice('Importazione non completata',error.message||'Verifica il file e riprova.');}
       });
     }catch(error){overlay?.remove();showNotice('Importazione piano dei conti non riuscita',(error.message||'Non riesco a leggere il file.')+'\n\nNessun conto è stato importato. Controlla formato, foglio e intestazioni, quindi riprova.');}
     event.target.value='';
