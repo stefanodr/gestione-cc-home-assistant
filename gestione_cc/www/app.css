@@ -754,3 +754,7 @@ body.sidebar-collapsed .local-card{justify-content:center;padding:11px 7px}
 #view-accounts .data-table th.account-movement-heading,
 #view-accounts .data-table td.account-movement-cell{text-align:right!important;white-space:nowrap}
 #view-accounts .account-movement-count{display:inline-flex;justify-content:flex-end;min-width:2.5em}
+
+
+/* Piano dei conti: azioni allineate sulla stessa colonna, senza margine variabile. */
+#view-accounts .data-table td:last-child .row-action-danger{display:inline-flex;align-items:center;justify-content:center;width:82px;min-width:82px;margin:0;padding:6px 8px;box-sizing:border-box}
