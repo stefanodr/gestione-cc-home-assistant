@@ -1,3 +1,11 @@
+## [2.1.12] - 2026-11-17
+
+### Correzioni Piano dei conti
+- Corretto il comando **Elimina**: ora la conferma e la cancellazione vengono gestite direttamente dall'azione, con controllo del risultato del salvataggio e ripristino in caso di errore.
+- Il comando continua a impedire l'eliminazione di conti con movimenti, sottoconti o collegamenti a regole, ricorrenze, conto bancario principale o budget.
+- Allineato a destra il numero dei movimenti e la relativa intestazione.
+- Nessuna modifica al backend, allo schema SQLite, alle API, all'autenticazione o ai dati esistenti.
+
 ## [2.1.11] - 2026-11-17
 
 ### Gestione dei movimenti e cancellazione sicura dei conti
