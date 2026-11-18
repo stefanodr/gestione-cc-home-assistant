@@ -1,3 +1,15 @@
+## [2.1.20] - 2026-11-18
+
+### Selezione automatica dei conti liquidi nei periodi storici
+- La Panoramica, i Report e le altre elaborazioni collegate partono da tutti i conti liquidi, così i movimenti registrati su conti precedenti o alternativi restano visibili quando si seleziona un periodo passato.
+- Rimane disponibile il filtro manuale per consultare un singolo conto; la scelta manuale viene mantenuta dopo la migrazione iniziale.
+- Nessuna modifica ai movimenti, agli ID dei conti, ai saldi di apertura o al database.
+
+### Automatic liquid-account selection for historical periods
+- Overview, Reports, and other linked calculations default to all liquid accounts, keeping movements recorded on previous or alternate accounts visible when a past period is selected.
+- The manual single-account filter remains available, and a manual choice is preserved after the one-time migration.
+- No changes to transactions, account IDs, opening balances, or the database.
+
 ## [2.1.19] - 2026-11-18
 
 ### Riordino della schermata Impostazioni
