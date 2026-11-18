@@ -1,3 +1,17 @@
+## [2.1.18] - 2026-11-18
+
+### Registro accessi: filtri e storico completo
+- La schermata mostra inizialmente gli ultimi 10 eventi e consente di caricare i successivi gruppi di 10.
+- Aggiunti filtri combinabili per data iniziale/finale, tipo di evento ed esito, con comando per azzerarli.
+- L'API restituisce tutti gli eventi ancora presenti nella finestra di conservazione di 30 giorni, non soltanto gli ultimi 200.
+- Invariata la pulizia automatica oltre i 30 giorni; nessun evento viene eliminato o alterato da filtri e paginazione.
+
+### Access log: filters and complete history
+- The screen initially displays the latest 10 events and lets users load subsequent groups of 10.
+- Added combinable start/end date, event type, and outcome filters, with a reset action.
+- The API now returns every event still within the 30-day retention window, instead of only the latest 200.
+- Automatic cleanup after 30 days is unchanged; filtering and pagination never delete or modify log entries.
+
 ## [2.1.17] - 2026-11-18
 
 ### Avvisi backup Google Drive
