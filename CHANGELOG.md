@@ -1,3 +1,7 @@
+## 2.1.24
+- IT: La selezione del conto nella Home e nei Report su smartphone/tablet segue i conti liquidi effettivamente movimentati nel periodo selezionato; corretta anche la corrispondenza degli ID conto.
+- EN: Account selection in Overview and Reports on phones/tablets now follows the liquid accounts actually used in the selected period; account ID matching is also hardened.
+
 ## [2.1.23] - 2026-11-18
 
 ### Selezione automatica dei conti liquidi su schermi compatti
