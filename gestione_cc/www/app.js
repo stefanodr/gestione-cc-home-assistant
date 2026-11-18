@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.21';
+  const APP_VERSION = '2.1.22';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -1702,9 +1702,24 @@
        normalizedPath.includes('liquidita') ||
        normalizedPath.includes('disponibilita liquide'));
   }
+  function automaticMobileLiquidAccountIds(start, end) {
+    if (!window.matchMedia('(max-width: 620px)').matches) return null;
+    const ids = new Set();
+    state.transactions.forEach(tx => {
+      if (!tx.date || tx.date < start || tx.date > end || tx.status === 'duplicate') return;
+      const id = String(tx.bankAccountId || '');
+      if (id && isLiquidAccount(accountById(id))) ids.add(id);
+    });
+    return ids;
+  }
   function periodTransactions(year, startMonth, endMonth, endDay = 31) {
-    const start = `${year}-${String(startMonth + 1).padStart(2, '0')}-01`;
-    const end = `${year}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    const start = String(year) + '-' + String(startMonth + 1).padStart(2, '0') + '-01';
+    const end = String(year) + '-' + String(endMonth + 1).padStart(2, '0') + '-' + String(endDay).padStart(2, '0');
+    const automaticIds = automaticMobileLiquidAccountIds(start, end);
+    if (automaticIds) {
+      return state.transactions.filter(tx => tx.date >= start && tx.date <= end && tx.status !== 'duplicate' &&
+        automaticIds.has(String(tx.bankAccountId || '')));
+    }
     const accountFilter = state.reportAccountId || state.bankAccountId;
     return state.transactions.filter(tx => tx.date >= start && tx.date <= end && tx.status !== 'duplicate' && (accountFilter === 'all' || !accountFilter || tx.bankAccountId === accountFilter));
   }
@@ -1803,11 +1818,19 @@
   }
   function pendingTransactions() { return state.transactions.filter(tx => tx.status === 'pending'); }
   function currentAccountBalance(monthKey) {
-    const accountFilter = state.reportAccountId || state.bankAccountId || 'all';
     const today = localDateKey(new Date());
     const [year, month] = monthKey.split('-').map(Number);
+    const monthStart = String(year) + '-' + String(month).padStart(2, '0') + '-01';
     const monthEnd = localDateKey(new Date(year, month, 0));
     const cutoff = monthEnd > today ? today : monthEnd;
+    const automaticIds = automaticMobileLiquidAccountIds(monthStart, cutoff);
+    if (automaticIds) {
+      const transactions = state.transactions.filter(tx => tx.date <= cutoff && tx.status !== 'duplicate' &&
+        automaticIds.has(String(tx.bankAccountId || '')));
+      const openingBase = automaticIds.has(String(state.bankAccountId || '')) ? Number(state.openingBalance || 0) : 0;
+      return { balance: openingBase + transactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0), transactions, cutoff, monthKey };
+    }
+    const accountFilter = state.reportAccountId || state.bankAccountId || 'all';
     const transactions = state.transactions.filter(tx => tx.date <= cutoff && tx.status !== 'duplicate' && (accountFilter === 'all' || tx.bankAccountId === accountFilter));
     const openingBase = accountFilter === 'all' || accountFilter === state.bankAccountId ? Number(state.openingBalance || 0) : 0;
     return { balance: openingBase + transactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0), transactions, cutoff, monthKey };
