@@ -1038,8 +1038,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/security/access-log":
             item = self.require_auth()
             if not item: return
+            cutoff = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - ACCESS_LOG_RETENTION_SECONDS))
             with access_db_connection() as connection:
-                rows = connection.execute("SELECT at,event,outcome,session_ref,ip_address FROM access_log ORDER BY id DESC LIMIT 200").fetchall()
+                rows = connection.execute(
+                    "SELECT at,event,outcome,session_ref,ip_address FROM access_log WHERE at >= ? ORDER BY id DESC",
+                    (cutoff,)).fetchall()
             self.send_json(200, {"items": [dict(row) for row in rows], "retention_days": 30})
             return
         if path == "/api/integration/token/status":
