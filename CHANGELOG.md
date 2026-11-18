@@ -1,3 +1,7 @@
+## 2.1.27
+- IT: La Home usa il selettore esplicito del conto liquido: la scelta dell'utente non viene più sostituita dall'autoselezione automatica su smartphone e tablet. Il saldo è calcolato sul conto selezionato anche nei periodi senza movimenti, senza cambiare conto al variare del mese.
+- EN: Overview now uses the explicit liquid-account selector: the user's choice is no longer overridden by automatic selection on phones and tablets. The balance is calculated for the selected account even in periods without transactions, without switching accounts when the month changes.
+
 ## 2.1.26
 - IT: L'autoselezione dei conti liquidi in base ai movimenti del periodo è attiva anche sui tablet touch in orientamento orizzontale, senza dipendere soltanto dalla larghezza della finestra.
 - EN: Automatic liquid-account selection based on period transactions now also works on touch tablets in landscape orientation, instead of relying only on viewport width.
