@@ -1,3 +1,15 @@
+## [2.1.22] - 2026-11-18
+
+### Selezione automatica dei conti liquidi nello storico mobile
+- Su smartphone, Panoramica e Report individuano automaticamente i conti liquidi che hanno movimenti nel periodo selezionato, invece di applicare il conto singolo salvato come filtro.
+- Il saldo della Panoramica considera i movimenti cumulativi fino alla fine del mese selezionato, limitandoli ai conti liquidi attivi in quel mese.
+- Su desktop restano invariati i filtri manuali; non vengono modificati preferenze, movimenti, saldi di apertura o database.
+
+### Automatic liquid-account selection in mobile history
+- On smartphones, Overview and Reports automatically identify liquid accounts with movements in the selected period instead of applying the saved single-account filter.
+- The Overview balance includes cumulative movements through the selected month's end, limited to liquid accounts active in that month.
+- Desktop manual filters remain unchanged; preferences, transactions, opening balances, and the database are not modified.
+
 ## [2.1.21] - 2026-11-18
 
 ### Correzione del filtro predefinito dei conti
