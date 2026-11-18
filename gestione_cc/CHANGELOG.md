@@ -1,3 +1,15 @@
+## [2.1.21] - 2026-11-18
+
+### Correzione del filtro predefinito dei conti
+- Corretta la migrazione per le installazioni che avevano già memorizzato il precedente flag: al primo avvio imposta effettivamente “Tutti i conti liquidi”.
+- Le successive selezioni manuali del conto vengono riconosciute e conservate.
+- Nessuna modifica ai movimenti, ai saldi di apertura o al database.
+
+### Default account filter migration fix
+- Fixed migration for installations that had already stored the previous flag: the first startup now actually selects “All liquid accounts”.
+- Subsequent manual account selections are detected and preserved.
+- No changes to transactions, opening balances, or the database.
+
 ## [2.1.20] - 2026-11-18
 
 ### Selezione automatica dei conti liquidi nei periodi storici
