@@ -1,3 +1,7 @@
+## 2.1.28
+- IT: Il selettore manuale del conto liquido e il relativo calcolo del saldo sono limitati agli smartphone (schermo fino a 600 px e puntatore touch). Desktop e tablet mantengono il comportamento precedente.
+- EN: The manual liquid-account selector and its balance calculation are limited to smartphones (up to 600 px viewport and touch pointer). Desktop and tablets retain their previous behavior.
+
 ## 2.1.27
 - IT: La Home usa il selettore esplicito del conto liquido: la scelta dell'utente non viene più sostituita dall'autoselezione automatica su smartphone e tablet. Il saldo è calcolato sul conto selezionato anche nei periodi senza movimenti, senza cambiare conto al variare del mese.
 - EN: Overview now uses the explicit liquid-account selector: the user's choice is no longer overridden by automatic selection on phones and tablets. The balance is calculated for the selected account even in periods without transactions, without switching accounts when the month changes.
