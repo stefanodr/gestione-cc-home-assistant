@@ -1,3 +1,15 @@
+## [2.1.23] - 2026-11-18
+
+### Selezione automatica dei conti liquidi su schermi compatti
+- Estesa fino a 900 px la modalità di selezione automatica dei conti liquidi in base ai movimenti del periodo visualizzato, includendo anche i tablet.
+- Su schermi più larghi resta invariata la selezione manuale del conto.
+- Nessuna modifica ai movimenti, al database, alle impostazioni di backup o ai dati esistenti.
+
+### Automatic liquid-account selection on compact screens
+- Extended automatic liquid-account selection, based on transactions in the displayed period, up to 900 px to include tablets.
+- Manual account selection remains unchanged on wider screens.
+- No changes to transactions, database, backup settings, or existing data.
+
 ## [2.1.19] - 2026-11-18
 
 ### Riordino della schermata Impostazioni
