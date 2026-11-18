@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.25';
+  const APP_VERSION = '2.1.26';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -1740,8 +1740,10 @@
        normalizedPath.includes('disponibilita liquide'));
   }
   function automaticMobileLiquidAccountIds(start, end) {
-    // Su smartphone/tablet usa i conti liquidi effettivamente movimentati nel periodo.
-    if (!window.matchMedia('(max-width: 900px)').matches) return null;
+    // Su smartphone e dispositivi touch (inclusi i tablet in orizzontale) usa i conti liquidi effettivamente movimentati nel periodo.
+    const compactScreen = window.matchMedia('(max-width: 900px)').matches;
+    const touchDevice = window.matchMedia('(pointer: coarse)').matches || Number(navigator.maxTouchPoints || 0) > 0;
+    if (!compactScreen && !touchDevice) return null;
     const accountsById = new Map(state.accounts.map(account => [String(account.id), account]));
     const ids = new Set();
     state.transactions.forEach(tx => {
