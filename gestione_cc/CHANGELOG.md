@@ -1,3 +1,15 @@
+## [2.1.19] - 2026-11-18
+
+### Riordino della schermata Impostazioni
+- Ripristinata la griglia a tre colonne per le schede delle impostazioni su schermi desktop.
+- Spostato il Registro accessi sotto le schede, esteso a tutta la larghezza disponibile.
+- Mantenute due colonne su schermi intermedi e una colonna su smartphone.
+
+### Settings layout refinement
+- Restored a three-column grid for settings cards on desktop screens.
+- Moved the Access Log below the settings cards and expanded it to the full available width.
+- Kept two columns on medium screens and one column on smartphones.
+
 ## [2.1.18] - 2026-11-18
 
 ### Registro accessi: filtri e storico completo
