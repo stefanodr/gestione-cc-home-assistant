@@ -1,3 +1,7 @@
+## 2.1.29
+- IT: Aggiunto nella Home uno specifico selettore «Seleziona conto liquido», visibile solo sugli smartphone touch. Il controllo desktop esistente resta invariato e nascosto solo nella vista smartphone; il saldo mobile segue il nuovo selettore.
+- EN: Added a dedicated “Select liquid account” selector to Overview, visible only on touch smartphones. The existing desktop control remains unchanged and is hidden only in the smartphone view; the mobile balance follows the new selector.
+
 ## 2.1.28
 - IT: Il selettore manuale del conto liquido e il relativo calcolo del saldo sono limitati agli smartphone (schermo fino a 600 px e puntatore touch). Desktop e tablet mantengono il comportamento precedente.
 - EN: The manual liquid-account selector and its balance calculation are limited to smartphones (up to 600 px viewport and touch pointer). Desktop and tablets retain their previous behavior.
