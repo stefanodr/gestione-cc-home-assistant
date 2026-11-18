@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.23';
+  const APP_VERSION = '2.1.24';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -1672,9 +1672,43 @@
   function renderAccountFilters() {
     const eligible = state.accounts.filter(isLiquidAccount);
     const options = `<option value="all">Tutti i conti liquidi</option>${eligible.map(a => `<option value="${safeText(a.id)}">${safeText(accountDisplayLabel(a))}</option>`).join('')}`;
-    for (const selector of ['#accountPicker', '#reportAccountPicker']) {
-      const control = $(selector); const prior = state.reportAccountId || state.bankAccountId || eligible[0]?.id || 'all';
+
+    // La Home segue il mese selezionato; il report segue l'intero intervallo del report.
+    const today = localDateKey(new Date());
+    const overviewMonth = monthSelection();
+    const [overviewYear, overviewMonthNumber] = overviewMonth.split('-').map(Number);
+    const overviewStart = `${overviewYear}-${String(overviewMonthNumber).padStart(2, '0')}-01`;
+    const overviewLastDay = localDateKey(new Date(overviewYear, overviewMonthNumber, 0));
+    const overviewEnd = overviewLastDay > today ? today : overviewLastDay;
+    const overviewAutoValue = automaticAccountFilterValue(overviewStart, overviewEnd);
+
+    const reportKey = $('#reportMonth')?.value || overviewMonth;
+    const [reportYear, reportMonthNumber] = reportKey.split('-').map(Number);
+    let reportStartMonth = reportMonthNumber, reportEndMonth = reportMonthNumber;
+    if (reportMode === 'quarterly') {
+      reportStartMonth = Math.floor((reportMonthNumber - 1) / 3) * 3 + 1;
+      reportEndMonth = reportStartMonth + 2;
+    } else if (reportMode === 'halfyearly') {
+      reportStartMonth = Math.floor((reportMonthNumber - 1) / 6) * 6 + 1;
+      reportEndMonth = reportStartMonth + 5;
+    } else if (reportMode === 'annual') {
+      reportStartMonth = 1;
+      reportEndMonth = reportMonthNumber;
+    }
+    const reportStart = `${reportYear}-${String(reportStartMonth).padStart(2, '0')}-01`;
+    const reportLastDay = localDateKey(new Date(reportYear, reportEndMonth, 0));
+    const reportEnd = reportLastDay > today ? today : reportLastDay;
+    const reportAutoValue = automaticAccountFilterValue(reportStart, reportEnd);
+
+    for (const [selector, automaticValue] of [['#accountPicker', overviewAutoValue], ['#reportAccountPicker', reportAutoValue]]) {
+      const control = $(selector);
       control.innerHTML = options;
+      if (automaticValue !== null) {
+        control.value = automaticValue === 'all' || eligible.some(a => String(a.id) === String(automaticValue))
+          ? automaticValue : 'all';
+        continue;
+      }
+      const prior = state.reportAccountId || state.bankAccountId || eligible[0]?.id || 'all';
       control.value = prior === 'all' || eligible.some(a => a.id === prior) ? prior : eligible[0]?.id || 'all';
     }
   }
@@ -1703,15 +1737,22 @@
        normalizedPath.includes('disponibilita liquide'));
   }
   function automaticMobileLiquidAccountIds(start, end) {
-    // Include anche i tablet in layout compatto: il breakpoint responsive dell'app arriva a 900px.
+    // Su smartphone/tablet usa i conti liquidi effettivamente movimentati nel periodo.
     if (!window.matchMedia('(max-width: 900px)').matches) return null;
+    const accountsById = new Map(state.accounts.map(account => [String(account.id), account]));
     const ids = new Set();
     state.transactions.forEach(tx => {
       if (!tx.date || tx.date < start || tx.date > end || tx.status === 'duplicate') return;
       const id = String(tx.bankAccountId || '');
-      if (id && isLiquidAccount(accountById(id))) ids.add(id);
+      const account = accountsById.get(id);
+      if (id && isLiquidAccount(account)) ids.add(id);
     });
     return ids;
+  }
+  function automaticAccountFilterValue(start, end) {
+    const ids = automaticMobileLiquidAccountIds(start, end);
+    if (ids === null) return null;
+    return ids.size === 1 ? [...ids][0] : 'all';
   }
   function periodTransactions(year, startMonth, endMonth, endDay = 31) {
     const start = String(year) + '-' + String(startMonth + 1).padStart(2, '0') + '-01';
