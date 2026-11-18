@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.28';
+  const APP_VERSION = '2.1.29';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -725,6 +725,13 @@
     $('#reportPeriodPrev')?.addEventListener('click', () => moveSelectedPeriod(-1, 'report'));
     $('#reportPeriodNext')?.addEventListener('click', () => moveSelectedPeriod(1, 'report'));
     $('#accountPicker').addEventListener('change', () => { state.reportAccountId = $('#accountPicker').value; state.reportAccountFilterManual = true; $('#reportAccountPicker').value = state.reportAccountId; saveState(); renderAll(); });
+    $('#mobileAccountPicker')?.addEventListener('change', () => {
+      state.reportAccountId = $('#mobileAccountPicker').value;
+      state.reportAccountFilterManual = true;
+      $('#accountPicker').value = state.reportAccountId;
+      $('#reportAccountPicker').value = state.reportAccountId;
+      saveState(); renderAll();
+    });
     $('#reportAccountPicker').addEventListener('change', () => { state.reportAccountId = $('#reportAccountPicker').value; state.reportAccountFilterManual = true; $('#accountPicker').value = state.reportAccountId; saveState(); renderAll(); });
     const resetTransactionFilters = () => { accountMovementFilterId = null; transactionSelection.clear(); transactionPage = 0; renderTransactions(); };
     $('#clearAccountMovementFilter')?.addEventListener('click', () => {
@@ -1680,7 +1687,7 @@
     const overviewLastDay = localDateKey(new Date(overviewYear, overviewMonthNumber, 0));
     const overviewEnd = overviewLastDay > today ? today : overviewLastDay;
     // Su smartphone la Home usa il conto scelto esplicitamente; desktop e tablet mantengono la selezione automatica precedente.
-    const isPhone = window.matchMedia('(max-width: 600px) and (pointer: coarse)').matches;
+    const isPhone = window.matchMedia('(max-width: 620px) and (pointer: coarse)').matches;
     const overviewAutoValue = isPhone ? null : automaticAccountFilterValue(overviewStart, overviewEnd);
 
     const reportKey = $('#reportMonth')?.value || overviewMonth;
@@ -1714,7 +1721,16 @@
         continue;
       }
       const prior = state.reportAccountId || state.bankAccountId || eligible[0]?.id || 'all';
-      control.value = prior === 'all' || eligible.some(a => a.id === prior) ? prior : eligible[0]?.id || 'all';
+      control.value = prior === 'all' || eligible.some(a => String(a.id) === String(prior)) ? prior : eligible[0]?.id || 'all';
+    }
+
+    // Il selettore dedicato è presente solo nell'interfaccia smartphone.
+    const mobileControl = $('#mobileAccountPicker');
+    if (mobileControl) {
+      mobileControl.innerHTML = optionsForDate(overviewEnd);
+      const selected = $('#accountPicker')?.value || state.reportAccountId || state.bankAccountId || 'all';
+      mobileControl.value = selected === 'all' || eligible.some(a => String(a.id) === String(selected))
+        ? String(selected) : String(eligible[0]?.id || 'all');
     }
   }
   function classifyType(type) {
@@ -1873,8 +1889,8 @@
     const monthEnd = localDateKey(new Date(year, month, 0));
     const cutoff = monthEnd > today ? today : monthEnd;
     // Su smartphone il saldo Home rispetta il selettore esplicito; sugli altri dispositivi resta il calcolo precedente.
-    const isPhone = window.matchMedia('(max-width: 600px) and (pointer: coarse)').matches;
-    const accountFilter = (isPhone ? $('#accountPicker')?.value : null) || state.reportAccountId || state.bankAccountId || 'all';
+    const isPhone = window.matchMedia('(max-width: 620px) and (pointer: coarse)').matches;
+    const accountFilter = (isPhone ? $('#mobileAccountPicker')?.value : null) || state.reportAccountId || state.bankAccountId || 'all';
     const transactions = state.transactions.filter(tx => tx.date <= cutoff && tx.status !== 'duplicate' &&
       (accountFilter === 'all' || String(tx.bankAccountId || '') === String(accountFilter)));
     const openingBase = accountFilter === 'all' || String(accountFilter) === String(state.bankAccountId || '')
