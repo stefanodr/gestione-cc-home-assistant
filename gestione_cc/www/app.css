@@ -758,3 +758,14 @@ body.sidebar-collapsed .local-card{justify-content:center;padding:11px 7px}
 
 /* Piano dei conti: azioni allineate sulla stessa colonna, senza margine variabile. */
 #view-accounts .data-table td:last-child .row-action-danger{display:inline-flex;align-items:center;justify-content:center;width:82px;min-width:82px;margin:0;padding:6px 8px;box-sizing:border-box}
+
+/* Registro accessi: filtri combinabili e consultazione progressiva dello storico. */
+#view-settings .access-log-card{grid-column:1/-1;min-width:0}
+.access-log-filters{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px;margin:14px 0 10px}
+.access-log-filters label{display:grid;gap:5px;color:#7f8d89;font-size:10px;font-weight:650}
+.access-log-filters input,.access-log-filters select{width:100%;min-width:0;border:1px solid #dce5e2;border-radius:7px;background:#fff;padding:9px 10px;color:#324541;font-size:11px}
+.access-log-actions{display:flex;gap:8px;flex-wrap:wrap;margin:5px 0 8px}
+.access-log-card .data-table{min-width:620px}
+.access-log-more{display:flex;justify-content:center;padding:12px 0 0}
+@media(max-width:760px){.access-log-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.access-log-filters{grid-template-columns:minmax(0,1fr)}}
