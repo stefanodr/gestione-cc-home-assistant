@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.27';
+  const APP_VERSION = '2.1.28';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -1679,8 +1679,9 @@
     const overviewStart = `${overviewYear}-${String(overviewMonthNumber).padStart(2, '0')}-01`;
     const overviewLastDay = localDateKey(new Date(overviewYear, overviewMonthNumber, 0));
     const overviewEnd = overviewLastDay > today ? today : overviewLastDay;
-    // La Home usa sempre il conto scelto esplicitamente dall'utente.
-    const overviewAutoValue = null;
+    // Su smartphone la Home usa il conto scelto esplicitamente; desktop e tablet mantengono la selezione automatica precedente.
+    const isPhone = window.matchMedia('(max-width: 600px) and (pointer: coarse)').matches;
+    const overviewAutoValue = isPhone ? null : automaticAccountFilterValue(overviewStart, overviewEnd);
 
     const reportKey = $('#reportMonth')?.value || overviewMonth;
     const [reportYear, reportMonthNumber] = reportKey.split('-').map(Number);
@@ -1871,8 +1872,9 @@
     const monthStart = String(year) + '-' + String(month).padStart(2, '0') + '-01';
     const monthEnd = localDateKey(new Date(year, month, 0));
     const cutoff = monthEnd > today ? today : monthEnd;
-    // Il saldo Home rispetta sempre il conto scelto nel selettore, anche su smartphone e tablet.
-    const accountFilter = $('#accountPicker')?.value || state.reportAccountId || state.bankAccountId || 'all';
+    // Su smartphone il saldo Home rispetta il selettore esplicito; sugli altri dispositivi resta il calcolo precedente.
+    const isPhone = window.matchMedia('(max-width: 600px) and (pointer: coarse)').matches;
+    const accountFilter = (isPhone ? $('#accountPicker')?.value : null) || state.reportAccountId || state.bankAccountId || 'all';
     const transactions = state.transactions.filter(tx => tx.date <= cutoff && tx.status !== 'duplicate' &&
       (accountFilter === 'all' || String(tx.bankAccountId || '') === String(accountFilter)));
     const openingBase = accountFilter === 'all' || String(accountFilter) === String(state.bankAccountId || '')
