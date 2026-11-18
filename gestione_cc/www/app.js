@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.16';
+  const APP_VERSION = '2.1.18';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -762,6 +762,15 @@
     $('#gnucashFile').addEventListener('change', onGnuCashFile);
     $('#exportBackup').addEventListener('click', exportBackup);
     $('#refreshAccessLog')?.addEventListener('click', refreshAccessLog);
+    ['accessLogFrom', 'accessLogTo', 'accessLogEvent', 'accessLogOutcome'].forEach(id => {
+      $('#' + id)?.addEventListener('change', () => { accessLogVisibleLimit = 10; renderAccessLog(); });
+    });
+    $('#clearAccessLogFilters')?.addEventListener('click', () => {
+      ['accessLogFrom', 'accessLogTo', 'accessLogEvent', 'accessLogOutcome'].forEach(id => { const field = $('#' + id); if (field) field.value = ''; });
+      accessLogVisibleLimit = 10;
+      renderAccessLog();
+    });
+    $('#accessLogShowMore')?.addEventListener('click', () => { accessLogVisibleLimit += 10; renderAccessLog(); });
     refreshAccessLog();
     $('#createIntegrationToken')?.addEventListener('click', createIntegrationToken);
     $('#revokeIntegrationToken')?.addEventListener('click', revokeIntegrationToken);
@@ -2952,23 +2961,55 @@
     $('#settingsRuleCount').textContent = String(state.rules.filter(r => r.source !== 'demo').length);
   }
 
-  async function refreshAccessLog() {
+  let accessLogItems = [];
+  let accessLogVisibleLimit = 10;
+
+  function renderAccessLog() {
     const body = $('#accessLogBody');
     const count = $('#accessLogCount');
+    const message = $('#accessLogMessage');
+    if (!body) return;
+    const eventLabels = { login: 'Accesso', mobile_login: 'Accesso app mobile', logout: 'Uscita', mobile_logout: 'Uscita app mobile', session_expired: 'Sessione scaduta', temporary_lockout: 'Blocco temporaneo' };
+    const outcomeLabels = { success: 'Riuscito', failed: 'Non riuscito', expired: 'Scaduta', blocked: 'Bloccato' };
+    const from = $('#accessLogFrom')?.value || '';
+    const to = $('#accessLogTo')?.value || '';
+    const event = $('#accessLogEvent')?.value || '';
+    const outcome = $('#accessLogOutcome')?.value || '';
+    const localDate = value => {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+    };
+    const filtered = accessLogItems.filter(item => {
+      const date = localDate(item.at);
+      return (!from || date >= from) && (!to || date <= to) &&
+        (!event || item.event === event) && (!outcome || item.outcome === outcome);
+    });
+    const visible = filtered.slice(0, accessLogVisibleLimit);
+    if (count) count.textContent = filtered.length + ' risultati';
+    body.innerHTML = visible.length ? visible.map(item => {
+      const date = item.at ? new Date(item.at).toLocaleString('it-IT') : '—';
+      return '<tr><td>' + safeText(date) + '</td><td>' + safeText(eventLabels[item.event] || item.event || '—') + '</td><td>' + safeText(outcomeLabels[item.outcome] || item.outcome || '—') + '</td><td>' + safeText(item.ip_address || '—') + '</td></tr>';
+    }).join('') : '<tr><td colspan="4">Nessun evento corrisponde ai filtri selezionati.</td></tr>';
+    const more = $('#accessLogShowMore');
+    if (more) {
+      more.hidden = visible.length >= filtered.length;
+      more.textContent = 'Mostra altri 10 (' + (filtered.length - visible.length) + ' rimanenti)';
+    }
+    if (message) message.textContent = 'Visualizzati ' + visible.length + ' eventi su ' + filtered.length + ' disponibili nei 30 giorni.';
+  }
+
+  async function refreshAccessLog() {
+    const body = $('#accessLogBody');
     const message = $('#accessLogMessage');
     if (!body) return;
     body.innerHTML = '<tr><td colspan="4">Caricamento…</td></tr>';
     try {
       const result = await apiRequest('/api/security/access-log');
-      const items = Array.isArray(result.items) ? result.items : [];
-      if (count) count.textContent = String(items.length);
-      const eventLabels = { login: 'Accesso', logout: 'Uscita', session_expired: 'Sessione scaduta', temporary_lockout: 'Blocco temporaneo' };
-      const outcomeLabels = { success: 'Riuscito', failed: 'Non riuscito', expired: 'Scaduta', blocked: 'Bloccato' };
-      body.innerHTML = items.length ? items.map(item => {
-        const date = item.at ? new Date(item.at).toLocaleString('it-IT') : '—';
-        return '<tr><td>' + safeText(date) + '</td><td>' + safeText(eventLabels[item.event] || item.event || '—') + '</td><td>' + safeText(outcomeLabels[item.outcome] || item.outcome || '—') + '</td><td>' + safeText(item.ip_address || '—') + '</td></tr>';
-      }).join('') : '<tr><td colspan="4">Nessun accesso registrato negli ultimi 30 giorni.</td></tr>';
-      if (message) message.textContent = 'Mostrati gli ultimi ' + items.length + ' eventi disponibili.';
+      accessLogItems = Array.isArray(result.items) ? result.items : [];
+      accessLogVisibleLimit = 10;
+      renderAccessLog();
     } catch (error) {
       body.innerHTML = '<tr><td colspan="4">Registro non disponibile.</td></tr>';
       if (message) message.textContent = error.message || 'Impossibile caricare il registro accessi.';
