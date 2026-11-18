@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.26';
+  const APP_VERSION = '2.1.27';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -1679,7 +1679,8 @@
     const overviewStart = `${overviewYear}-${String(overviewMonthNumber).padStart(2, '0')}-01`;
     const overviewLastDay = localDateKey(new Date(overviewYear, overviewMonthNumber, 0));
     const overviewEnd = overviewLastDay > today ? today : overviewLastDay;
-    const overviewAutoValue = automaticAccountFilterValue(overviewStart, overviewEnd);
+    // La Home usa sempre il conto scelto esplicitamente dall'utente.
+    const overviewAutoValue = null;
 
     const reportKey = $('#reportMonth')?.value || overviewMonth;
     const [reportYear, reportMonthNumber] = reportKey.split('-').map(Number);
@@ -1870,16 +1871,12 @@
     const monthStart = String(year) + '-' + String(month).padStart(2, '0') + '-01';
     const monthEnd = localDateKey(new Date(year, month, 0));
     const cutoff = monthEnd > today ? today : monthEnd;
-    const automaticIds = automaticMobileLiquidAccountIds(monthStart, cutoff);
-    if (automaticIds) {
-      const transactions = state.transactions.filter(tx => tx.date <= cutoff && tx.status !== 'duplicate' &&
-        automaticIds.has(String(tx.bankAccountId || '')));
-      const openingBase = automaticIds.has(String(state.bankAccountId || '')) ? Number(state.openingBalance || 0) : 0;
-      return { balance: openingBase + transactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0), transactions, cutoff, monthKey };
-    }
-    const accountFilter = state.reportAccountId || state.bankAccountId || 'all';
-    const transactions = state.transactions.filter(tx => tx.date <= cutoff && tx.status !== 'duplicate' && (accountFilter === 'all' || tx.bankAccountId === accountFilter));
-    const openingBase = accountFilter === 'all' || accountFilter === state.bankAccountId ? Number(state.openingBalance || 0) : 0;
+    // Il saldo Home rispetta sempre il conto scelto nel selettore, anche su smartphone e tablet.
+    const accountFilter = $('#accountPicker')?.value || state.reportAccountId || state.bankAccountId || 'all';
+    const transactions = state.transactions.filter(tx => tx.date <= cutoff && tx.status !== 'duplicate' &&
+      (accountFilter === 'all' || String(tx.bankAccountId || '') === String(accountFilter)));
+    const openingBase = accountFilter === 'all' || String(accountFilter) === String(state.bankAccountId || '')
+      ? Number(state.openingBalance || 0) : 0;
     return { balance: openingBase + transactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0), transactions, cutoff, monthKey };
   }
 
