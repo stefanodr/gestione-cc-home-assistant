@@ -1,3 +1,7 @@
+## 2.1.26
+- IT: L'autoselezione dei conti liquidi in base ai movimenti del periodo è attiva anche sui tablet touch in orientamento orizzontale, senza dipendere soltanto dalla larghezza della finestra.
+- EN: Automatic liquid-account selection based on period transactions now also works on touch tablets in landscape orientation, instead of relying only on viewport width.
+
 ## 2.1.25
 - IT: I nomi dei conti nella selezione della Home e dei Report vengono mostrati secondo la cronologia valida alla data finale del periodo selezionato, invece di usare sempre la denominazione odierna.
 - EN: Account names in Overview and Reports are now displayed using the name history valid at the selected period end date, rather than always using today's name.
