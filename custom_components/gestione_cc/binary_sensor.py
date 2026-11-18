@@ -37,6 +37,8 @@ class GestioneCCBinarySensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def is_on(self):
         value = (self.coordinator.data or {}).get(self._section, {}).get(self._field)
+        if self._field == "nightly_error":
+            return bool(value)
         return value if isinstance(value, bool) else None
 
     @property
