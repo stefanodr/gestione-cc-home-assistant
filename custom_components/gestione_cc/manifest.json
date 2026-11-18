@@ -1,7 +1,7 @@
 {
   "domain": "gestione_cc",
   "name": "Gestione C/C",
-  "version": "1.1.8",
+  "version": "1.1.15",
   "documentation": "https://github.com/stefanodr/gestione-cc-home-assistant",
   "issue_tracker": "https://github.com/stefanodr/gestione-cc-home-assistant/issues",
   "codeowners": [
