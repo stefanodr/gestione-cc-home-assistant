@@ -1,6 +1,6 @@
 # Integrazione Home Assistant — Gestione C/C
 
-Custom integration HACS per il monitoraggio tecnico dell'Home Assistant App Gestione C/C e l'avvio di operazioni di manutenzione autorizzate. Versione dell'integrazione: **1.1.6**. Versione dell'applicazione distribuita con Home Assistant App 2.1.8: **2.1.8**.
+Custom integration HACS per il monitoraggio tecnico dell'Home Assistant App Gestione C/C e l'avvio di operazioni di manutenzione autorizzate. Versione dell'integrazione: **1.1.7**. Versione dell'applicazione distribuita con Home Assistant App 2.1.8: **2.1.8**.
 
 L'integrazione non legge né trasferisce dati contabili, movimenti, saldi, documenti, file di backup o registro accessi.
 
@@ -26,7 +26,7 @@ In alternativa, copiare la directory `custom_components/gestione_cc` in `/config
 Il token è conservato nei dati di configurazione Home Assistant, che non costituiscono un vault cifrato: proteggi backup e accesso amministrativo. La verifica TLS è obbligatoria: l'integrazione non disabilita la verifica del certificato e non accetta HTTP o URL pubblici. Per ruotare il token in questa prima versione: generare il nuovo token nell'app (l'operazione sostituisce immediatamente il precedente), copiarlo e poi rimuovere e aggiungere nuovamente l'integrazione in Home Assistant con il nuovo token. Durante la riconfigurazione l'integrazione resterà temporaneamente non disponibile. La funzione di riconfigurazione senza rimozione verrà valutata in una fase successiva.
 
 ## Sensori e comandi
-L'integrazione espone disponibilità app, versioni app/add-on, uptime, dimensione/ultima modifica DB, backup, spazio, conteggio allegati, conteggi aggregati dei processi e contatori OCR separati (coda, in elaborazione, errori). I conteggi coprono gli ultimi 7 giorni. Sono previsti tre pulsanti: backup locale, backup Google Drive e controllo integrità.
+L'integrazione espone disponibilità app, versioni app/add-on, uptime, dimensione/ultima modifica DB, backup, spazio, conteggio allegati, conteggi aggregati dei processi e contatori OCR separati (coda, in elaborazione, errori). I conteggi coprono gli ultimi 7 giorni. Sono previsti tre pulsanti: backup locale, backup Google Drive e controllo integrità. Per Google Drive sono inoltre esposti i binary sensor `binary_sensor.gestione_cc_google_drive_connected`, `binary_sensor.gestione_cc_google_drive_backup_failed` e `binary_sensor.gestione_cc_google_drive_backup_overdue`. Il controllo segnala autorizzazione non valida, errore del backup notturno e backup del giorno non completato entro le 04:00 (Europe/Rome).
 
 Non vengono creati sensori finanziari e non vengono trasferiti conti, saldi, movimenti, descrizioni o contenuti documentali.
 
@@ -94,7 +94,7 @@ Sono disponibili esempi YAML in `docs/dashboard_gestione_cc.yaml` e `docs/automa
 
 # Home Assistant integration — Gestione C/C
 
-HACS custom integration for technical monitoring of the Gestione C/C Home Assistant App and for starting explicitly authorised maintenance operations. Integration version: **1.1.6**. Application version bundled with Home Assistant App 2.1.8: **2.1.8**.
+HACS custom integration for technical monitoring of the Gestione C/C Home Assistant App and for starting explicitly authorised maintenance operations. Integration version: **1.1.7**. Application version bundled with Home Assistant App 2.1.8: **2.1.8**.
 
 The integration does not read or transfer accounting data, transactions, balances, documents, backup files or access logs.
 

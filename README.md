@@ -36,7 +36,7 @@ After updating the Home Assistant App, open `https://<lan-host>:8443/mobile/` on
 Questa distribuzione comprende **tre componenti distinti**, che svolgono ruoli diversi:
 
 - **Home Assistant App (server):** ospita Gestione C/C, l'interfaccia web e il database SQLite persistente.
-- **Integrazione personalizzata HACS (v1.1.6):** collega Home Assistant al server e aggiunge sensori di monitoraggio tecnico e pulsanti di manutenzione. Non importa in Home Assistant conti, saldi o movimenti.
+- **Integrazione personalizzata HACS (v1.1.7):** collega Home Assistant al server e aggiunge sensori di monitoraggio tecnico e pulsanti di manutenzione. Non importa in Home Assistant conti, saldi o movimenti.
 - **PWA (Progressive Web App):** permette di installare l'interfaccia come finestra/app sul PC o su un dispositivo compatibile. Non è un programma autonomo e richiede che il server Home Assistant sia raggiungibile.
 
 **Novità documentate nella 2.0.0:** integrazione HACS con autenticazione tramite token e certificato CA privata; monitoraggio di disponibilità, database, backup, spazio e processi; comandi di backup locale, backup Google Drive e controllo integrità; manifest e icone PWA con istruzioni per Chrome, Edge e Firefox su Windows.
@@ -50,7 +50,7 @@ Questa distribuzione comprende **tre componenti distinti**, che svolgono ruoli d
 This distribution includes **three separate components** with different roles:
 
 - **Home Assistant App (server):** hosts Gestione C/C, its web interface and persistent SQLite database.
-- **HACS custom integration (v1.1.6):** connects Home Assistant to the server and adds technical monitoring sensors and maintenance buttons. It does not import account, balance or transaction data into Home Assistant.
+- **HACS custom integration (v1.1.7):** connects Home Assistant to the server and adds technical monitoring sensors and maintenance buttons. It does not import account, balance or transaction data into Home Assistant.
 - **PWA (Progressive Web App):** lets you install the interface as a dedicated app/window on a PC or compatible device. It is not a standalone program and requires the Home Assistant server to be reachable.
 
 **Version 2.0.0 highlights:** HACS integration authenticated with a dedicated token and private CA certificate; monitoring of availability, database, backups, storage and jobs; local backup, Google Drive backup and integrity-check commands; PWA manifest and icons with Chrome, Edge and Firefox for Windows installation instructions.
@@ -79,7 +79,7 @@ Gestione C/C include una **custom integration HACS** per collegare Home Assistan
 - Esempi pronti di dashboard e automazioni.
 - Connessione HTTPS con CA privata, token dedicato e autorizzazioni API limitate.
 
-**Separazione dei dati:** l'integrazione non legge né trasferisce conti, saldi, movimenti, descrizioni, documenti, file di backup o registro accessi. Home Assistant riceve soltanto informazioni tecniche predefinite e può inviare i comandi di manutenzione autorizzati. La versione HACS è indipendente dalla versione dell'app: per questa release è **1.1.6**.
+**Separazione dei dati:** l'integrazione non legge né trasferisce conti, saldi, movimenti, descrizioni, documenti, file di backup o registro accessi. Home Assistant riceve soltanto informazioni tecniche predefinite e può inviare i comandi di manutenzione autorizzati. La versione HACS è indipendente dalla versione dell'app: per questa release è **1.1.7**.
 
 Installazione e configurazione sono descritte nella sezione [Integrazione HACS](#integrazione-home-assistant-tramite-hacs) e nel [manuale dell'integrazione](custom_components/gestione_cc/README.md). Sono disponibili esempi di [dashboard](docs/dashboard_gestione_cc.yaml) e [automazioni](docs/automazioni_gestione_cc.yaml).
 
@@ -231,7 +231,7 @@ L'integrazione può esporre informazioni tecniche relative a disponibilità, ver
 
 **Non vengono esposti** movimenti, descrizioni, conti, saldi, dati di budget, contenuti documentali, file di backup o registro accessi. Non vengono creati sensori finanziari. Il token è una credenziale: non inserirlo in dashboard, automazioni condivise, screenshot o repository pubblici.
 
-La verifica TLS resta obbligatoria. Non usare HTTP, non disabilitare la verifica del certificato e non esporre la porta dell'App su Internet. La versione HACS è indipendente e, per questa release, è **1.1.6**.
+La verifica TLS resta obbligatoria. Non usare HTTP, non disabilitare la verifica del certificato e non esporre la porta dell'App su Internet. La versione HACS è indipendente e, per questa release, è **1.1.7**.
 
 Per i dettagli aggiornati consulta il [README tecnico dell'integrazione](custom_components/gestione_cc/README.md).
 
@@ -347,7 +347,7 @@ Per le novità della versione installata consulta le [note di rilascio](CHANGELO
 
 L'uso gratuito è consentito alle persone fisiche per finalità personali e non commerciali, nei limiti della licenza. Gli usi professionali, aziendali e commerciali richiedono un accordo scritto.
 
-Versione Home Assistant App: **2.1.1**. Versione dell'app inclusa: **2.1.1**. Versione custom integration HACS: **1.1.6** (indipendente).
+Versione Home Assistant App: **2.1.1**. Versione dell'app inclusa: **2.1.1**. Versione custom integration HACS: **1.1.7** (indipendente).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). Tutti i diritti riservati salvo i permessi espressamente concessi.
 
@@ -459,7 +459,7 @@ The integration can expose technical information about availability, versions, u
 
 **It does not expose** transactions, descriptions, accounts, balances, budget data, document contents, backup files or access logs. No financial sensors are created. Treat the token as a credential: never put it in dashboards, shared automations, screenshots or public repositories.
 
-TLS verification remains mandatory. Do not use HTTP, disable certificate verification or expose the App port to the Internet. The HACS integration has its own independent version; it is **1.1.6** for this release.
+TLS verification remains mandatory. Do not use HTTP, disable certificate verification or expose the App port to the Internet. The HACS integration has its own independent version; it is **1.1.7** for this release.
 
 See the [integration technical README](custom_components/gestione_cc/README.md) for further details.
 
@@ -577,7 +577,7 @@ See the [release notes](CHANGELOG.md) for changes in each version.
 
 Free use is permitted to individuals for personal, non-commercial purposes, subject to the licence terms. Professional, business and commercial uses require a written agreement.
 
-Home Assistant App version: **2.1.14**. Bundled application version: **2.1.14**. HACS custom integration version: **1.1.6** (independent).
+Home Assistant App version: **2.1.14**. Bundled application version: **2.1.14**. HACS custom integration version: **1.1.7** (independent).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). All rights reserved except where permissions are expressly granted.
 

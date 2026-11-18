@@ -635,8 +635,8 @@ def background_job_worker():
 def drive_nightly_backup():
     with DRIVE_LOCK:
         cfg = drive_read_config()
-        if not cfg.get("token"):
-            return
+        if not cfg.get("token", {}).get("refresh_token"):
+            raise RuntimeError("Google Drive non è collegato. Completa nuovamente l'autorizzazione.")
         local = create_sqlite_backup("drive-nightly")
         stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         try:
@@ -646,7 +646,11 @@ def drive_nightly_backup():
             for old in backups[3:]:
                 drive_delete_file(old["id"])
             cfg = drive_read_config()
-            cfg["last_nightly_backup"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            completed_at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            cfg["last_nightly_backup"] = completed_at
+            cfg["last_nightly_attempt"] = completed_at
+            cfg["last_nightly_error"] = ""
+            cfg["drive_auth_error"] = ""
             drive_write_config(cfg)
         finally:
             try: local.unlink()
@@ -669,7 +673,21 @@ def drive_backup_scheduler():
             drive_nightly_backup()
             print("GestioneCC: backup notturno Google Drive completato")
         except Exception as error:
-            print("GestioneCC: backup notturno Google Drive non riuscito: " + str(error))
+            error_text = str(error)[:500]
+            try:
+                with DRIVE_LOCK:
+                    cfg = drive_read_config()
+                    attempted_at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                    cfg["last_nightly_attempt"] = attempted_at
+                    cfg["last_nightly_error"] = error_text
+                    if ("autorizzazione" in error_text.lower()
+                            or "http 401" in error_text.lower()
+                            or "non è collegato" in error_text.lower()):
+                        cfg["drive_auth_error"] = error_text
+                    drive_write_config(cfg)
+            except Exception as status_error:
+                print("GestioneCC: impossibile salvare lo stato del backup: " + str(status_error))
+            print("GestioneCC: backup notturno Google Drive non riuscito: " + error_text)
 
 
 
@@ -763,7 +781,28 @@ def integration_status(path):
         local_files = [p for p in BACKUP_DIR.glob("*.sqlite3") if p.is_file()]
         latest = max((p.stat().st_mtime for p in local_files), default=0)
         cfg = drive_read_config()
-        return {"local_count": len(local_files), "local_last_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(latest)) if latest else None, "drive_connected": bool(cfg.get("token", {}).get("refresh_token")), "drive_last_at": cfg.get("last_nightly_backup")}
+        drive_connected = bool(cfg.get("token", {}).get("refresh_token")) and not bool(cfg.get("drive_auth_error"))
+        try:
+            from zoneinfo import ZoneInfo
+            local_now = __import__("datetime").datetime.now(ZoneInfo("Europe/Rome"))
+        except Exception:
+            local_now = __import__("datetime").datetime.now()
+        last_nightly = str(cfg.get("last_nightly_backup") or "")
+        nightly_overdue = bool(
+            drive_connected
+            and local_now.hour >= 4
+            and (not last_nightly or not last_nightly.startswith(local_now.strftime("%Y-%m-%d")))
+        )
+        return {
+            "local_count": len(local_files),
+            "local_last_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(latest)) if latest else None,
+            "drive_connected": drive_connected,
+            "drive_last_at": cfg.get("last_nightly_backup"),
+            "nightly_attempt_at": cfg.get("last_nightly_attempt"),
+            "nightly_error": cfg.get("last_nightly_error") or None,
+            "drive_auth_error": cfg.get("drive_auth_error") or None,
+            "nightly_overdue": nightly_overdue,
+        }
     if path == "/api/integration/v1/storage/status":
         usage = shutil.disk_usage(DATA)
         return {"total_bytes": int(usage.total), "used_bytes": int(usage.used), "free_bytes": int(usage.free)}

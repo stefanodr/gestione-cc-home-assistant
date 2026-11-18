@@ -77,3 +77,49 @@
         title: "Gestione C/C"
         message: "È presente almeno un processo non riuscito negli ultimi 7 giorni. Apri l'app per verificare."
   mode: single
+
+- id: gestione_cc_google_drive_disconnesso
+  alias: "Gestione C/C - Google Drive scollegato"
+  description: "Avvisa una sola volta quando l'autorizzazione Google Drive non è più valida."
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.gestione_cc_google_drive_connected
+      to: "off"
+  actions:
+    - action: notify.mobile_app_cell_stefano
+      data:
+        title: "Gestione C/C - Google Drive"
+        message: "Google Drive risulta scollegato o l'autorizzazione è scaduta. Ricollega Google Drive in Impostazioni > Backup · Google Drive."
+  mode: single
+
+- id: gestione_cc_google_drive_backup_fallito
+  alias: "Gestione C/C - backup Google Drive non riuscito"
+  description: "Avvisa se il backup notturno fallisce mentre Google Drive risulta collegato."
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.gestione_cc_google_drive_backup_failed
+      to: "on"
+  conditions:
+    - condition: state
+      entity_id: binary_sensor.gestione_cc_google_drive_connected
+      state: "on"
+  actions:
+    - action: notify.mobile_app_cell_stefano
+      data:
+        title: "Gestione C/C - backup non riuscito"
+        message: "Il backup notturno su Google Drive non è riuscito. Verifica la connessione e lo spazio disponibile su Drive."
+  mode: single
+
+- id: gestione_cc_google_drive_backup_mancante
+  alias: "Gestione C/C - backup Google Drive mancante"
+  description: "Avvisa se, dopo le 04:00, il backup notturno del giorno non risulta completato."
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.gestione_cc_google_drive_backup_overdue
+      to: "on"
+  actions:
+    - action: notify.mobile_app_cell_stefano
+      data:
+        title: "Gestione C/C - backup mancante"
+        message: "Il backup notturno su Google Drive non risulta completato entro le 04:00. Controlla Gestione C/C."
+  mode: single
