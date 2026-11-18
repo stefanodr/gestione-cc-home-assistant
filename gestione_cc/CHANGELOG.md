@@ -1,3 +1,10 @@
+## [2.1.17] - 2026-11-18
+
+### Avvisi backup Google Drive
+- Aggiunto il rilevamento degli errori del backup notturno Google Drive e dell'assenza del backup giornaliero dopo le 04:00 (Europe/Rome).
+- Esposti gli stati tecnici tramite l'integrazione Home Assistant; le automazioni di esempio inviano notifiche solo in caso di problema.
+- Nessuna modifica alla sezione Backup · Google Drive, alle credenziali OAuth, al database contabile o ai dati esistenti.
+
 ## [2.1.10] - 2026-11-17
 
 ### Modifica del tipo GnuCash nel Piano dei conti
