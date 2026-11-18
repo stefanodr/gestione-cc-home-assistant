@@ -1672,8 +1672,6 @@
   function renderAccountFilters() {
     const eligible = state.accounts.filter(isLiquidAccount);
 
-    // La Home segue il mese selezionato; il report segue l'intero intervallo del report.`;
-
     // La Home segue il mese selezionato; il report segue l'intero intervallo del report.
     const today = localDateKey(new Date());
     const overviewMonth = monthSelection();
