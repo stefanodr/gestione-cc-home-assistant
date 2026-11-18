@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.20';
+  const APP_VERSION = '2.1.21';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -610,13 +610,12 @@
       changed = true;
     }
     if (!state.reportAccountId) { state.reportAccountId = state.bankAccountId; changed = true; }
-    // Default to all liquid accounts so historical periods include movements
-    // recorded on previous or alternate accounts. A manual account selection
-    // remains available and is preserved after this one-time migration.
-    if (!state.reportAccountDefaultMigrated) {
-      state.reportAccountId = 'all';
+    // Existing installations may already have passed the older default
+    // migration while still retaining the current account filter. Apply this
+    // migration once unless the user has explicitly chosen a filter manually.
+    if (!state.reportAccountFilterManual) {
+      if (state.reportAccountId !== 'all') { state.reportAccountId = 'all'; changed = true; }
       state.reportAccountDefaultMigrated = true;
-      changed = true;
     }
     return changed;
   }
@@ -725,8 +724,8 @@
     $('#monthNext')?.addEventListener('click', () => moveSelectedPeriod(1, 'overview'));
     $('#reportPeriodPrev')?.addEventListener('click', () => moveSelectedPeriod(-1, 'report'));
     $('#reportPeriodNext')?.addEventListener('click', () => moveSelectedPeriod(1, 'report'));
-    $('#accountPicker').addEventListener('change', () => { state.reportAccountId = $('#accountPicker').value; $('#reportAccountPicker').value = state.reportAccountId; saveState(); renderAll(); });
-    $('#reportAccountPicker').addEventListener('change', () => { state.reportAccountId = $('#reportAccountPicker').value; $('#accountPicker').value = state.reportAccountId; saveState(); renderAll(); });
+    $('#accountPicker').addEventListener('change', () => { state.reportAccountId = $('#accountPicker').value; state.reportAccountFilterManual = true; $('#reportAccountPicker').value = state.reportAccountId; saveState(); renderAll(); });
+    $('#reportAccountPicker').addEventListener('change', () => { state.reportAccountId = $('#reportAccountPicker').value; state.reportAccountFilterManual = true; $('#accountPicker').value = state.reportAccountId; saveState(); renderAll(); });
     const resetTransactionFilters = () => { accountMovementFilterId = null; transactionSelection.clear(); transactionPage = 0; renderTransactions(); };
     $('#clearAccountMovementFilter')?.addEventListener('click', () => {
       accountMovementFilterId = null;
