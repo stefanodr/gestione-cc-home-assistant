@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.24';
+  const APP_VERSION = '2.1.25';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -1610,10 +1610,10 @@
     if (view === 'documents') void searchDocuments();
   }
   function accountById(id) { return state.accounts.find(a => a.id === id); }
-  function accountDisplayLabel(account) {
+  function accountDisplayLabel(account, date = localDateKey(new Date())) {
     if (!account) return 'Da classificare';
     const tags = Array.isArray(account.tags) ? account.tags : [];
-    return accountPathAt(account, localDateKey(new Date())) + (tags.length ? ' · [' + tags.join(', ') + ']' : '');
+    return accountPathAt(account, date) + (tags.length ? ' · [' + tags.join(', ') + ']' : '');
   }
   function accountLabel(id) { return accountDisplayLabel(accountById(id)); }
   function accountReportLabel(account) {
@@ -1671,7 +1671,8 @@
   }
   function renderAccountFilters() {
     const eligible = state.accounts.filter(isLiquidAccount);
-    const options = `<option value="all">Tutti i conti liquidi</option>${eligible.map(a => `<option value="${safeText(a.id)}">${safeText(accountDisplayLabel(a))}</option>`).join('')}`;
+
+    // La Home segue il mese selezionato; il report segue l'intero intervallo del report.`;
 
     // La Home segue il mese selezionato; il report segue l'intero intervallo del report.
     const today = localDateKey(new Date());
@@ -1699,8 +1700,12 @@
     const reportLastDay = localDateKey(new Date(reportYear, reportEndMonth, 0));
     const reportEnd = reportLastDay > today ? today : reportLastDay;
     const reportAutoValue = automaticAccountFilterValue(reportStart, reportEnd);
+    const optionsForDate = date => `<option value="all">Tutti i conti liquidi</option>${eligible.map(a => `<option value="${safeText(a.id)}">${safeText(accountDisplayLabel(a, date))}</option>`).join('')}`;
 
-    for (const [selector, automaticValue] of [['#accountPicker', overviewAutoValue], ['#reportAccountPicker', reportAutoValue]]) {
+    for (const [selector, automaticValue, options] of [
+      ['#accountPicker', overviewAutoValue, optionsForDate(overviewEnd)],
+      ['#reportAccountPicker', reportAutoValue, optionsForDate(reportEnd)]
+    ]) {
       const control = $(selector);
       control.innerHTML = options;
       if (automaticValue !== null) {
