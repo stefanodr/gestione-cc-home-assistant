@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.19';
+  const APP_VERSION = '2.1.20';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -610,9 +610,10 @@
       changed = true;
     }
     if (!state.reportAccountId) { state.reportAccountId = state.bankAccountId; changed = true; }
-    // GnuCash books may have several successive checking accounts. The report
-    // default must include them all; retain an explicit user selection.
-    if (state.transactions.some(tx => tx.source === 'gnucash') && !state.reportAccountDefaultMigrated) {
+    // Default to all liquid accounts so historical periods include movements
+    // recorded on previous or alternate accounts. A manual account selection
+    // remains available and is preserved after this one-time migration.
+    if (!state.reportAccountDefaultMigrated) {
       state.reportAccountId = 'all';
       state.reportAccountDefaultMigrated = true;
       changed = true;
