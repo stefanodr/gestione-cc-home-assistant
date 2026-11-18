@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.22';
+  const APP_VERSION = '2.1.23';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -1703,7 +1703,8 @@
        normalizedPath.includes('disponibilita liquide'));
   }
   function automaticMobileLiquidAccountIds(start, end) {
-    if (!window.matchMedia('(max-width: 620px)').matches) return null;
+    // Include anche i tablet in layout compatto: il breakpoint responsive dell'app arriva a 900px.
+    if (!window.matchMedia('(max-width: 900px)').matches) return null;
     const ids = new Set();
     state.transactions.forEach(tx => {
       if (!tx.date || tx.date < start || tx.date > end || tx.status === 'duplicate') return;
