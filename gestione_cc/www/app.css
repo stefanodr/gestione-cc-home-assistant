@@ -788,3 +788,93 @@ body.sidebar-collapsed .local-card{justify-content:center;padding:11px 7px}
     font-size: 14px;
   }
 }
+
+
+/* Maschere documento: campi in griglia, con etichette sempre sopra agli input. */
+.document-metadata-card{
+  width:min(560px,calc(100vw - 32px));
+  max-height:calc(100vh - 32px);
+  overflow-y:auto;
+  text-align:left;
+}
+.document-metadata-card>.modal-symbol,
+.document-metadata-card>h2,
+.document-metadata-card>#documentMetadataIntro{text-align:center}
+.document-metadata-card .document-field-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px 16px;
+  margin:20px 0;
+  text-align:left;
+}
+.document-metadata-card .document-field-grid label{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:6px;
+  min-width:0;
+  color:#6f807b;
+  font-size:11px;
+  font-weight:650;
+}
+.document-metadata-card .document-field-grid input{
+  display:block;
+  width:100%;
+  min-width:0;
+  min-height:40px;
+  padding:9px 10px;
+  border:1px solid #dce5e2;
+  border-radius:7px;
+  background:#fff;
+  color:#344945;
+  font-size:13px;
+}
+.document-metadata-card .document-field-grid input:focus,
+.pin-settings-fields input:focus{
+  outline:2px solid #c7e4dd;
+  border-color:#69a79d;
+}
+.document-metadata-card .modal-actions{justify-content:center;flex-wrap:wrap}
+
+/* Cambio PIN: ogni etichetta e il relativo campo occupano una riga dedicata. */
+#view-settings .pin-settings-form{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:12px;
+  max-width:440px;
+  margin-top:16px;
+}
+#view-settings .pin-settings-fields{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:12px;
+}
+#view-settings .pin-settings-field{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:6px;
+  min-width:0;
+}
+#view-settings .pin-settings-field label{
+  color:#53645f;
+  font-size:12px;
+  font-weight:600;
+}
+#view-settings .pin-settings-field input{
+  display:block;
+  width:100%;
+  min-width:0;
+  min-height:40px;
+  padding:9px 10px;
+  border:1px solid #dce5e2;
+  border-radius:7px;
+  background:#fff;
+  color:#344945;
+}
+#view-settings .pin-settings-form #changePinMessage{min-height:0;margin:0}
+#view-settings .pin-settings-form #changePinButton{justify-self:start;margin-top:2px}
+
+@media(max-width:600px){
+  .document-metadata-card .document-field-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+  .document-metadata-card{padding:24px 20px 20px}
+  #view-settings .pin-settings-form{max-width:none}
+}
