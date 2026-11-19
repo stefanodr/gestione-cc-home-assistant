@@ -1,3 +1,7 @@
+## 2.1.33
+- IT: Nella sola Home smartphone `/mobile`, il menu «Seleziona conto liquido» mostra i conti liquidi con almeno un movimento nel mese o nell'anno visualizzato. La scelta manuale resta disponibile; cambiando periodo il conto selezionato viene mantenuto se ha movimenti, altrimenti il filtro torna a «Tutti i conti liquidi». Nessuna modifica all'interfaccia desktop o ai dati.
+- EN: In the smartphone Home `/mobile` only, the “Select liquid account” menu lists liquid accounts with at least one transaction in the displayed month or year. Manual selection remains available; when the period changes, the selected account is kept if it has transactions, otherwise the filter returns to “All liquid accounts”. No desktop UI or data changes.
+
 ## 2.1.32
 - IT: Aggiunto nella Home smartphone `/mobile` il selettore «Seleziona conto liquido» all'interno del riquadro del saldo, subito sotto «Saldo ricostruito dai movimenti» e prima di «Aggiornato al». La scelta aggiorna saldo, entrate, uscite, grafici e movimenti del periodo senza modificare i dati contabili o le preferenze salvate.
 - EN: Added the “Select liquid account” control to the `/mobile` smartphone Home balance card, directly below “Balance reconstructed from transactions” and before “Updated on”. Changing the selection refreshes the balance, income, expenses, charts and transactions for the selected period without changing accounting data or saved preferences.
