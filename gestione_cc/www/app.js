@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1.30';
+  const APP_VERSION = '2.1.31';
   const GNUCASH_ACCOUNT_TYPES = Object.freeze(['ASSET','BANK','CASH','CREDIT','LIABILITY','EQUITY','INCOME','EXPENSE','STOCK','MUTUAL','CURRENCY','RECEIVABLE','PAYABLE','TRADING','CREDITLINE']);
   const isGnuCashAccountType = type => GNUCASH_ACCOUNT_TYPES.includes(String(type || '').toUpperCase());
   let privacyMode = false;
@@ -1687,7 +1687,7 @@
     const overviewLastDay = localDateKey(new Date(overviewYear, overviewMonthNumber, 0));
     const overviewEnd = overviewLastDay > today ? today : overviewLastDay;
     // Su smartphone la Home usa il conto scelto esplicitamente; desktop e tablet mantengono la selezione automatica precedente.
-    const isPhone = window.matchMedia('(max-width: 620px) and (pointer: coarse)').matches;
+    const isPhone = window.matchMedia('(max-width: 620px)').matches;
     const overviewAutoValue = isPhone ? null : automaticAccountFilterValue(overviewStart, overviewEnd);
 
     const reportKey = $('#reportMonth')?.value || overviewMonth;
@@ -1728,7 +1728,7 @@
     const mobileControl = $('#mobileAccountPicker');
     if (mobileControl) {
       mobileControl.innerHTML = optionsForDate(overviewEnd);
-      const selected = $('#accountPicker')?.value || state.reportAccountId || state.bankAccountId || 'all';
+      const selected = state.reportAccountId || state.lastImportBankAccountId || state.bankAccountId || 'all';
       mobileControl.value = selected === 'all' || eligible.some(a => String(a.id) === String(selected))
         ? String(selected) : String(eligible[0]?.id || 'all');
     }
@@ -3405,19 +3405,20 @@
     const matches=state.accounts.filter(account=>Array.isArray(account.externalAccountIds)&&account.externalAccountIds.some(item=>String(item.id??'').trim()===key));
     return matches.length===1?matches[0]:null;
   }
-  function chooseImportBankAccount(accounts) {
+  function chooseImportBankAccount(accounts, preferredId) {
     return new Promise(resolve => {
       const overlay=document.createElement('div');
       overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Selezione conto liquido');
       overlay.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:16px';
       const options=accounts.map(a=>'<option value="'+safeText(a.id)+'">'+safeText(a.path||a.name)+'</option>').join('');
-      overlay.innerHTML='<div style="background:var(--panel,#fff);color:var(--text,#17212b);width:min(520px,100%);border-radius:14px;padding:22px"><h2>Seleziona il conto da movimentare</h2><p>Non assegnerò i movimenti a un conto liquido automaticamente. Scegli il conto a cui appartiene il file che stai importando.</p><label for="importBankAccount">Conto liquido</label><select id="importBankAccount" style="display:block;width:100%;padding:10px;margin:8px 0 16px"><option value="">— Seleziona un conto —</option>'+options+'</select><div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" data-import-cancel class="button button-quiet">Annulla</button><button type="button" data-import-confirm class="button button-primary" disabled>Continua</button></div></div>';
+      const initial=accounts.some(a=>String(a.id)===String(preferredId))?String(preferredId):String(accounts[0]?.id||'');
+      overlay.innerHTML='<div style="background:var(--panel,#fff);color:var(--text,#17212b);width:min(520px,100%);border-radius:14px;padding:22px"><h2>Seleziona il conto da movimentare</h2><p>Il conto è preimpostato in base al file o all’ultima importazione. Puoi cambiarlo prima di continuare.</p><label for="importBankAccount">Conto liquido</label><select id="importBankAccount" style="display:block;width:100%;padding:10px;margin:8px 0 16px">'+options+'</select><div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" data-import-cancel class="button button-quiet">Annulla</button><button type="button" data-import-confirm class="button button-primary">Continua</button></div></div>';
       document.body.append(overlay);
-      const select=overlay.querySelector('#importBankAccount'),confirm=overlay.querySelector('[data-import-confirm]');
+      const select=overlay.querySelector('#importBankAccount');
+      select.value=initial;
       const finish=value=>{overlay.remove();resolve(value);};
-      select.addEventListener('change',()=>{confirm.disabled=!select.value;});
       overlay.querySelector('[data-import-cancel]').addEventListener('click',()=>finish(null));
-      confirm.addEventListener('click',()=>finish(select.value||null));
+      overlay.querySelector('[data-import-confirm]').addEventListener('click',()=>finish(select.value||null));
       overlay.addEventListener('click',e=>{if(e.target===overlay)finish(null);});
       select.focus();
     });
@@ -3455,16 +3456,25 @@
           const details=[...new Set(unresolvedSourceRows.map(tx=>[tx.accountExternalId,tx.counterpartExternalId].filter(Boolean).join(' / ')))];
           throw new Error('Non trovo un conto di movimentazione riconciliato per questi movimenti. Verifica i codici Conto / Contropartita nel PDC: '+details.join(', ')+'. Nessun movimento è stato importato.');
         }
-        const needsFallback=unique.some(tx=>!isCashFlowSourceAccount(resolveExternalAccount(tx.accountExternalId))&&!isCashFlowSourceAccount(resolveExternalAccount(tx.counterpartExternalId)));
-        const selectedImportAccount=needsFallback?await chooseImportBankAccount(liquidAccounts):null;
-        if(needsFallback&&!selectedImportAccount){state=originalState;renderAll();return;}
+        const detectedImportAccounts=[...new Set(unique.map(tx=>{
+          const a=String(tx.accountExternalId||'').trim()?resolveExternalAccount(tx.accountExternalId):null;
+          const b=String(tx.counterpartExternalId||'').trim()?resolveExternalAccount(tx.counterpartExternalId):null;
+          const source=isCashFlowSourceAccount(b)?b:isCashFlowSourceAccount(a)?a:null;
+          return source?.id||null;
+        }).filter(Boolean))];
+        const preferredImportAccount=detectedImportAccounts.length===1
+          ? detectedImportAccounts[0]
+          : state.lastImportBankAccountId||state.bankAccountId||liquidAccounts[0]?.id;
+        const selectedImportAccount=await chooseImportBankAccount(liquidAccounts,preferredImportAccount);
+        if(!selectedImportAccount){state=originalState;renderAll();return;}
         const importedBankIds=new Set();
         let unresolvedCounterparts=0;
         unique.forEach(tx=>{
           const account=String(tx.accountExternalId||'').trim()?resolveExternalAccount(tx.accountExternalId):null;
           const counterpart=String(tx.counterpartExternalId||'').trim()?resolveExternalAccount(tx.counterpartExternalId):null;
           // Nel formato del dataset la contropartita è il conto di movimentazione; nei trasferimenti tra due conti patrimoniali si mantiene questa convenzione.
-          const sourceAccount=isCashFlowSourceAccount(counterpart)?counterpart:isCashFlowSourceAccount(account)?account:accountById(selectedImportAccount);
+          const detectedSource=isCashFlowSourceAccount(counterpart)?counterpart:isCashFlowSourceAccount(account)?account:null;
+          const sourceAccount=accountById(selectedImportAccount)||detectedSource;
           const otherAccount=sourceAccount?.id===counterpart?.id?account:counterpart;
           if(!sourceAccount||!isCashFlowSourceAccount(sourceAccount)){state=originalState;renderAll();throw new Error('Conto di movimentazione non riconosciuto per il movimento '+(tx.description||tx.date)+'.');}
           tx.bankAccountId=sourceAccount.id;importedBankIds.add(sourceAccount.id);
@@ -3482,8 +3492,8 @@
         });
         state.transactions.push(...unique);state.demo=false;
         const bankIds=[...importedBankIds];
-        state.bankAccountId=bankIds[0]||selectedImportAccount||state.bankAccountId;
-        const reportAccount=bankIds.length===1?bankIds[0]:'all';
+        state.lastImportBankAccountId=selectedImportAccount;
+        const reportAccount=selectedImportAccount;
         const mostRecentImport=unique.map(tx=>tx.date).filter(Boolean).sort().at(-1);
         if(mostRecentImport){const month=mostRecentImport.slice(0,7);state.selectedMonth=month;$('#monthPicker').value=month;syncReportPeriodPicker(month);$('#statementMonth').value=month;}
         state.reportAccountId=reportAccount;
