@@ -1,6 +1,6 @@
 'use strict';
 (() => {
- let state=null,periodMode='month',selectedMonth='',activeScreen='overview',hideAmounts=false,csrf='';
+ let state=null,periodMode='month',selectedMonth='',activeScreen='overview',hideAmounts=false,csrf='',selectedAccountId='all';
  const $=id=>document.getElementById(id),moneyNumber=new Intl.NumberFormat('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:true}),money={format:value=>{const n=num(value),sign=n<0?'−':'';return sign+moneyNumber.format(Math.abs(n))+' €';}};
  const num=n=>Number.isFinite(Number(n))?Number(n):0;
  const dateKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -10,6 +10,22 @@
  const account=id=>state.accounts.find(a=>String(a.id)===String(id));
  const accountName=id=>account(id)?.path||account(id)?.name||'Da classificare';
  const isMortgage=a=>{let x=a,seen=new Set();while(x&&!seen.has(String(x.id))){seen.add(String(x.id));if(x.mortgage===true)return true;x=x.parentId?account(x.parentId):null;}return false;};
+ const isLiquidAccount=a=>{
+  if(!a)return false;
+  const type=String(a.type||'').toUpperCase();
+  if(type==='BANK'||type==='CASH')return true;
+  if(type!=='ASSET')return false;
+  const path=normalize(a.path||a.name||'');
+  return ['attivita correnti','conto corrente','conto deposito','banca','cassa','liquidita','disponibilita liquide'].some(term=>path.includes(term));
+ };
+ function renderMobileAccountPicker(){
+  const picker=$('mobileBalanceAccount');
+  if(!picker)return;
+  const liquid=state.accounts.filter(isLiquidAccount);
+  picker.innerHTML='<option value="all">Tutti i conti liquidi</option>'+liquid.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.path||a.name||'Conto')+'</option>').join('');
+  if(!liquid.some(a=>String(a.id)===String(selectedAccountId))&&selectedAccountId!=='all')selectedAccountId=state.bankAccountId&&liquid.some(a=>String(a.id)===String(state.bankAccountId))?String(state.bankAccountId):'all';
+  picker.value=selectedAccountId;
+ }
  const isExpense=a=>!!a&&(a.type==='EXPENSE'||(a.classification==='Patrimoniale'&&(a.includeInBudget===true||isMortgage(a))));
  function periodRange(){
   const [y,m]=selectedMonth.split('-').map(Number),today=dateKey(new Date()),currentYear=new Date().getFullYear();
@@ -19,7 +35,7 @@
   }
   return {start:y+'-01-01',end:y===currentYear?today:y+'-12-31',label:'Anno '+y};
  }
- function transactionsIn(range){const f=state.reportAccountId||state.bankAccountId||'all';return state.transactions.filter(t=>t.date>=range.start&&t.date<=range.end&&t.status!=='duplicate'&&(f==='all'||!f||String(t.bankAccountId)===String(f)));}
+ function transactionsIn(range){const f=selectedAccountId;return state.transactions.filter(t=>t.date>=range.start&&t.date<=range.end&&t.status!=='duplicate'&&(f==='all'||!f||String(t.bankAccountId)===String(f)));}
  function flowTotals(rows){let income=0,expense=0;for(const t of rows){if(num(t.amount)>0)income+=num(t.amount);else expense+=Math.abs(num(t.amount));}return{income,expense,net:income-expense};}
  function expenseTotals(rows){
   const totals=new Map();
@@ -54,10 +70,10 @@
   const range=periodRange(),rows=transactionsIn(range),totals=flowTotals(rows),now=dateKey(new Date()),cutoff=range.end>now?now:range.end;
   $('periodLabel').textContent=range.label;$('periodNext').disabled=selectedMonth>=now.slice(0,7);
   $('periodPrev').disabled=false;
-  setMoney($('balanceValue'),balanceFor(state.reportAccountId||state.bankAccountId||'all',cutoff));
+  setMoney($('balanceValue'),balanceFor(selectedAccountId,cutoff));
   setMoney($('incomeValue'),totals.income);setMoney($('expenseValue'),totals.expense);setMoney($('netValue'),totals.net);
   $('incomeCompare').textContent='Nel periodo selezionato';$('expenseCompare').textContent='Nel periodo selezionato';
-  $('accountCaption').textContent=state.reportAccountId==='all'?'Tutti i conti liquidi':accountName(state.reportAccountId||state.bankAccountId);
+  $('accountCaption').textContent=selectedAccountId==='all'?'Tutti i conti liquidi':accountName(selectedAccountId);
   $('asOfCaption').textContent='Aggiornato al '+new Intl.DateTimeFormat('it-IT',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(cutoff+'T12:00:00'));
   const max=Math.max(1,totals.income,totals.expense);
   $('flowBars').innerHTML=[['Entrate',totals.income,'income'],['Uscite',totals.expense,'expense']].map(([label,value,kind])=>'<div class="flow-row"><span>'+label+'</span><div class="flow-track"><div class="flow-fill '+kind+'" style="width:'+Math.max(value?2:0,value/max*100)+'%"></div></div><strong class="money">'+money.format(value)+'</strong></div>').join('');
@@ -123,11 +139,14 @@
    if(!response.ok)throw new Error('Errore server ('+response.status+')');
    const data=await response.json();state=data.state;csrf=data.csrf||'';
    if(!state)throw new Error('Archivio non inizializzato.');
+   selectedAccountId=state.reportAccountId||state.bankAccountId||'all';
+   renderMobileAccountPicker();
    $('mobileLoading').hidden=true;$('mobileApp').hidden=false;
    document.querySelectorAll('[data-screen]').forEach(el=>el.addEventListener('click',()=>setScreen(el.dataset.screen)));
    document.querySelectorAll('[data-period]').forEach(el=>el.addEventListener('click',()=>setPeriod(el.dataset.period)));
    $('periodPrev').addEventListener('click',()=>shiftPeriod(-1));$('periodNext').addEventListener('click',()=>shiftPeriod(1));
    $('transactionFilter').addEventListener('change',()=>renderTransactions(transactionsIn(periodRange())));
+   $('mobileBalanceAccount').addEventListener('change',()=>{selectedAccountId=$('mobileBalanceAccount').value||'all';render();});
    $('privacyButton').addEventListener('click',()=>{hideAmounts=!hideAmounts;applyPrivacy();});
    $('logoutButton').addEventListener('click',logout);
    if('serviceWorker' in navigator) navigator.serviceWorker.register('/mobile/service-worker.js',{scope:'/mobile/'}).catch(()=>{});
