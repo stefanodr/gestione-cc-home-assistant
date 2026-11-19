@@ -773,7 +773,7 @@ body.sidebar-collapsed .local-card{justify-content:center;padding:11px 7px}
 
 /* Selettore conto liquido dedicato alla sola Home smartphone. */
 .mobile-account-control { display: none; }
-@media (max-width: 620px) and (pointer: coarse) {
+@media (max-width: 620px) {
   #view-overview #desktopAccountControl { display: none !important; }
   #view-overview .mobile-account-control {
     display: grid;
