@@ -1,3 +1,9 @@
+## 2.1.31
+- IT: Durante l'importazione dei movimenti il conto liquido viene sempre proposto nel menu: preselezione dal file quando riconoscibile, altrimenti dall'ultima importazione. La scelta dell'utente si applica a tutti i movimenti importati e viene ricordata.
+- IT: Uniformata la selezione del conto liquido su smartphone: il menu della Home aggiorna anche movimenti e report per il periodo mensile, trimestrale, semestrale o annuale. La selezione resta manuale e sincronizzata.
+- EN: Bank-account selection is always shown during transaction import: preselected from the file when identifiable, otherwise from the last import. The user's choice applies to all imported transactions and is remembered.
+- EN: Unified liquid-account selection on smartphones: the Home selector also updates transactions and reports for monthly, quarterly, half-yearly, and yearly periods. The selection remains manual and synchronized.
+
 ## 2.1.30
 - IT: Corretto il layout delle finestre di verifica e modifica dei dati documento: etichette e campi sono disposti in modo leggibile, senza sovrapposizioni, con adattamento agli schermi piccoli.
 - IT: Riorganizzato il modulo «Cambia PIN amministratore» con etichette sopra ai rispettivi campi e spaziatura uniforme. Nessuna modifica alla logica PIN o ai dati.
