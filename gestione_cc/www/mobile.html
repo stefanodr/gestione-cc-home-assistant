@@ -9,9 +9,9 @@
 <link rel="manifest" href="/mobile.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/app-icon-192.png">
 <link rel="apple-touch-icon" href="/app-icon-192.png">
-<link rel="stylesheet" href="/mobile.css">
+<link rel="stylesheet" href="/mobile.css?v=2.1.32">
 <script src="/financial-engine.js" defer></script>
-<script src="/mobile.js" defer></script>
+<script src="/mobile.js?v=2.1.32" defer></script>
 </head>
 <body>
 <div id="mobileLoading" class="loading"><span class="spinner"></span><strong>Caricamento dati…</strong></div>
@@ -31,6 +31,7 @@
 <section id="screen-overview" class="screen active">
  <article class="balance-card">
   <span>Saldo conto selezionato</span><strong id="balanceValue" class="money">—</strong><small id="balanceCaption">Saldo ricostruito dai movimenti</small>
+  <label class="mobile-balance-account" for="mobileBalanceAccount">Seleziona conto liquido</label><select id="mobileBalanceAccount" class="mobile-balance-account-select" aria-label="Seleziona conto liquido"></select>
   <div class="balance-foot"><span id="accountCaption">Tutti i conti</span><span id="asOfCaption">—</span></div>
  </article>
  <div class="metric-grid">
