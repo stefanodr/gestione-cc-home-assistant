@@ -18,12 +18,15 @@
   const path=normalize(a.path||a.name||'');
   return ['attivita correnti','conto corrente','conto deposito','banca','cassa','liquidita','disponibilita liquide'].some(term=>path.includes(term));
  };
- function renderMobileAccountPicker(){
+ function renderMobileAccountPicker(range=periodRange()){
   const picker=$('mobileBalanceAccount');
   if(!picker)return;
-  const liquid=state.accounts.filter(isLiquidAccount);
+  const activeAccountIds=new Set(state.transactions
+   .filter(t=>t.date>=range.start&&t.date<=range.end&&t.status!=='duplicate'&&t.bankAccountId!=null)
+   .map(t=>String(t.bankAccountId)));
+  const liquid=state.accounts.filter(a=>isLiquidAccount(a)&&activeAccountIds.has(String(a.id)));
   picker.innerHTML='<option value="all">Tutti i conti liquidi</option>'+liquid.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.path||a.name||'Conto')+'</option>').join('');
-  if(!liquid.some(a=>String(a.id)===String(selectedAccountId))&&selectedAccountId!=='all')selectedAccountId=state.bankAccountId&&liquid.some(a=>String(a.id)===String(state.bankAccountId))?String(state.bankAccountId):'all';
+  if(selectedAccountId!=='all'&&!liquid.some(a=>String(a.id)===String(selectedAccountId)))selectedAccountId='all';
   picker.value=selectedAccountId;
  }
  const isExpense=a=>!!a&&(a.type==='EXPENSE'||(a.classification==='Patrimoniale'&&(a.includeInBudget===true||isMortgage(a))));
@@ -67,7 +70,9 @@
  }
  function setMoney(el,value){el.textContent=money.format(value);el.classList.toggle('masked',hideAmounts);}
  function render(){
-  const range=periodRange(),rows=transactionsIn(range),totals=flowTotals(rows),now=dateKey(new Date()),cutoff=range.end>now?now:range.end;
+  const range=periodRange();
+  renderMobileAccountPicker(range);
+  const rows=transactionsIn(range),totals=flowTotals(rows),now=dateKey(new Date()),cutoff=range.end>now?now:range.end;
   $('periodLabel').textContent=range.label;$('periodNext').disabled=selectedMonth>=now.slice(0,7);
   $('periodPrev').disabled=false;
   setMoney($('balanceValue'),balanceFor(selectedAccountId,cutoff));
