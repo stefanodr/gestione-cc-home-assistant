@@ -1,3 +1,9 @@
+## 2.1.30
+- IT: Corretto il layout delle finestre di verifica e modifica dei dati documento: etichette e campi sono disposti in modo leggibile, senza sovrapposizioni, con adattamento agli schermi piccoli.
+- IT: Riorganizzato il modulo «Cambia PIN amministratore» con etichette sopra ai rispettivi campi e spaziatura uniforme. Nessuna modifica alla logica PIN o ai dati.
+- EN: Fixed the document review and editing dialogs: labels and fields now use a readable layout without overlap, adapting to small screens.
+- EN: Reorganized the administrator PIN form with labels above their corresponding fields and consistent spacing. No changes to PIN logic or stored data.
+
 ## 2.1.29
 - IT: Aggiunto nella Home uno specifico selettore «Seleziona conto liquido», visibile solo sugli smartphone touch. Il controllo desktop esistente resta invariato e nascosto solo nella vista smartphone; il saldo mobile segue il nuovo selettore.
 - EN: Added a dedicated “Select liquid account” selector to Overview, visible only on touch smartphones. The existing desktop control remains unchanged and is hidden only in the smartphone view; the mobile balance follows the new selector.
