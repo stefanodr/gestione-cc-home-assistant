@@ -1,3 +1,7 @@
+## 2.1.34
+- IT: Allineata la versione mostrata nell'app alla versione 2.1.34. Uniformati altezza, bordi, spaziatura e stato di selezione dei campi di ricerca dell'Archivio documenti e del menu «Backup disponibili su Google Drive». Aggiornata la cache dell'interfaccia desktop.
+- EN: Aligned the version displayed in the app to 2.1.34. Standardized the height, borders, spacing and focus state of the Document Archive search fields and the “Available Google Drive backups” selector. Updated desktop interface cache versions.
+
 ## 2.1.33
 - IT: Nella sola Home smartphone `/mobile`, il menu «Seleziona conto liquido» mostra i conti liquidi con almeno un movimento nel mese o nell'anno visualizzato. La scelta manuale resta disponibile; cambiando periodo il conto selezionato viene mantenuto se ha movimenti, altrimenti il filtro torna a «Tutti i conti liquidi». Nessuna modifica all'interfaccia desktop o ai dati.
 - EN: In the smartphone Home `/mobile` only, the “Select liquid account” menu lists liquid accounts with at least one transaction in the displayed month or year. Manual selection remains available; when the period changes, the selected account is kept if it has transactions, otherwise the filter returns to “All liquid accounts”. No desktop UI or data changes.
