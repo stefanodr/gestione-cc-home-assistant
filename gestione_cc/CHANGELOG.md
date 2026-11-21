@@ -1,3 +1,55 @@
+## 2.1.35
+- IT: Uniformato il menu «Categoria» nelle righe dell'Archivio documenti allo stile degli altri selettori dell'app, mantenendo le stesse opzioni e la modifica della categoria. Aggiornata la versione applicazione e i riferimenti cache. Sincronizzato il changelog nella cartella dell'add-on, così le note della release vengono incluse nei metadati letti da Home Assistant.
+- EN: Matched the “Category” menu in Document Archive rows to the styling of the app's other selectors, preserving the same options and category-editing behavior. Updated the application version and cache references. Synchronized the changelog inside the add-on directory so release notes are included in the metadata read by Home Assistant.
+
+## 2.1.34
+- IT: Allineata la versione mostrata nell'app alla versione 2.1.34. Uniformati altezza, bordi, spaziatura e stato di selezione dei campi di ricerca dell'Archivio documenti e del menu «Backup disponibili su Google Drive». Aggiornata la cache dell'interfaccia desktop.
+- EN: Aligned the version displayed in the app to 2.1.34. Standardized the height, borders, spacing and focus state of the Document Archive search fields and the “Available Google Drive backups” selector. Updated desktop interface cache versions.
+
+## 2.1.33
+- IT: Nella sola Home smartphone `/mobile`, il menu «Seleziona conto liquido» mostra i conti liquidi con almeno un movimento nel mese o nell'anno visualizzato. La scelta manuale resta disponibile; cambiando periodo il conto selezionato viene mantenuto se ha movimenti, altrimenti il filtro torna a «Tutti i conti liquidi». Nessuna modifica all'interfaccia desktop o ai dati.
+- EN: In the smartphone Home `/mobile` only, the “Select liquid account” menu lists liquid accounts with at least one transaction in the displayed month or year. Manual selection remains available; when the period changes, the selected account is kept if it has transactions, otherwise the filter returns to “All liquid accounts”. No desktop UI or data changes.
+
+## 2.1.32
+- IT: Aggiunto nella Home smartphone `/mobile` il selettore «Seleziona conto liquido» all'interno del riquadro del saldo, subito sotto «Saldo ricostruito dai movimenti» e prima di «Aggiornato al». La scelta aggiorna saldo, entrate, uscite, grafici e movimenti del periodo senza modificare i dati contabili o le preferenze salvate.
+- EN: Added the “Select liquid account” control to the `/mobile` smartphone Home balance card, directly below “Balance reconstructed from transactions” and before “Updated on”. Changing the selection refreshes the balance, income, expenses, charts and transactions for the selected period without changing accounting data or saved preferences.
+
+## 2.1.31
+- IT: Durante l'importazione dei movimenti il conto liquido viene sempre proposto nel menu: preselezione dal file quando riconoscibile, altrimenti dall'ultima importazione. La scelta dell'utente si applica a tutti i movimenti importati e viene ricordata.
+- IT: Uniformata la selezione del conto liquido su smartphone: il menu della Home aggiorna anche movimenti e report per il periodo mensile, trimestrale, semestrale o annuale. La selezione resta manuale e sincronizzata.
+- EN: Bank-account selection is always shown during transaction import: preselected from the file when identifiable, otherwise from the last import. The user's choice applies to all imported transactions and is remembered.
+- EN: Unified liquid-account selection on smartphones: the Home selector also updates transactions and reports for monthly, quarterly, half-yearly, and yearly periods. The selection remains manual and synchronized.
+
+## 2.1.30
+- IT: Corretto il layout delle finestre di verifica e modifica dei dati documento: etichette e campi sono disposti in modo leggibile, senza sovrapposizioni, con adattamento agli schermi piccoli.
+- IT: Riorganizzato il modulo «Cambia PIN amministratore» con etichette sopra ai rispettivi campi e spaziatura uniforme. Nessuna modifica alla logica PIN o ai dati.
+- EN: Fixed the document review and editing dialogs: labels and fields now use a readable layout without overlap, adapting to small screens.
+- EN: Reorganized the administrator PIN form with labels above their corresponding fields and consistent spacing. No changes to PIN logic or stored data.
+
+## 2.1.29
+- IT: Aggiunto nella Home uno specifico selettore «Seleziona conto liquido», visibile solo sugli smartphone touch. Il controllo desktop esistente resta invariato e nascosto solo nella vista smartphone; il saldo mobile segue il nuovo selettore.
+- EN: Added a dedicated “Select liquid account” selector to Overview, visible only on touch smartphones. The existing desktop control remains unchanged and is hidden only in the smartphone view; the mobile balance follows the new selector.
+
+## 2.1.28
+- IT: Il selettore manuale del conto liquido e il relativo calcolo del saldo sono limitati agli smartphone (schermo fino a 600 px e puntatore touch). Desktop e tablet mantengono il comportamento precedente.
+- EN: The manual liquid-account selector and its balance calculation are limited to smartphones (up to 600 px viewport and touch pointer). Desktop and tablets retain their previous behavior.
+
+## 2.1.27
+- IT: La Home usa il selettore esplicito del conto liquido: la scelta dell'utente non viene più sostituita dall'autoselezione automatica su smartphone e tablet. Il saldo è calcolato sul conto selezionato anche nei periodi senza movimenti, senza cambiare conto al variare del mese.
+- EN: Overview now uses the explicit liquid-account selector: the user's choice is no longer overridden by automatic selection on phones and tablets. The balance is calculated for the selected account even in periods without transactions, without switching accounts when the month changes.
+
+## 2.1.26
+- IT: L'autoselezione dei conti liquidi in base ai movimenti del periodo è attiva anche sui tablet touch in orientamento orizzontale, senza dipendere soltanto dalla larghezza della finestra.
+- EN: Automatic liquid-account selection based on period transactions now also works on touch tablets in landscape orientation, instead of relying only on viewport width.
+
+## 2.1.25
+- IT: I nomi dei conti nella selezione della Home e dei Report vengono mostrati secondo la cronologia valida alla data finale del periodo selezionato, invece di usare sempre la denominazione odierna.
+- EN: Account names in Overview and Reports are now displayed using the name history valid at the selected period end date, rather than always using today's name.
+
+## 2.1.24
+- IT: La selezione del conto nella Home e nei Report su smartphone/tablet segue i conti liquidi effettivamente movimentati nel periodo selezionato; corretta anche la corrispondenza degli ID conto.
+- EN: Account selection in Overview and Reports on phones/tablets now follows the liquid accounts actually used in the selected period; account ID matching is also hardened.
+
 ## [2.1.22] - 2026-11-18
 
 ### Selezione automatica dei conti liquidi nello storico mobile
