@@ -1,5 +1,7 @@
 # Gestione C/C — Documentation / Documentazione
 
+**Versione applicazione / Application version: 2.1.37 · Home Assistant App: 2.1.37 · Integrazione HACS / HACS integration: 1.1.15 (versione indipendente / independent version)**
+
 [Italiano](#italiano) · [English](#english)
 
 ---
@@ -10,7 +12,7 @@
 
 Gestione C/C è un'app Home Assistant che esegue un'applicazione web per la gestione dei conti personali. Il frontend è servito dal container e i dati sono conservati in SQLite nella directory persistente `/data`. I browser autorizzati condividono lo stesso archivio.
 
-Non è un'integrazione Home Assistant e non crea entità o dispositivi Home Assistant.
+L'App non è di per sé un'integrazione Home Assistant e non crea entità o dispositivi. La custom integration HACS è un componente separato, descritto nel [README dell'integrazione](../custom_components/gestione_cc/README.md): espone soltanto informazioni tecniche e comandi di manutenzione autorizzati, non i dati contabili.
 
 ## 2. Requisiti
 
@@ -58,6 +60,12 @@ La chiave privata della CA e le chiavi TLS restano nella directory persistente d
 
 Il database centrale è `/data/gestione_cc.sqlite3`. L'archivio comprende piano dei conti, movimenti, regole, impostazioni, allegati e storico delle modifiche.
 
+### Interfaccia smartphone e registro accessi
+
+L'interfaccia smartphone è disponibile separatamente all'indirizzo `/mobile/`. È una vista in sola lettura con accesso dedicato e API a dati ridotti: permette di consultare i riepiloghi, ma non di inserire o modificare movimenti. La scelta del conto liquido e del periodo aggiorna i valori e i grafici mostrati. L'interfaccia desktop resta disponibile all'indirizzo principale.
+
+Il **Registro accessi** è consultabile dalle Impostazioni. Mostra inizialmente gli ultimi 10 eventi e consente di caricare i successivi gruppi di 10. Sono disponibili filtri combinabili per data iniziale/finale, tipo di evento ed esito. La conservazione è di 30 giorni; filtri e paginazione non modificano gli eventi registrati.
+
 ### Allegati e storico dei movimenti
 
 Dalla riga di un movimento usa **Allegati** per aprire la finestra dedicata. Il pulsante **UPLOAD · Carica allegato** apre il selettore file del computer; dall'elenco puoi scaricare o eliminare ogni documento. Sono ammessi PDF, JPEG e PNG: massimo **5 MB per file** e **15 MB complessivi per singolo movimento**. Non è previsto un limite fisso complessivo per l'archivio. Al raggiungimento di 100 MB compare un avviso informativo, senza bloccare ulteriori caricamenti.
@@ -72,7 +80,7 @@ Usa **Storico** per consultare le modifiche registrate per quel movimento. Lo st
 
 Sono previste funzioni di importazione per backup GnuCash e file QIF, CSV e XLSX supportati dall'interfaccia. La compatibilità dipende dalla struttura concreta del file: conserva sempre una copia originale e verifica i totali dopo l'importazione.
 
-L'importazione GnuCash in modalità aggiunta associa i conti tramite percorso e aggiunge movimenti/regole senza sostituire intenzionalmente l'archivio esistente. Il controllo duplicati aiuta a individuare possibili ripetizioni, ma non sostituisce una verifica contabile.
+L'importazione del Piano dei conti da Excel/CSV controlla intestazioni, righe non importabili e conti duplicati con tipologie incompatibili. Quando i tipi GnuCash non sono espliciti o devono essere adattati, l'interfaccia propone la riconciliazione della classificazione, inclusa la linea di credito. L'importazione dei movimenti conserva i codici dei conti e delle contropartite quando riconosciuti; le contropartite non riconciliate restano da classificare.\n\nL'importazione GnuCash in modalità aggiunta associa i conti tramite percorso e aggiunge movimenti/regole senza sostituire intenzionalmente l'archivio esistente. Il controllo duplicati aiuta a individuare possibili ripetizioni, ma non sostituisce una verifica contabile.
 
 ## 7. Backup e ripristino
 
@@ -165,7 +173,7 @@ Apri una issue GitHub indicando versioni, architettura, log pertinenti e passagg
 
 Gestione C/C is a Home Assistant App running a personal-finance web application. The frontend is served by the App container and accounting data are stored in SQLite under the persistent `/data` directory. Authorised browsers share the same archive.
 
-It is not a Home Assistant integration and does not create Home Assistant entities or devices.
+The App itself is not a Home Assistant integration and does not create Home Assistant entities or devices. The HACS custom integration is a separate component, described in the [integration README](../custom_components/gestione_cc/README.md): it exposes technical information and authorised maintenance commands only, not accounting data.
 
 ## 2. Requirements
 
@@ -213,6 +221,12 @@ The CA private key and TLS keys are stored in the App's persistent data director
 
 The central database is `/data/gestione_cc.sqlite3`. It contains the chart of accounts, transactions, learned rules, application settings, attachments and transaction history.
 
+### Smartphone interface and access log
+
+The dedicated smartphone interface is available at `/mobile/`. It is a read-only view with dedicated access and reduced-data APIs: users can consult summaries but cannot add or edit transactions. Selecting a liquid account and period updates the displayed figures and charts. The desktop interface remains available at the main address.
+
+The **Access Log** is available from Settings. It initially displays the latest 10 events and lets users load subsequent groups of 10. Combinable filters are available for start/end date, event type and outcome. Events are retained for 30 days; filtering and pagination do not modify the recorded events.
+
 ### Transaction attachments and history
 
 Use **Attachments** on a transaction row to open its dedicated dialog. **UPLOAD · Carica allegato** opens the computer's file picker; the list lets you download or delete each document. PDF, JPEG and PNG are supported, with a maximum of **5 MB per file** and **15 MB total per transaction**. There is no fixed overall archive-size cap. At 100 MB the App displays an informational warning but does not block further uploads.
@@ -227,7 +241,7 @@ Use **History** to inspect recorded changes for that transaction. The append-onl
 
 Import functions support GnuCash backups and transaction files in formats exposed by the interface (QIF, CSV, XLSX). Compatibility depends on the actual file structure. Keep the original file and verify totals after import.
 
-GnuCash merge mode maps accounts by account path and adds transactions/rules without intentionally replacing the existing archive. Duplicate detection helps identify possible duplicates but does not replace accounting review.
+Excel/CSV chart-of-accounts import validates headers, non-importable rows and duplicate accounts with incompatible types. When GnuCash types are missing or need adaptation, the interface proposes account-type reconciliation, including credit lines. Transaction import preserves account and counterpart codes when recognised; unresolved counterpart accounts remain pending classification.\n\nGnuCash merge mode maps accounts by account path and adds transactions/rules without intentionally replacing the existing archive. Duplicate detection helps identify possible duplicates but does not replace accounting review.
 
 ## 7. Backup and restore
 
