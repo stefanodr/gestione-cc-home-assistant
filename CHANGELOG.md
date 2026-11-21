@@ -1,3 +1,7 @@
+## 2.1.35
+- IT: Uniformato il menu «Categoria» nelle righe dell'Archivio documenti allo stile degli altri selettori dell'app, mantenendo le stesse opzioni e la modifica della categoria. Aggiornata la versione applicazione e i riferimenti cache. Sincronizzato il changelog nella cartella dell'add-on, così le note della release vengono incluse nei metadati letti da Home Assistant.
+- EN: Matched the “Category” menu in Document Archive rows to the styling of the app's other selectors, preserving the same options and category-editing behavior. Updated the application version and cache references. Synchronized the changelog inside the add-on directory so release notes are included in the metadata read by Home Assistant.
+
 ## 2.1.34
 - IT: Allineata la versione mostrata nell'app alla versione 2.1.34. Uniformati altezza, bordi, spaziatura e stato di selezione dei campi di ricerca dell'Archivio documenti e del menu «Backup disponibili su Google Drive». Aggiornata la cache dell'interfaccia desktop.
 - EN: Aligned the version displayed in the app to 2.1.34. Standardized the height, borders, spacing and focus state of the Document Archive search fields and the “Available Google Drive backups” selector. Updated desktop interface cache versions.
