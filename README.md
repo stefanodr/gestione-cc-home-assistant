@@ -11,7 +11,7 @@
 
 **Italiano · English**
 
-## Novità dalla versione 2.1.3
+## Funzionalità introdotte nella versione 2.1.3
 
 La versione **2.1.3** include la PWA dedicata allo smartphone, in sola lettura, con correzione dei grafici delle entrate per categoria e aggiornamento dei sensori versione:
 - Accesso con PIN esistente e sessione smartphone separata.
@@ -21,7 +21,7 @@ La versione **2.1.3** include la PWA dedicata allo smartphone, in sola lettura, 
 
 Dopo l'aggiornamento dell'Home Assistant App, apri `https://<host-lan>:8443/mobile/` dal telefono. La funzione resta LAN-only e richiede il certificato CA HTTPS già installato sul dispositivo.
 
-### What's new in version 2.1.3
+### Features introduced in version 2.1.3
 
 Version **2.1.3** includes the dedicated read-only smartphone PWA, with a fix for income-by-category charts and updated version sensors:
 - Existing PIN authentication with a separate smartphone session.
@@ -43,7 +43,7 @@ Questa distribuzione comprende **tre componenti distinti**, che svolgono ruoli d
 
 **Guide rapide:** [installazione dell'App](#installazione) · [configurazione HACS](#integrazione-home-assistant-tramite-hacs) · [installazione PWA](#pwa-e-installazione-come-app-desktop) · [dettagli dei pulsanti di backup](custom_components/gestione_cc/README.md#pulsanti-di-manutenzione) · [changelog 2.0.0](gestione_cc/CHANGELOG.md).
 
-**Versione smartphone (in sviluppo):** interfaccia separata in sola lettura per consultare saldi, flussi e movimenti dal telefono. Consulta la [documentazione della versione smartphone](docs/SMARTPHONE.md).
+**Interfaccia smartphone:** disponibile in sola lettura su `/mobile/`, con accesso dedicato e API a dati ridotti. Consulta il [manuale dell'App](gestione_cc/DOCS.md#interfaccia-smartphone-e-registro-accessi).
 
 ### What's new in version 2.0.0
 
@@ -79,7 +79,7 @@ Gestione C/C include una **custom integration HACS** per collegare Home Assistan
 - Esempi pronti di dashboard e automazioni.
 - Connessione HTTPS con CA privata, token dedicato e autorizzazioni API limitate.
 
-**Separazione dei dati:** l'integrazione non legge né trasferisce conti, saldi, movimenti, descrizioni, documenti, file di backup o registro accessi. Home Assistant riceve soltanto informazioni tecniche predefinite e può inviare i comandi di manutenzione autorizzati. La versione HACS è indipendente dalla versione dell'app: per questa release è **1.1.7**.
+**Separazione dei dati:** l'integrazione non legge né trasferisce conti, saldi, movimenti, descrizioni, documenti, file di backup o registro accessi. Home Assistant riceve soltanto informazioni tecniche predefinite e può inviare i comandi di manutenzione autorizzati. La versione HACS è indipendente dalla versione dell'app: la versione corrente dell'integrazione è **1.1.15**.
 
 Installazione e configurazione sono descritte nella sezione [Integrazione HACS](#integrazione-home-assistant-tramite-hacs) e nel [manuale dell'integrazione](custom_components/gestione_cc/README.md). Sono disponibili esempi di [dashboard](docs/dashboard_gestione_cc.yaml) e [automazioni](docs/automazioni_gestione_cc.yaml).
 
@@ -231,7 +231,7 @@ L'integrazione può esporre informazioni tecniche relative a disponibilità, ver
 
 **Non vengono esposti** movimenti, descrizioni, conti, saldi, dati di budget, contenuti documentali, file di backup o registro accessi. Non vengono creati sensori finanziari. Il token è una credenziale: non inserirlo in dashboard, automazioni condivise, screenshot o repository pubblici.
 
-La verifica TLS resta obbligatoria. Non usare HTTP, non disabilitare la verifica del certificato e non esporre la porta dell'App su Internet. La versione HACS è indipendente e, per questa release, è **1.1.7**.
+La verifica TLS resta obbligatoria. Non usare HTTP, non disabilitare la verifica del certificato e non esporre la porta dell'App su Internet. La versione HACS è indipendente e la versione corrente dell'integrazione è **1.1.15**.
 
 Per i dettagli aggiornati consulta il [README tecnico dell'integrazione](custom_components/gestione_cc/README.md).
 
@@ -347,7 +347,7 @@ Per le novità della versione installata consulta le [note di rilascio](CHANGELO
 
 L'uso gratuito è consentito alle persone fisiche per finalità personali e non commerciali, nei limiti della licenza. Gli usi professionali, aziendali e commerciali richiedono un accordo scritto.
 
-Versione Home Assistant App: **2.1.1**. Versione dell'app inclusa: **2.1.1**. Versione custom integration HACS: **1.1.7** (indipendente).
+Versione Home Assistant App: **2.1.37**. Versione dell'app inclusa: **2.1.37**. Versione custom integration HACS: **1.1.15** (indipendente).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). Tutti i diritti riservati salvo i permessi espressamente concessi.
 
@@ -459,7 +459,7 @@ The integration can expose technical information about availability, versions, u
 
 **It does not expose** transactions, descriptions, accounts, balances, budget data, document contents, backup files or access logs. No financial sensors are created. Treat the token as a credential: never put it in dashboards, shared automations, screenshots or public repositories.
 
-TLS verification remains mandatory. Do not use HTTP, disable certificate verification or expose the App port to the Internet. The HACS integration has its own independent version; it is **1.1.7** for this release.
+TLS verification remains mandatory. Do not use HTTP, disable certificate verification or expose the App port to the Internet. The HACS integration has its own independent version; the current integration version is **1.1.15**.
 
 See the [integration technical README](custom_components/gestione_cc/README.md) for further details.
 
@@ -577,7 +577,7 @@ See the [release notes](CHANGELOG.md) for changes in each version.
 
 Free use is permitted to individuals for personal, non-commercial purposes, subject to the licence terms. Professional, business and commercial uses require a written agreement.
 
-Home Assistant App version: **2.1.14**. Bundled application version: **2.1.14**. HACS custom integration version: **1.1.7** (independent).
+Home Assistant App version: **2.1.37**. Bundled application version: **2.1.37**. HACS custom integration version: **1.1.15** (independent).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). All rights reserved except where permissions are expressly granted.
 
