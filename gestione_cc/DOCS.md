@@ -78,7 +78,7 @@ La voce **Archivio documenti** nel menu laterale consente di cercare nei nomi de
 
 Usa **Storico** per consultare le modifiche registrate per quel movimento. Lo storico è append-only e conserva data/ora, tipo di evento e valori precedenti/nuovi dei campi modificati. Le modifiche sono registrate quando il server riceve e salva lo stato; le modifiche effettuate prima dell'aggiornamento non possono essere ricostruite retroattivamente.
 
-Sono previste funzioni di importazione per backup GnuCash e file QIF, CSV e XLSX supportati dall'interfaccia. La compatibilità dipende dalla struttura concreta del file: conserva sempre una copia originale e verifica i totali dopo l'importazione.
+Sono previste funzioni di importazione per backup GnuCash e file di movimenti QIF, OFX, CSV, XLSX e TXT con struttura QIF supportati dall'interfaccia. La compatibilità dipende dalla struttura concreta del file: conserva sempre una copia originale e verifica i totali dopo l'importazione.
 
 L'importazione del Piano dei conti da Excel/CSV controlla intestazioni, righe non importabili e conti duplicati con tipologie incompatibili. Quando i tipi GnuCash non sono espliciti o devono essere adattati, l'interfaccia propone la riconciliazione della classificazione, inclusa la linea di credito. L'importazione dei movimenti conserva i codici dei conti e delle contropartite quando riconosciuti; le contropartite non riconciliate restano da classificare.
 
@@ -241,7 +241,7 @@ The **Document archive** menu searches filenames, OCR text and extracted metadat
 
 Use **History** to inspect recorded changes for that transaction. The append-only log stores timestamps, event types and before/after field values. Changes made before this update cannot be reconstructed retroactively.
 
-Import functions support GnuCash backups and transaction files in formats exposed by the interface (QIF, CSV, XLSX). Compatibility depends on the actual file structure. Keep the original file and verify totals after import.
+Import functions support GnuCash backups and transaction files in formats exposed by the interface (QIF, OFX, CSV, XLSX and QIF-structured TXT). Compatibility depends on the actual file structure. Keep the original file and verify totals after import.
 
 Excel/CSV chart-of-accounts import validates headers, non-importable rows and duplicate accounts with incompatible types. When GnuCash types are missing or need adaptation, the interface proposes account-type reconciliation, including credit lines. Transaction import preserves account and counterpart codes when recognised; unresolved counterpart accounts remain pending classification.
 
