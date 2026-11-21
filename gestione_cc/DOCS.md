@@ -80,7 +80,9 @@ Usa **Storico** per consultare le modifiche registrate per quel movimento. Lo st
 
 Sono previste funzioni di importazione per backup GnuCash e file QIF, CSV e XLSX supportati dall'interfaccia. La compatibilità dipende dalla struttura concreta del file: conserva sempre una copia originale e verifica i totali dopo l'importazione.
 
-L'importazione del Piano dei conti da Excel/CSV controlla intestazioni, righe non importabili e conti duplicati con tipologie incompatibili. Quando i tipi GnuCash non sono espliciti o devono essere adattati, l'interfaccia propone la riconciliazione della classificazione, inclusa la linea di credito. L'importazione dei movimenti conserva i codici dei conti e delle contropartite quando riconosciuti; le contropartite non riconciliate restano da classificare.\n\nL'importazione GnuCash in modalità aggiunta associa i conti tramite percorso e aggiunge movimenti/regole senza sostituire intenzionalmente l'archivio esistente. Il controllo duplicati aiuta a individuare possibili ripetizioni, ma non sostituisce una verifica contabile.
+L'importazione del Piano dei conti da Excel/CSV controlla intestazioni, righe non importabili e conti duplicati con tipologie incompatibili. Quando i tipi GnuCash non sono espliciti o devono essere adattati, l'interfaccia propone la riconciliazione della classificazione, inclusa la linea di credito. L'importazione dei movimenti conserva i codici dei conti e delle contropartite quando riconosciuti; le contropartite non riconciliate restano da classificare.
+
+L'importazione GnuCash in modalità aggiunta associa i conti tramite percorso e aggiunge movimenti/regole senza sostituire intenzionalmente l'archivio esistente. Il controllo duplicati aiuta a individuare possibili ripetizioni, ma non sostituisce una verifica contabile.
 
 ## 7. Backup e ripristino
 
@@ -241,7 +243,9 @@ Use **History** to inspect recorded changes for that transaction. The append-onl
 
 Import functions support GnuCash backups and transaction files in formats exposed by the interface (QIF, CSV, XLSX). Compatibility depends on the actual file structure. Keep the original file and verify totals after import.
 
-Excel/CSV chart-of-accounts import validates headers, non-importable rows and duplicate accounts with incompatible types. When GnuCash types are missing or need adaptation, the interface proposes account-type reconciliation, including credit lines. Transaction import preserves account and counterpart codes when recognised; unresolved counterpart accounts remain pending classification.\n\nGnuCash merge mode maps accounts by account path and adds transactions/rules without intentionally replacing the existing archive. Duplicate detection helps identify possible duplicates but does not replace accounting review.
+Excel/CSV chart-of-accounts import validates headers, non-importable rows and duplicate accounts with incompatible types. When GnuCash types are missing or need adaptation, the interface proposes account-type reconciliation, including credit lines. Transaction import preserves account and counterpart codes when recognised; unresolved counterpart accounts remain pending classification.
+
+GnuCash merge mode maps accounts by account path and adds transactions/rules without intentionally replacing the existing archive. Duplicate detection helps identify possible duplicates but does not replace accounting review.
 
 ## 7. Backup and restore
 
