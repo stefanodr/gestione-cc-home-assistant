@@ -36,12 +36,12 @@ After updating the Home Assistant App, open `https://<lan-host>:8443/mobile/` on
 Questa distribuzione comprende **tre componenti distinti**, che svolgono ruoli diversi:
 
 - **Home Assistant App (server):** ospita Gestione C/C, l'interfaccia web e il database SQLite persistente.
-- **Integrazione personalizzata HACS (v1.1.7):** collega Home Assistant al server e aggiunge sensori di monitoraggio tecnico e pulsanti di manutenzione. Non importa in Home Assistant conti, saldi o movimenti.
+- **Integrazione HACS facoltativa:** componente separato, con repository e ciclo di versione indipendenti. [Documentazione e installazione](https://github.com/stefanodr/gestione-cc-integration).
 - **PWA (Progressive Web App):** permette di installare l'interfaccia come finestra/app sul PC o su un dispositivo compatibile. Non è un programma autonomo e richiede che il server Home Assistant sia raggiungibile.
 
-**Novità documentate nella 2.0.0:** integrazione HACS con autenticazione tramite token e certificato CA privata; monitoraggio di disponibilità, database, backup, spazio e processi; comandi di backup locale, backup Google Drive e controllo integrità; manifest e icone PWA con istruzioni per Chrome, Edge e Firefox su Windows.
+**Novità documentate nella 2.0.0:** integrazione HACS separata con autenticazione tramite token e certificato CA privata; manifest e icone PWA con istruzioni per Chrome, Edge e Firefox su Windows. I dettagli dell'integrazione sono mantenuti nel [repository dedicato](https://github.com/stefanodr/gestione-cc-integration).
 
-**Guide rapide:** [installazione dell'App](#installazione) · [configurazione HACS](#integrazione-home-assistant-tramite-hacs) · [installazione PWA](#pwa-e-installazione-come-app-desktop) · [dettagli dei pulsanti di backup](custom_components/gestione_cc/README.md#pulsanti-di-manutenzione) · [changelog 2.0.0](gestione_cc/CHANGELOG.md).
+**Guide rapide:** [installazione dell'App](#installazione) · [repository dell'integrazione HACS](https://github.com/stefanodr/gestione-cc-integration) · [installazione PWA](#pwa-e-installazione-come-app-desktop) · [changelog](gestione_cc/CHANGELOG.md).
 
 **Interfaccia smartphone:** disponibile in sola lettura su `/mobile/`, con accesso dedicato e API a dati ridotti. Consulta il [manuale dell'App](gestione_cc/DOCS.md#interfaccia-smartphone-e-registro-accessi).
 
@@ -50,12 +50,12 @@ Questa distribuzione comprende **tre componenti distinti**, che svolgono ruoli d
 This distribution includes **three separate components** with different roles:
 
 - **Home Assistant App (server):** hosts Gestione C/C, its web interface and persistent SQLite database.
-- **HACS custom integration (v1.1.7):** connects Home Assistant to the server and adds technical monitoring sensors and maintenance buttons. It does not import account, balance or transaction data into Home Assistant.
+- **Optional HACS integration:** a separate component with its own repository and release cycle. [Documentation and installation](https://github.com/stefanodr/gestione-cc-integration).
 - **PWA (Progressive Web App):** lets you install the interface as a dedicated app/window on a PC or compatible device. It is not a standalone program and requires the Home Assistant server to be reachable.
 
-**Version 2.0.0 highlights:** HACS integration authenticated with a dedicated token and private CA certificate; monitoring of availability, database, backups, storage and jobs; local backup, Google Drive backup and integrity-check commands; PWA manifest and icons with Chrome, Edge and Firefox for Windows installation instructions.
+**Version 2.0.0 highlights:** separate HACS integration with dedicated-token authentication and private CA certificate; PWA manifest and icons with Chrome, Edge and Firefox for Windows installation instructions. Integration details are maintained in the [dedicated repository](https://github.com/stefanodr/gestione-cc-integration).
 
-**Quick links:** [Install the App](#installation) · [Set up HACS](#home-assistant-integration-through-hacs) · [Install the PWA](#pwa-and-desktop-app-installation) · [Backup button details](custom_components/gestione_cc/README.md#maintenance-buttons) · [version 2.0.0 changelog](gestione_cc/CHANGELOG.md).
+**Quick links:** [Install the App](#installation) · [HACS integration repository](https://github.com/stefanodr/gestione-cc-integration) · [Install the PWA](#pwa-and-desktop-app-installation) · [changelog](gestione_cc/CHANGELOG.md).
 
 > [!IMPORTANT]
 > **SCHERMATE DIMOSTRATIVE — DATI FITTIZI**
@@ -71,169 +71,13 @@ This distribution includes **three separate components** with different roles:
 
 ## Integrazione Home Assistant tramite HACS
 
-Gestione C/C include una **custom integration HACS** per collegare Home Assistant all'istanza dell'app e monitorarne esclusivamente lo stato tecnico.
+L'integrazione HACS è **facoltativa** e viene distribuita e documentata separatamente dall'App. L'App funziona autonomamente anche senza installare l'integrazione.
 
-- Sensori per disponibilità, versione app e integrazione, uptime, database, backup, spazio, allegati e processi.
-- Sensori binari per gli stati tecnici supportati.
-- Pulsanti di manutenzione: **Backup totale/locale** (crea una copia SQLite completa del database sul server Home Assistant, con conservazione delle ultime 30 copie locali), **Backup Google Drive** (crea una copia SQLite e la carica nel Drive collegato, mantenendo gli ultimi 3 backup notturni) e **Controllo integrità** (esegue `PRAGMA integrity_check` sul database). I comandi vengono accodati ed eseguiti in background.
-- Esempi pronti di dashboard e automazioni.
-- Connessione HTTPS con CA privata, token dedicato e autorizzazioni API limitate.
+Per installazione, configurazione, requisiti, compatibilità, entità, servizi, sicurezza ed esempi aggiornati, consulta il repository dedicato:
 
-**Separazione dei dati:** l'integrazione non legge né trasferisce conti, saldi, movimenti, descrizioni, documenti, file di backup o registro accessi. Home Assistant riceve soltanto informazioni tecniche predefinite e può inviare i comandi di manutenzione autorizzati. La versione HACS è indipendente dalla versione dell'app: la versione corrente dell'integrazione è **1.1.15**.
+**[Apri il repository Gestione C/C – Integrazione Home Assistant](https://github.com/stefanodr/gestione-cc-integration)**
 
-Installazione e configurazione sono descritte nella sezione [Integrazione HACS](#integrazione-home-assistant-tramite-hacs) e nel [manuale dell'integrazione](custom_components/gestione_cc/README.md). Sono disponibili esempi di [dashboard](docs/dashboard_gestione_cc.yaml) e [automazioni](docs/automazioni_gestione_cc.yaml).
-
----
-
-## Funzionalità principali
-
-- **Migrazione da GnuCash:** importa piano dei conti, movimenti e regole da un libro GnuCash in formato XML, anche compresso con GZIP, mantenendo i dati già presenti. [Dettagli sull'importazione](gestione_cc/DOCS.md#6-dati-importazione-e-compatibilità).
-- **Importazione del piano dei conti:** carica conti e sottoconti da file Excel `.xlsx` o `.csv`, utilizzando il modello disponibile nell'app. [Dettagli](gestione_cc/DOCS.md#6-dati-importazione-e-compatibilità).
-- **Importazione dei movimenti:** supporta `.qif`, `.txt` con struttura QIF, `.ofx`, `.csv` e `.xlsx`. [Dettagli e compatibilità](gestione_cc/DOCS.md#6-dati-importazione-e-compatibilità).
-- **Ripartizione dei movimenti:** suddivide un'operazione tra più conti o categorie e conserva lo storico delle modifiche. [Registro movimenti](#registro-movimenti).
-- **Allegati e archivio documentale:** associa PDF, JPEG/JPG e PNG ai movimenti oppure archivia documenti autonomi; OCR, indicizzazione, ricerca e modifica dei metadati. Massimo 5 MB per file e 15 MB per movimento; avviso al raggiungimento di 100 MB complessivi, senza bloccare i caricamenti. [Dettagli](gestione_cc/DOCS.md#allegati-e-storico-dei-movimenti).
-- **Ricerca avanzata:** filtra i movimenti per testo, periodo, importo, conto e stato, con possibilità di salvare i filtri. [Registro movimenti](#registro-movimenti).
-- **Budget e previsioni:** gestisce i budget e stima l'andamento futuro delle entrate e delle uscite. [Budget e previsioni](#budget-e-previsioni).
-- **Report:** analisi mensili, trimestrali, semestrali e annuali, confronti tra periodi, scostamenti per categoria ed esportazione in XLSX o PDF. [Sezione Report](#report).
-- **Backup e ripristino:** backup JSON e SQLite, copie automatiche locali e backup facoltativo su Google Drive. [Guida backup e ripristino](gestione_cc/DOCS.md#7-backup-e-ripristino) · [Guida Google Drive](docs/GOOGLE_DRIVE_BACKUP.md).
-
----
-
-## Indice / Contents
-
-- [Italiano](#italiano)
-  - [Presentazione](#presentazione)
-  - [Funzionalità](#funzionalità)
-  - [Requisiti](#requisiti)
-  - [Installazione](#installazione)
-  - [Integrazione Home Assistant tramite HACS](#integrazione-home-assistant-tramite-hacs)
-  - [PWA e installazione come app desktop](#pwa-e-installazione-come-app-desktop)
-  - [Configurazione e primo accesso](#configurazione-e-primo-accesso)
-  - [Sicurezza e privacy](#sicurezza-e-privacy)
-  - [Dati, backup e ripristino](#dati-backup-e-ripristino)
-  - [Aggiornamenti](#aggiornamenti)
-  - [Supporto e licenza](#supporto-e-licenza)
-- [English](#english)
-  - [Overview](#overview)
-  - [Features](#features)
-  - [Requirements](#requirements)
-  - [Installation](#installation)
-  - [Home Assistant integration through HACS](#home-assistant-integration-through-hacs)
-  - [PWA and desktop app installation](#pwa-and-desktop-app-installation)
-  - [Configuration and first access](#configuration-and-first-access)
-  - [Security and privacy](#security-and-privacy)
-  - [Data, backup and restore](#data-backup-and-restore)
-  - [Updates](#updates)
-  - [Support and licence](#support-and-licence)
-
----
-
-# Italiano
-
-## Presentazione
-
-**Gestione C/C** è un'applicazione web self-hosted per la gestione dei conti personali, la registrazione dei movimenti e l'analisi dei flussi finanziari. Questa edizione viene distribuita come **Home Assistant App** (in precedenza denominata add-on) e conserva i dati in un database SQLite persistente sul server Home Assistant.
-
-L'applicazione permette di consultare in un unico ambiente entrate, uscite, saldi, categorie, budget e andamento nel tempo. Supporta inoltre l'importazione di archivi GnuCash e di file di movimenti nei formati previsti.
-
-È pensata per l'uso personale in rete locale e non richiede un servizio cloud esterno.
-
-> **Importante:** questa è una Home Assistant App, non un'integrazione, una dashboard card o un plugin del Marketplace. Si installa dal catalogo delle App di Home Assistant.
-
-## Funzionalità
-
-### Panoramica finanziaria
-- Riepilogo di entrate, uscite e saldo netto del periodo.
-- Consultazione dei saldi e dell'andamento storico.
-- Grafici dei flussi finanziari e delle spese per categoria.
-- Selezione del conto e del periodo di analisi.
-
-### Registro movimenti
-- Consultazione, ricerca avanzata e filtraggio dei movimenti per testo, periodo, importo, conto e stato; possibilità di salvare i filtri.
-- Inserimento manuale e importazione di movimenti da QIF, TXT (struttura QIF), OFX, CSV e XLSX.
-- Importazione del piano dei conti da Excel XLSX o CSV tramite il modello previsto.
-- Classificazione e ripartizione di una singola operazione tra più conti o categorie.
-- Allegati PDF, JPEG/JPG e PNG associabili ai movimenti e archivio documentale autonomo: massimo 5 MB per file e 15 MB complessivi per movimento; avviso informativo al raggiungimento di 100 MB nell'archivio, senza bloccare ulteriori caricamenti.
-- OCR locale, indicizzazione e ricerca nell'archivio documentale; modifica dei metadati riconosciuti.
-- Storico append-only delle creazioni, modifiche e cancellazioni, con data/ora e valori precedenti e nuovi.
-
-### Piano dei conti e classificazione
-- Struttura gerarchica di conti e sottoconti.
-- Importazione del piano dei conti da GnuCash e da file Excel XLSX o CSV.
-- Compatibilità con i conti importati da GnuCash.
-- Suggerimenti e regole locali basati sulle classificazioni confermate.
-
-### Budget e previsioni
-- Gestione dei budget e confronto tra valori previsti ed effettivi.
-- Previsioni future basate sullo storico e sui movimenti programmati.
-
-### Report
-- Analisi mensile, trimestrale, semestrale e annuale.
-- Confronti storici e analisi degli scostamenti per categoria.
-- Esportazione dei report in XLSX e PDF tramite la funzione di stampa del browser.
-
-### Archivio e protezione
-- Database SQLite persistente sul server Home Assistant.
-- Accesso protetto da PIN amministratore di 6 cifre.
-- Connessione HTTPS.
-- Backup e ripristino in formato JSON e SQLite, con copie automatiche locali e backup facoltativo su Google Drive.
-
-> Le funzioni disponibili e il relativo comportamento dipendono dalla versione installata. Per l'elenco delle modifiche consultare il [CHANGELOG](CHANGELOG.md).
-
-## Requisiti
-
-- Home Assistant OS con Supervisor e catalogo App.
-- Architettura `amd64` oppure `aarch64`.
-- Rete locale raggiungibile dai dispositivi client.
-- Hostname locale risolvibile dai client.
-- Subnet LAN corretta da indicare nell'opzione `lan_network`.
-- Browser moderno con JavaScript abilitato.
-
-## Installazione
-
-1. In Home Assistant apri **Impostazioni → App**.
-2. Apri il menu in alto a destra e seleziona **Repository**.
-3. Aggiungi il repository:
-
-   `https://github.com/stefanodr/gestione-cc-home-assistant`
-
-4. Aggiorna l'elenco delle App, cerca **Gestione C/C** e installala.
-5. Prima del primo avvio, configura il PIN iniziale di **esattamente 6 cifre**.
-6. Controlla le opzioni `hostname` e `lan_network`. Quest'ultima deve corrispondere alla subnet reale della tua rete locale: non mantenere un valore di esempio senza averlo verificato.
-7. Avvia l'App e apri nel browser:
-
-   `https://<hostname-locale>:8443`
-
-   Per esempio, `https://homeassistant.local:8443`, se il nome è risolvibile nella tua rete.
-
-8. Al primo accesso il browser può segnalare che il certificato è emesso da una CA privata. Accedi solo dalla rete locale, scarica la CA dalla pagina di login/Impostazioni e installala sui dispositivi autorizzati seguendo la [documentazione](gestione_cc/DOCS.md).
-
-## Integrazione Home Assistant tramite HACS
-
-Questa integrazione è distinta dall'Home Assistant App che ospita il server Gestione C/C. L'App fornisce database e interfaccia web; la custom integration collega Home Assistant al servizio tecnico dell'App.
-
-### Installazione
-1. Apri **HACS → Integrazioni**.
-2. Apri il menu in alto a destra e scegli **Repository personalizzati**.
-3. Inserisci `https://github.com/stefanodr/gestione-cc-home-assistant` e seleziona la categoria **Integrazione**.
-4. Aggiungi il repository e installa **Gestione C/C**.
-5. Riavvia Home Assistant.
-6. Dall'interfaccia Gestione C/C apri **Impostazioni → Integrazione Home Assistant** e genera il token dedicato.
-7. Dalla sezione Sicurezza/Certificati scarica la CA privata dell'App e copiala nella cartella `/ssl` di Home Assistant, ad esempio come `/ssl/gestione-cc-ca.crt`.
-8. In Home Assistant apri **Impostazioni → Dispositivi e servizi → Aggiungi integrazione**, cerca **Gestione C/C** e inserisci:
-   - URL HTTPS LAN dell'App, ad esempio `https://192.168.1.27:8443`;
-   - token dedicato generato nell'app;
-   - percorso della CA, ad esempio `/ssl/gestione-cc-ca.crt`.
-9. Completa la configurazione e verifica che i sensori tecnici risultino disponibili.
-
-### Entità e privacy
-L'integrazione può esporre informazioni tecniche relative a disponibilità, versioni, uptime, database, backup, spazio, allegati e processi, oltre a sensori binari e pulsanti di manutenzione. I pulsanti consentono esclusivamente le operazioni autorizzate dall'API tecnica.
-
-**Non vengono esposti** movimenti, descrizioni, conti, saldi, dati di budget, contenuti documentali, file di backup o registro accessi. Non vengono creati sensori finanziari. Il token è una credenziale: non inserirlo in dashboard, automazioni condivise, screenshot o repository pubblici.
-
-La verifica TLS resta obbligatoria. Non usare HTTP, non disabilitare la verifica del certificato e non esporre la porta dell'App su Internet. La versione HACS è indipendente e la versione corrente dell'integrazione è **1.1.15**.
-
-Per i dettagli aggiornati consulta il [README tecnico dell'integrazione](custom_components/gestione_cc/README.md).
+L'integrazione richiede che l'App Gestione C/C sia installata e raggiungibile tramite la rete locale. L'installazione HACS non installa l'App.
 
 ## PWA e installazione come app desktop
 
@@ -347,7 +191,7 @@ Per le novità della versione installata consulta le [note di rilascio](CHANGELO
 
 L'uso gratuito è consentito alle persone fisiche per finalità personali e non commerciali, nei limiti della licenza. Gli usi professionali, aziendali e commerciali richiedono un accordo scritto.
 
-Versione Home Assistant App: **2.1.37**. Versione dell'app inclusa: **2.1.37**. Versione custom integration HACS: **1.1.15** (indipendente).
+Versione Home Assistant App: **2.1.37**. Versione dell'app inclusa: **2.1.37**. L'integrazione HACS ha un versionamento indipendente: consulta il [repository dedicato](https://github.com/stefanodr/gestione-cc-integration).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). Tutti i diritti riservati salvo i permessi espressamente concessi.
 
@@ -438,30 +282,13 @@ It is designed for personal use on a local network and does not require an exter
 
 ## Home Assistant integration through HACS
 
-This integration is separate from the Home Assistant App that hosts the Gestione C/C server. The App provides the database and web interface; the custom integration connects Home Assistant to the App's technical service.
+The HACS integration is **optional** and is distributed and documented separately from the App. Gestione C/C works independently without installing the integration.
 
-### Installation
-1. Open **HACS → Integrations**.
-2. Open the top-right menu and choose **Custom repositories**.
-3. Enter `https://github.com/stefanodr/gestione-cc-home-assistant` and select the **Integration** category.
-4. Add the repository and install **Gestione C/C**.
-5. Restart Home Assistant.
-6. In Gestione C/C, open **Settings → Home Assistant Integration** and generate the dedicated token.
-7. From the Security/Certificates section, download the App's private CA and copy it into Home Assistant's `/ssl` folder, for example as `/ssl/gestione-cc-ca.crt`.
-8. In Home Assistant, open **Settings → Devices & services → Add integration**, search for **Gestione C/C**, and provide:
-   - the App's LAN HTTPS URL, e.g. `https://192.168.1.27:8443`;
-   - the dedicated token generated by the app;
-   - the CA path, e.g. `/ssl/gestione-cc-ca.crt`.
-9. Complete setup and verify that the technical entities are available.
+For current installation instructions, configuration, requirements, compatibility, entities, services, security information and examples, visit the dedicated repository:
 
-### Entities and privacy
-The integration can expose technical information about availability, versions, uptime, database, backups, storage, attachments and processes, as well as supported binary sensors and maintenance buttons. Buttons can only invoke operations explicitly authorised by the technical API.
+**[Open Gestione C/C – Home Assistant Integration](https://github.com/stefanodr/gestione-cc-integration)**
 
-**It does not expose** transactions, descriptions, accounts, balances, budget data, document contents, backup files or access logs. No financial sensors are created. Treat the token as a credential: never put it in dashboards, shared automations, screenshots or public repositories.
-
-TLS verification remains mandatory. Do not use HTTP, disable certificate verification or expose the App port to the Internet. The HACS integration has its own independent version; the current integration version is **1.1.15**.
-
-See the [integration technical README](custom_components/gestione_cc/README.md) for further details.
+The integration requires the Gestione C/C App to be installed and reachable over the local network. Installing it through HACS does not install the App.
 
 ## PWA and desktop app installation
 
@@ -577,7 +404,7 @@ See the [release notes](CHANGELOG.md) for changes in each version.
 
 Free use is permitted to individuals for personal, non-commercial purposes, subject to the licence terms. Professional, business and commercial uses require a written agreement.
 
-Home Assistant App version: **2.1.37**. Bundled application version: **2.1.37**. HACS custom integration version: **1.1.15** (independent).
+Home Assistant App version: **2.1.37**. Bundled application version: **2.1.37**. The HACS integration is versioned independently; see its [dedicated repository](https://github.com/stefanodr/gestione-cc-integration).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). All rights reserved except where permissions are expressly granted.
 
