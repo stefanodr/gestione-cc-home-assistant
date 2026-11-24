@@ -191,7 +191,7 @@ Per le novità della versione installata consulta le [note di rilascio](CHANGELO
 
 L'uso gratuito è consentito alle persone fisiche per finalità personali e non commerciali, nei limiti della licenza. Gli usi professionali, aziendali e commerciali richiedono un accordo scritto.
 
-Versione Home Assistant App: **2.1.37**. Versione dell'app inclusa: **2.1.37**. L'integrazione HACS ha un versionamento indipendente: consulta il [repository dedicato](https://github.com/stefanodr/gestione-cc-integration).
+Versione Home Assistant App: **2.1.38**. Versione dell'app inclusa: **2.1.38**. L'integrazione HACS ha un versionamento indipendente: consulta il [repository dedicato](https://github.com/stefanodr/gestione-cc-integration).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). Tutti i diritti riservati salvo i permessi espressamente concessi.
 
@@ -404,7 +404,7 @@ See the [release notes](CHANGELOG.md) for changes in each version.
 
 Free use is permitted to individuals for personal, non-commercial purposes, subject to the licence terms. Professional, business and commercial uses require a written agreement.
 
-Home Assistant App version: **2.1.37**. Bundled application version: **2.1.37**. The HACS integration is versioned independently; see its [dedicated repository](https://github.com/stefanodr/gestione-cc-integration).
+Home Assistant App version: **2.1.38**. Bundled application version: **2.1.38**. The HACS integration is versioned independently; see its [dedicated repository](https://github.com/stefanodr/gestione-cc-integration).
 
 Copyright © 2026 Stefano Di Ricco (`stefanodr`). All rights reserved except where permissions are expressly granted.
 

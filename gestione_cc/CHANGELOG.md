@@ -1,3 +1,7 @@
+## 2.1.38
+- IT: Corretta l’importazione dei movimenti bancari rimuovendo il riferimento obsoleto a `statementMonth`, che causava un errore durante l’importazione.
+- EN: Fixed bank transaction imports by removing the obsolete `statementMonth` reference that caused an import error.
+
 ## 2.1.37
 - IT: Approfondita la Guida all'utilizzo in italiano verificando le procedure sul codice applicativo: gerarchia e vincoli del Piano dei conti; inserimento e modifica massiva dei movimenti; segni delle ripartizioni; criteri di importazione e duplicati; filtri e risultati della Ricerca avanzata; calcolo delle proposte Budget; logica delle Previsioni e delle ricorrenze; criteri degli scostamenti Report; correzione dei metadati OCR; differenze tra ripristino JSON, SQLite e Google Drive; comportamento effettivo delle regole apprese. Allineata anche la versione inglese, mantenendo i 12 capitoli e la struttura della guida.
 - EN: Expanded the English User Guide alongside the Italian version, based on verified application behavior: chart-of-accounts hierarchy and constraints; transaction entry and bulk editing; split signs; import and duplicate-detection rules; Advanced Search filters and results; Budget proposal calculations; Forecast and recurring-item logic; Report deviation baselines; OCR metadata corrections; JSON, SQLite and Google Drive restore differences; and learned-rule behavior. Retained the 12-chapter structure.

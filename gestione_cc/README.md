@@ -1,6 +1,6 @@
 # Gestione C/C — Home Assistant App
 
-**Versione Home Assistant App: 2.1.37 · Versione applicazione inclusa: 2.1.37 · Integrazione HACS: 1.1.15**
+**Versione Home Assistant App: 2.1.38 · Versione applicazione inclusa: 2.1.38 · Integrazione HACS: 1.1.15**
 
 Applicazione web self-hosted per la gestione dei conti personali, distribuita come Home Assistant App. I dati operativi sono conservati in un database SQLite persistente sul server Home Assistant.
 
@@ -146,6 +146,6 @@ See the [full App manual](DOCS.md), the [main bilingual README](../README.md), t
 
 ---
 
-**Versions:** Home Assistant App **2.1.37** · bundled application **2.1.37** · HACS custom integration **1.1.15** (independent).
+**Versions:** Home Assistant App **2.1.38** · bundled application **2.1.38** · HACS custom integration **1.1.15** (independent).
 
 Support: [GitHub Issues](https://github.com/stefanodr/gestione-cc-home-assistant/issues). Never publish databases, backups, PINs, private certificates, cookies or real financial data.

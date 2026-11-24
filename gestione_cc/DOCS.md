@@ -1,6 +1,6 @@
 # Gestione C/C — Documentation / Documentazione
 
-**Versione applicazione / Application version: 2.1.37 · Home Assistant App: 2.1.37 · Integrazione HACS / HACS integration: 1.1.15 (versione indipendente / independent version)**
+**Versione applicazione / Application version: 2.1.38 · Home Assistant App: 2.1.38 · Integrazione HACS / HACS integration: 1.1.15 (versione indipendente / independent version)**
 
 [Italiano](#italiano) · [English](#english)
 
