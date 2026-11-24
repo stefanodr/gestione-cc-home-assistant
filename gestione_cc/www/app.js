@@ -3495,7 +3495,7 @@
         state.lastImportBankAccountId=selectedImportAccount;
         const reportAccount=selectedImportAccount;
         const mostRecentImport=unique.map(tx=>tx.date).filter(Boolean).sort().at(-1);
-        if(mostRecentImport){const month=mostRecentImport.slice(0,7);state.selectedMonth=month;$('#monthPicker').value=month;syncReportPeriodPicker(month);$('#statementMonth').value=month;}
+        if(mostRecentImport){const month=mostRecentImport.slice(0,7);state.selectedMonth=month;$('#monthPicker').value=month;syncReportPeriodPicker(month);}
         state.reportAccountId=reportAccount;
         $('#accountPicker').value=reportAccount;$('#reportAccountPicker').value=reportAccount;
         const saved = await saveState();
